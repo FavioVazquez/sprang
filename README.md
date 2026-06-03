@@ -251,7 +251,7 @@ cd ../..
 ```bash
 # Verify
 which sprang        # should print $PNPM_HOME/sprang
-sprang --version    # 0.1.1
+sprang --version    # 0.1.2
 sprang --help
 ```
 
