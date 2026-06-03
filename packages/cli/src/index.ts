@@ -3,6 +3,8 @@ import { Command } from 'commander';
 import { makeScanCommand } from './commands/scan.js';
 import { makeHealthCommand } from './commands/health.js';
 import { makeQueryCommand } from './commands/query.js';
+import { makeWatchCommand } from './commands/watch.js';
+import { makeStatusCommand } from './commands/status.js';
 
 const program = new Command();
 
@@ -14,5 +16,7 @@ program
 program.addCommand(makeScanCommand());
 program.addCommand(makeHealthCommand());
 program.addCommand(makeQueryCommand());
+program.addCommand(makeWatchCommand());
+program.addCommand(makeStatusCommand());
 
 program.parse(process.argv);

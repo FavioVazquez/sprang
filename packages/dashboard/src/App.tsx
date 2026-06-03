@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Activity,
   Globe,
@@ -170,7 +170,7 @@ export default function App() {
               <button
                 key={id}
                 onClick={() => setCurrentView(id)}
-                className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+                className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sprang-500 ${
                   currentView === id
                     ? 'text-surface-50 bg-surface-800'
                     : 'text-surface-500 hover:text-surface-300 hover:bg-surface-800/50'

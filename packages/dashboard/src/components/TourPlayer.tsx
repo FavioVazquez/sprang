@@ -127,7 +127,7 @@ export function TourPlayer({
                     key={idx}
                     onClick={() => onStepChange(idx)}
                     aria-label={`Go to step ${idx + 1}`}
-                    className={`rounded-full transition-all duration-200 ${
+                    className={`rounded-full transition-[width,background-color] duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sprang-500 ${
                       idx === currentStep
                         ? 'w-4 h-1.5 bg-sprang-500'
                         : 'w-1.5 h-1.5 bg-surface-700 hover:bg-surface-500'

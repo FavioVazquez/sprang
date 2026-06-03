@@ -6,3 +6,4 @@ export * from './graph/query.js';
 export * from './llm/client.js';
 export * from './agents/base.js';
 export * from './orchestrator/runner.js';
+export * from './watcher/watcher.js';

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -43,6 +43,18 @@ export function GraphView({
   const [tourStep, setTourStep] = useState(0);
   const [hoveredLayerId, setHoveredLayerId] = useState<string | undefined>();
   const [showLayerMenu, setShowLayerMenu] = useState(false);
+  const [showTourMenu, setShowTourMenu] = useState(false);
+  const tourMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (tourMenuRef.current && !tourMenuRef.current.contains(e.target as Node)) {
+        setShowTourMenu(false);
+      }
+    };
+    if (showTourMenu) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showTourMenu]);
 
   const selectedNode = selectedNodeId
     ? graph.nodes.find((n) => n.id === selectedNodeId) ?? null
@@ -181,32 +193,44 @@ export function GraphView({
 
         {/* Tours */}
         {graph.tours.length > 0 && !activeTour && (
-          <div className="relative group">
-            <Button variant="outline" size="sm">
+          <div ref={tourMenuRef} className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTourMenu((v) => !v)}
+              aria-expanded={showTourMenu}
+              aria-haspopup="menu"
+            >
               <BookOpen className="w-3.5 h-3.5" />
               Tours
               <ChevronDown className="w-3 h-3 opacity-60" />
             </Button>
-            <div className="absolute right-0 top-full mt-1 w-60 bg-surface-800 border border-surface-700 rounded-lg shadow-xl shadow-black/50 z-30 py-1 overflow-hidden invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-150">
-              {graph.tours.map((tour) => (
-                <button
-                  key={tour.id}
-                  className="w-full flex items-start gap-2 px-3 py-2.5 text-left hover:bg-surface-700/50 transition-colors"
-                  onClick={() => handleTourStart(tour)}
-                >
-                  <Play className="w-3 h-3 text-sprang-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-surface-200">{tour.title}</p>
-                    <p className="text-[10px] text-surface-500 mt-0.5 line-clamp-2">
-                      {tour.description}
-                    </p>
-                    <p className="text-[10px] text-surface-600 mt-0.5">
-                      {tour.steps.length} steps
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {showTourMenu && (
+              <div
+                role="menu"
+                className="absolute right-0 top-full mt-1 w-60 bg-surface-800 border border-surface-700 rounded-lg shadow-xl shadow-black/50 z-30 py-1 overflow-hidden"
+              >
+                {graph.tours.map((tour) => (
+                  <button
+                    key={tour.id}
+                    role="menuitem"
+                    className="w-full flex items-start gap-2 px-3 py-2.5 text-left hover:bg-surface-700/50 transition-colors focus-visible:outline-none focus-visible:bg-surface-700/50"
+                    onClick={() => { handleTourStart(tour); setShowTourMenu(false); }}
+                  >
+                    <Play className="w-3 h-3 text-sprang-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-medium text-surface-200">{tour.title}</p>
+                      <p className="text-[10px] text-surface-500 mt-0.5 line-clamp-2">
+                        {tour.description}
+                      </p>
+                      <p className="text-[10px] text-surface-600 mt-0.5">
+                        {tour.steps.length} steps
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
