@@ -34,12 +34,61 @@ Cascade is the intelligence layer. Sprang is the data layer. Together they answe
 
 ---
 
+## Quick install — just ask Cascade
+
+Open Cascade (or any AI agent with terminal access) and paste this prompt. It will clone, build, wire up the MCP server, copy the rules, and run your first scan — all in one shot.
+
+```
+Please install the Sprang knowledge graph platform for this project.
+
+Steps:
+1. Clone the repo somewhere sensible (e.g. ~/tools/sprang):
+   git clone https://github.com/FavioVazquez/sprang.git ~/tools/sprang
+
+2. Install and build:
+   cd ~/tools/sprang && pnpm install && pnpm build
+
+3. Link the CLI globally so `sprang` works from any terminal:
+   pnpm --filter @sprang/cli link --global
+
+4. Add the MCP server to Windsurf's global config at
+   ~/.codeium/windsurf/mcp_config.json
+   (merge into existing file if it already exists):
+   {
+     "mcpServers": {
+       "sprang": {
+         "command": "node",
+         "args": ["<ABSOLUTE_PATH_TO_SPRANG>/packages/mcp/dist/server.js"],
+         "env": { "SPRANG_ROOT": "<ABSOLUTE_PATH_TO_THIS_PROJECT>" }
+       }
+     }
+   }
+   Replace <ABSOLUTE_PATH_TO_SPRANG> with the real path where you cloned it,
+   and <ABSOLUTE_PATH_TO_THIS_PROJECT> with the current workspace root.
+
+5. Copy the Cascade rules into this project so Sprang runs automatically:
+   cp ~/tools/sprang/.devin/rules/sprang-context.md .devin/rules/
+   cp ~/tools/sprang/.devin/rules/sprang-highrisk.md .devin/rules/
+   (create .devin/rules/ if it does not exist)
+
+6. Run the initial scan on this project:
+   sprang scan . --skip-llm
+
+7. Tell me when done. I will reload the MCP server and run /sprang-onboard
+   to give you a full architecture walkthrough.
+```
+
+> **Windsurf users:** after step 4, reload the window (`Cmd/Ctrl+Shift+P` → *Reload Window*) to pick up the new MCP server before step 7.
+
+---
+
 ## Contents
 
+- [Quick install — just ask Cascade](#quick-install--just-ask-cascade)
 - [What Sprang does](#what-sprang-does)
 - [Platform architecture](#platform-architecture)
 - [Prerequisites](#prerequisites)
-- [Installation](#installation)
+- [Manual installation](#manual-installation)
 - [CLI usage](#cli-usage)
 - [Setup with Windsurf / Cascade](#setup-with-windsurf--cascade)
 - [Setup with Devin Desktop](#setup-with-devin-desktop)
@@ -143,7 +192,7 @@ graph LR
 
 ---
 
-## Installation
+## Manual installation
 
 ```bash
 # 1. Clone
