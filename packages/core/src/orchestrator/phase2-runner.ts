@@ -1,5 +1,6 @@
 // Standalone entry point forked by runner.ts for background Phase 2 execution.
 // Receives config via environment variables set by the parent process.
+import { isAbsolute } from 'node:path';
 import { runPhase2 } from './phase2.js';
 
 const projectRoot = process.env['SPRANG_PROJECT_ROOT'];
@@ -11,7 +12,29 @@ if (!projectRoot || !sprangDir) {
   process.exit(1);
 }
 
-const options = rawOptions ? JSON.parse(rawOptions) : {};
+if (!isAbsolute(projectRoot) || !isAbsolute(sprangDir)) {
+  process.stderr.write('[sprang phase2-runner] SPRANG_PROJECT_ROOT and SPRANG_DIR must be absolute paths\n');
+  process.exit(1);
+}
+
+if (projectRoot.includes('..') || sprangDir.includes('..')) {
+  process.stderr.write('[sprang phase2-runner] Paths must not contain relative segments\n');
+  process.exit(1);
+}
+
+let options: Record<string, unknown> = {};
+if (rawOptions) {
+  try {
+    const parsed: unknown = JSON.parse(rawOptions);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('SPRANG_OPTIONS must be a JSON object');
+    }
+    options = parsed as Record<string, unknown>;
+  } catch (err) {
+    process.stderr.write(`[sprang phase2-runner] Invalid SPRANG_OPTIONS: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+  }
+}
 
 const log = (msg: string) => process.stderr.write(`[sprang phase2] ${msg}\n`);
 

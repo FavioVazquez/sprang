@@ -13,6 +13,8 @@ const sprangGraphPlugin = () => ({
         path.join(root, '.sprang', 'knowledge-graph.json'),
         path.join(root, 'knowledge-graph.json'),
       ];
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
       for (const candidate of candidates) {
         if (fs.existsSync(candidate)) {
           res.setHeader('Content-Type', 'application/json');

@@ -11,13 +11,10 @@ export function makeWatchCommand(): Command {
     .action(async (pathArg: string | undefined, options: { debounce: string }) => {
       const projectRoot = resolve(pathArg ?? process.cwd());
       const sprangDir = join(projectRoot, '.sprang');
-      const debounceMs = parseInt(options.debounce, 10) || 2000;
-
-      if (!process.env['ANTHROPIC_API_KEY']) {
-        process.stderr.write(
-          'Note: ANTHROPIC_API_KEY not set — incremental updates will use static analysis only.\n\n'
-        );
-      }
+      const rawDebounce = parseInt(options.debounce, 10);
+      const debounceMs = Number.isFinite(rawDebounce)
+        ? Math.max(100, Math.min(rawDebounce, 60_000))
+        : 2000;
 
       const watcher = createWatcher(projectRoot, sprangDir, {
         debounceMs,

@@ -40,7 +40,10 @@ export async function runSprangAnalysis(
       detached: true,
       stdio: 'ignore',
       env: {
-        ...process.env,
+        // Whitelist only what the child process needs — do not inherit the full env
+        PATH: process.env['PATH'],
+        HOME: process.env['HOME'],
+        NODE_ENV: process.env['NODE_ENV'],
         SPRANG_PROJECT_ROOT: projectRoot,
         SPRANG_DIR: sprangDir,
         SPRANG_OPTIONS: JSON.stringify(options),

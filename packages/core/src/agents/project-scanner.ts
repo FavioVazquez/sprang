@@ -108,7 +108,12 @@ async function readIgnoreFile(projectRoot: string): Promise<string[]> {
   return raw
     .split('\n')
     .map((l) => l.trim())
-    .filter((l) => l.length > 0 && !l.startsWith('#'));
+    .filter((l) => {
+      if (l.length === 0 || l.startsWith('#')) return false;
+      // Reject absolute paths and path traversal sequences
+      if (l.startsWith('/') || l.includes('..')) return false;
+      return true;
+    });
 }
 
 function complexityFromLines(lines: number): 'simple' | 'moderate' | 'complex' {
@@ -157,11 +162,13 @@ export class ProjectScannerAgent extends BaseAgent {
         const ext = extname(absPath).toLowerCase();
         const language = EXTENSION_TO_LANGUAGE[ext] ?? 'unknown';
 
+        const FILE_SIZE_LIMIT = 10 * 1024 * 1024; // 10MB
         let sizeLines = 0;
         let mtime = 0;
         try {
           const fileStat = await stat(absPath);
           mtime = fileStat.mtimeMs;
+          if (fileStat.size > FILE_SIZE_LIMIT) continue;
           const content = await readFile(absPath, 'utf-8');
           sizeLines = content.split('\n').length;
 

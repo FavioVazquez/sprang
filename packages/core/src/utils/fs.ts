@@ -1,7 +1,7 @@
-import { readFile, writeFile, rename, mkdir, stat, access } from 'node:fs/promises';
+import { readFile, writeFile, rename, unlink, mkdir, stat, access } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname } from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 export class SprangError extends Error {
   constructor(
@@ -20,9 +20,14 @@ export async function ensureDir(dirPath: string): Promise<void> {
 
 export async function writeFileAtomic(filePath: string, content: string): Promise<void> {
   await ensureDir(dirname(filePath));
-  const tmpPath = `${filePath}.tmp`;
-  await writeFile(tmpPath, content, 'utf-8');
-  await rename(tmpPath, filePath);
+  const tmpPath = `${filePath}.${randomBytes(6).toString('hex')}.tmp`;
+  try {
+    await writeFile(tmpPath, content, 'utf-8');
+    await rename(tmpPath, filePath);
+  } catch (err) {
+    try { await unlink(tmpPath); } catch { /* best-effort cleanup */ }
+    throw err;
+  }
 }
 
 export async function readJsonFile<T>(filePath: string): Promise<T> {

@@ -59,7 +59,7 @@ export function createWatcher(
       ...DEFAULT_EXCLUDES,
       `${sprangDir}/intermediate/**`,
       `${sprangDir}/cache/**`,
-      `${sprangDir}/*.tmp`,
+      `${sprangDir}/**/*.tmp`,
     ],
     persistent: true,
     ignoreInitial: true,

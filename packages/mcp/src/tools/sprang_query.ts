@@ -27,7 +27,9 @@ export async function sprangQuery(
     return { nodes: [], total: 0, query: input.query };
   }
 
-  const { query, node_types, limit = 10 } = input;
+  const rawLimit = typeof input.limit === 'number' ? input.limit : 10;
+  const limit = Math.max(1, Math.min(rawLimit, 500));
+  const { query, node_types } = input;
   const lowerQuery = query.toLowerCase();
 
   type ScoredNode = {
