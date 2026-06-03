@@ -43,8 +43,12 @@ Paste this prompt into Cascade (or any AI agent with terminal access). It will d
 Please install the Sprang knowledge graph platform for this project.
 Run all steps sequentially using terminal commands. Do not ask me for input between steps.
 
-1. Clone Sprang to ~/tools/sprang (skip if it already exists):
-   git clone https://github.com/FavioVazquez/sprang.git ~/tools/sprang
+1. Clone Sprang to ~/tools/sprang, or pull latest if it already exists:
+   if [ -d ~/tools/sprang ]; then
+     git -C ~/tools/sprang pull --ff-only
+   else
+     git clone https://github.com/FavioVazquez/sprang.git ~/tools/sprang
+   fi
 
 2. Install dependencies and build all packages (run both in ~/tools/sprang):
    pnpm install
@@ -228,8 +232,12 @@ graph LR
 ## Manual installation
 
 ```bash
-# 1. Clone
-git clone https://github.com/FavioVazquez/sprang.git ~/tools/sprang
+# 1. Clone (or pull latest if already cloned)
+if [ -d ~/tools/sprang ]; then
+  git -C ~/tools/sprang pull --ff-only
+else
+  git clone https://github.com/FavioVazquez/sprang.git ~/tools/sprang
+fi
 cd ~/tools/sprang
 
 # 2. Install all dependencies
