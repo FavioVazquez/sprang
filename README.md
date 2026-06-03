@@ -36,63 +36,68 @@ Cascade is the intelligence layer. Sprang is the data layer. Together they answe
 
 ## Quick install — just ask Cascade
 
-Open Cascade (or any AI agent with terminal access) and paste this prompt. It will clone, build, wire up the MCP server, copy the rules, and run your first scan — all in one shot.
+Paste this prompt into Cascade (or any AI agent with terminal access). It will do everything — clone, build, wire up the MCP server, copy the slash commands and rules, and run the first scan. When it finishes, you reload Windsurf once and you're live.
 
 ```
 Please install the Sprang knowledge graph platform for this project.
+Run all steps sequentially using terminal commands. Do not ask me for input between steps.
 
-Steps:
-1. Clone the repo somewhere sensible (e.g. ~/tools/sprang):
+1. Clone Sprang to ~/tools/sprang (skip if it already exists):
    git clone https://github.com/FavioVazquez/sprang.git ~/tools/sprang
 
-2. Install and build:
-   cd ~/tools/sprang && pnpm install && pnpm build
+2. Install dependencies and build all packages:
+   pnpm install  (run in ~/tools/sprang)
+   pnpm build    (run in ~/tools/sprang)
 
 3. Link the CLI globally so `sprang` works from any terminal:
-   pnpm --filter @sprang/cli link --global
+   pnpm --filter @sprang/cli link --global  (run in ~/tools/sprang)
 
-4. Add the MCP server to Windsurf's global config at
-   ~/.codeium/windsurf/mcp_config.json
-   (merge into existing file if it already exists):
+4. Determine the two absolute paths you need:
+   SPRANG_DIR = the absolute path where you cloned sprang (~/tools/sprang resolved)
+   PROJECT_DIR = the absolute path of the current workspace root
+
+   Write the MCP server config to ~/.codeium/windsurf/mcp_config.json.
+   If the file already exists and has other mcpServers entries, merge — do not overwrite.
+   The entry to add:
    {
      "mcpServers": {
        "sprang": {
          "command": "node",
-         "args": ["<ABSOLUTE_PATH_TO_SPRANG>/packages/mcp/dist/server.js"],
-         "env": { "SPRANG_ROOT": "<ABSOLUTE_PATH_TO_THIS_PROJECT>" }
+         "args": ["SPRANG_DIR/packages/mcp/dist/server.js"],
+         "env": { "SPRANG_ROOT": "PROJECT_DIR" }
        }
      }
    }
-   Replace <ABSOLUTE_PATH_TO_SPRANG> with the real path where you cloned it,
-   and <ABSOLUTE_PATH_TO_THIS_PROJECT> with the current workspace root.
+   Use the real resolved paths, not placeholders.
 
-5. Copy the rules, workflows, and skills into this project:
+5. Copy rules, workflows, and skills into the current project:
 
-   Rules (tell Cascade to use Sprang automatically before/after every edit):
+   Rules — tell Cascade to use Sprang automatically before/after every edit:
      mkdir -p .devin/rules
      cp ~/tools/sprang/.devin/rules/sprang-context.md .devin/rules/
      cp ~/tools/sprang/.devin/rules/sprang-highrisk.md .devin/rules/
 
-   Workflows (the /sprang-* slash commands for Windsurf / Cascade):
+   Workflows — all /sprang-* slash commands for Windsurf / Cascade:
      mkdir -p .windsurf/workflows
      cp ~/tools/sprang/.windsurf/workflows/*.md .windsurf/workflows/
 
-   Skills (the same /sprang-* commands for Devin Desktop):
+   Skills — same /sprang-* commands for Devin Desktop:
      mkdir -p .windsurf/skills
      cp -r ~/tools/sprang/.windsurf/skills/sprang* .windsurf/skills/
 
-   Symlink .devin/workflows and .devin/skills so Devin Desktop also finds them:
+   Symlinks so Devin Desktop also finds them under .devin/:
      ln -sf ../.windsurf/workflows .devin/workflows
      ln -sf ../.windsurf/skills .devin/skills
 
-6. Run the initial scan on this project:
+6. Run the initial scan of this project (Phase 1 — fully static, under 60s):
    sprang scan . --phase1-only
 
-7. Tell me when done. I will reload the MCP server and run /sprang-onboard
-   to give you a full architecture walkthrough.
+7. Report a summary of what was installed and where. Then tell me:
+   "Please reload Windsurf now (Cmd/Ctrl+Shift+P → Reload Window) so the
+   MCP server activates. Once reloaded, type /sprang-onboard to begin."
 ```
 
-> **Windsurf users:** after step 4, reload the window (`Cmd/Ctrl+Shift+P` → *Reload Window*) to pick up the new MCP server before step 7.
+> After Cascade finishes, **reload Windsurf once** (`Cmd/Ctrl+Shift+P` → *Reload Window*), then type `/sprang-onboard` in the chat.
 
 ---
 
