@@ -90,6 +90,9 @@ export async function sprangTour(
     }
   } else {
     tour = graph.tours[0];
+    if (!tour) {
+      return { error: 'No tours available in this graph', code: 'NO_TOURS' };
+    }
   }
 
   const filteredSteps = filterStepsForPersona(tour.steps, persona, graph);
