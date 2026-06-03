@@ -36,8 +36,7 @@ Cascade is the intelligence layer. Sprang is the data layer. Together they answe
 
 ## Contents
 
-- [Why Sprang?](#why-sprang)
-- [What it does](#what-it-does)
+- [What Sprang does](#what-sprang-does)
 - [Platform architecture](#platform-architecture)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
@@ -57,26 +56,7 @@ Cascade is the intelligence layer. Sprang is the data layer. Together they answe
 
 ---
 
-## Why Sprang?
-
-| Feature | Understand-Anything | **Sprang** |
-|---|---|---|
-| LLM enrichment | Claude Code only | **Any model — Cascade/Windsurf native** |
-| Static analysis | None | **git-layer, smell-detector, risk-scorer** |
-| Graph kinds | Codebase only | **Codebase + Knowledge (Obsidian, Logseq, …)** |
-| Dashboard | React Flow basic | **Sigma.js + React Flow, diff overlay, BFS pathfinder, persona UI** |
-| Source viewer | None | **Prism syntax highlight, line-range jump** |
-| File explorer | None | **Tree with search, double-click to source** |
-| Diff analysis | Manual | **Automated blast-radius with amber overlay** |
-| Annotations | Manual notes | **`sprang_annotate` MCP tool + staleness detection** |
-| Persona modes | None | **non-technical / junior / experienced + Learn tab** |
-| Knowledge graphs | Basic | **Obsidian / Logseq / Dendron / Foam / Zettelkasten / plain** |
-| Install | npm | **Single `pnpm install && pnpm build`** |
-| Test coverage | ~40 tests | **167 tests, zero failures** |
-
----
-
-## What it does
+## What Sprang does
 
 <!-- Dashboard mockup — generated with Gemini gemini-3.1-flash-image-preview -->
 <p align="center">
@@ -84,18 +64,45 @@ Cascade is the intelligence layer. Sprang is the data layer. Together they answe
   <em>Force-directed knowledge graph, risk heatmap, node detail panel with decision context, and guided tour player.</em>
 </p>
 
+Sprang gives Cascade a persistent memory of your codebase — not just file names and symbols, but the full context of *why* things exist, *who* changed them, *what* they risk, and *how* they connect.
+
+### One-call answers
+
+```
+# "What will break if I change auth.ts?"
+sprang_diff_impact { files: ["src/auth.ts"] }
+→ 14 impacted nodes, top risk: api-gateway.ts (0.91), session.ts (0.78)
+
+# "Why does this file exist?"
+sprang_why { node_id: "src/auth.ts" }
+→ 23 commits, 3 authors, PR #441 "add JWT refresh flow", churn: 8/90d
+
+# "Show me the riskiest parts of this codebase"
+sprang_health {}
+→ god_node: 2, circular_dependency: 1, unstable_interface: 3
+  top risk: auth.ts (0.82), api.ts (0.71), db/pool.ts (0.68)
+
+# "Walk me through the architecture"
+/sprang-onboard
+→ 8-step guided tour, persona-adaptive (junior / senior / PM)
+```
+
+### What it brings to Cascade
+
 | Capability | How |
 |---|---|
 | **Git decision context** | `git-layer` — who changed each file, why, PR references, change frequency |
-| **Code smell detection** | `smell-detector` — 8 deterministic detectors, zero LLM required |
-| **Risk scoring** | `risk-scorer` — blast radius × coupling × test gap × churn |
+| **Code smell detection** | `smell-detector` — 8 deterministic heuristics, zero LLM required |
+| **Risk scoring** | `risk-scorer` — blast radius × coupling × test gap × churn, 0.0–1.0 per node |
 | **Guided tours** | `tour-builder` — BFS-ordered pedagogical paths through the codebase |
-| **Domain map** | `domain-analyzer` — directory cohesion clustering |
-| **11 Cascade workflows** | `/sprang`, `/sprang-analyze`, `/sprang-chat`, `/sprang-explain`, `/sprang-onboard`, `/sprang-diff`, `/sprang-domain`, `/sprang-why`, `/sprang-health`, `/sprang-team`, `/sprang-knowledge` |
-| **11 Agent Skills** | Same commands for Devin Local — `SKILL.md` in `.windsurf/skills/` (symlinked to `.devin/skills/`) |
-| **8 MCP tools** | Direct graph access for Cascade's tool calls |
-| **< 60s skeleton** | Phase 1 is 100% static — no LLM, no API key |
-| **Live dashboard** | Force-directed graph, risk heatmap, tour player, health view |
+| **Domain map** | `domain-analyzer` — directory cohesion clustering into named business layers |
+| **Blast-radius diff** | `sprang_diff_impact` — BFS over the graph before any edit, risk-ranked |
+| **Team annotations** | `sprang_annotate` — write `.sprang/annotations/<id>.md`, committed to the repo |
+| **Knowledge graphs** | `/sprang-knowledge` — Obsidian / Logseq / Dendron / Foam / Zettelkasten / plain markdown |
+| **11 slash commands** | Full workflow coverage for both Windsurf/Cascade and Devin Desktop |
+| **8 MCP tools** | Direct graph access — no extra API key, Cascade is the LLM |
+| **< 60s skeleton** | Phase 1 is 100% static — no LLM, no API key, runs anywhere |
+| **Live dashboard** | Sigma.js force-directed graph, risk heatmap, diff overlay, BFS pathfinder, tour player |
 
 ---
 
@@ -633,4 +640,4 @@ MIT
 
 ---
 
-*Sprang was inspired by knowledge graph work in the open-source codebase comprehension space. The name comes from Kierkegaard's concept of the* qualitative spring *— the leap that cannot be reached by gradual accumulation alone, but only by a discontinuous jump in understanding. The three differentiating agents (git-layer, smell-detector, risk-scorer) and the Devin Desktop integration are original work.*
+*The name Sprang comes from Kierkegaard's concept of the* qualitative spring *— the leap that cannot be reached by gradual accumulation alone, but only by a discontinuous jump in understanding. The git-layer, smell-detector, risk-scorer agents and the Devin Desktop integration are original work. Sprang was inspired by the open-source codebase comprehension space, particularly the work in [Understand-Anything](https://github.com/adamcohenhillel/understand-anything).*
