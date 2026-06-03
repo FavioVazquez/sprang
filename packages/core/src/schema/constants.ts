@@ -87,13 +87,30 @@ export const DEFAULT_EXCLUDES = [
   '**/*.map',
 ];
 
-// Entry point patterns for tour-builder
+// Entry point patterns for tour-builder (TypeScript/JavaScript + multi-language)
 export const ENTRY_POINT_PATTERNS = [
+  // TypeScript / JavaScript
   '**/index.ts', '**/index.js', '**/index.tsx',
   '**/main.ts', '**/main.js',
   '**/app.ts', '**/app.js', '**/App.tsx',
   '**/server.ts', '**/server.js',
   '**/cli.ts', '**/cli.js',
+  // Python
+  '**/main.py', '**/app.py', '**/__main__.py', '**/manage.py', '**/wsgi.py', '**/asgi.py',
+  // Go
+  '**/main.go', '**/cmd/**/main.go',
+  // Rust
+  '**/src/main.rs', '**/src/lib.rs',
+  // Java / Kotlin
+  '**/Main.java', '**/Application.java', '**/Main.kt', '**/Application.kt',
+  // Ruby
+  '**/main.rb', '**/app.rb', '**/config.ru',
+  // PHP
+  '**/index.php', '**/app.php',
+  // C / C++
+  '**/main.c', '**/main.cpp',
+  // C#
+  '**/Program.cs', '**/Startup.cs',
 ];
 
 // Smell detector thresholds (can be overridden via .sprang/config.json)
