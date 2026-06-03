@@ -149,8 +149,8 @@ sprang_health {}
 | **Team annotations** | `sprang_annotate` — write `.sprang/annotations/<id>.md`, committed to the repo |
 | **Knowledge graphs** | `/sprang-knowledge` — Obsidian / Logseq / Dendron / Foam / Zettelkasten / plain markdown |
 | **11 slash commands** | Full workflow coverage for both Windsurf/Cascade and Devin Desktop |
-| **8 MCP tools** | Direct graph access — no extra API key, Cascade is the LLM |
-| **< 60s skeleton** | Phase 1 is 100% static — no LLM, no API key, runs anywhere |
+| **8 MCP tools** | Direct graph access — Cascade reads and writes the graph via MCP |
+| **< 60s skeleton** | Phase 1 is fully static — runs anywhere, no network, no waiting |
 | **Live dashboard** | Sigma.js force-directed graph, risk heatmap, diff overlay, BFS pathfinder, tour player |
 
 ---
@@ -220,10 +220,10 @@ sprang --help
 ## CLI usage
 
 ```bash
-# Phase 1 only — static, < 60s, zero LLM, zero API key
-sprang scan /path/to/your/project --skip-llm
+# Phase 1 — static analysis, < 60s, builds the skeleton graph
+sprang scan /path/to/your/project --phase1-only
 
-# Full scan — Phase 1 + Phase 2 Cascade-driven enrichment in background
+# Full scan — Phase 1 now + Phase 2 enrichment triggered by Cascade
 sprang scan /path/to/your/project
 
 # Check graph age, phase, and node/edge count
@@ -258,10 +258,10 @@ your-project/
 ### Step 1 — Scan your project
 
 ```bash
-sprang scan . --skip-llm
+sprang scan . --phase1-only
 ```
 
-Produces `.sprang/knowledge-graph.json` in under 60 seconds with no external API calls.
+Produces `.sprang/knowledge-graph.json` in under 60 seconds — fully static, no network calls.
 
 ### Step 2 — Add the MCP server
 
@@ -348,7 +348,7 @@ Skills and workflows live in `.windsurf/skills/` and `.windsurf/workflows/`, sym
 <!-- Pipeline diagram — generated with Gemini gemini-3.1-flash-image-preview -->
 <p align="center">
   <img src="assets/pipeline.png" alt="Sprang two-phase pipeline: Phase 1 static skeleton, Phase 2 Cascade-driven enrichment" width="100%" />
-  <em>Phase 1 is entirely static — no LLM, no API key, under 60 seconds. Phase 2 runs in the background driven by Cascade.</em>
+  <em>Phase 1 is fully static — runs in under 60 seconds, no network calls. Phase 2 is driven by Cascade as the intelligence layer.</em>
 </p>
 
 ```mermaid
@@ -368,7 +368,7 @@ flowchart TB
     SG -->|"fork background process"| Phase2
 ```
 
-**No external API.** Cascade is the LLM. Phase 2 enrichment is performed by Cascade calling the scan pipeline with its own context window. No third-party API key required.
+**Cascade is the intelligence layer.** There is no external API. Phase 2 enrichment is performed by Cascade using its own context window — it reads the graph, writes summaries, and calls `sprang_annotate` to record what it learns.
 
 ---
 

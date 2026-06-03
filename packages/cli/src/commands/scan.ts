@@ -8,19 +8,20 @@ export function makeScanCommand(): Command {
   cmd
     .description('Scan a project and build (or refresh) the Sprang knowledge graph')
     .argument('[path]', 'Path to the project root to scan', undefined)
-    .option('--no-background', 'Run Phase 2 LLM analysis inline instead of in the background')
-    .option('--skip-llm', 'Phase 1 only — no LLM calls (fast skeleton graph)')
-    .action(async (pathArg: string | undefined, options: { background: boolean; skipLlm: boolean }) => {
+    .option('--no-background', 'Run Phase 2 enrichment inline instead of in the background')
+    .option('--phase1-only', 'Static analysis only — build the skeleton graph without Phase 2 enrichment')
+    .action(async (pathArg: string | undefined, options: { background: boolean; phase1Only: boolean }) => {
       const projectRoot = resolve(pathArg ?? process.cwd());
       const spinner = ora('Phase 1: Scanning files...').start();
 
       try {
-        if (options.skipLlm) {
+        if (options.phase1Only) {
           const graph = await runPhase1Only(projectRoot, { skipLLM: true });
           const fileCount = graph.nodes.filter((n) => n.type === 'file').length;
-          spinner.succeed(`Scanned ${fileCount} files, ${graph.nodes.length} nodes created (skeleton only, LLM skipped)`);
+          spinner.succeed(`Scanned ${fileCount} files — ${graph.nodes.length} nodes (Phase 1 complete, Phase 2 ready for Cascade)`);
           process.stdout.write(`\nGraph:  ${projectRoot}/.sprang/knowledge-graph.json\n`);
-          process.stdout.write(`Report: ${projectRoot}/.sprang/SPRANG_REPORT.md\n\n`);
+          process.stdout.write(`Report: ${projectRoot}/.sprang/SPRANG_REPORT.md\n`);
+          process.stdout.write(`\nRun /sprang-onboard in Cascade to start Phase 2 enrichment.\n\n`);
           return;
         }
 
