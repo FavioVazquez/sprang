@@ -30,3 +30,8 @@ test-results/
 playwright-report/
 packages/dashboard/test-results/
 packages/dashboard/playwright-report/
+
+# Development tool artifacts (never commit)
+.claude/
+.impeccable/
+.agents/skills/impeccable/
