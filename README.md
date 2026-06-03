@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="#installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
+  <a href="#manual-installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-8_tools-7C3AED?style=flat-square" alt="8 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
   <img src="https://img.shields.io/badge/tests-167_passing-10B981?style=flat-square" alt="167 tests passing"/>
@@ -215,7 +215,7 @@ graph LR
 
 ```bash
 # 1. Clone
-git clone https://github.com/faviovazquez/sprang.git
+git clone https://github.com/FavioVazquez/sprang.git
 cd sprang
 
 # 2. Install all dependencies
@@ -274,6 +274,8 @@ your-project/
 
 ## Setup with Windsurf / Cascade
 
+The fastest path is the [agentic install prompt](#quick-install--just-ask-cascade) at the top — paste it into Cascade and it handles everything. For manual setup:
+
 ### Step 1 — Scan your project
 
 ```bash
@@ -284,7 +286,7 @@ Produces `.sprang/knowledge-graph.json` in under 60 seconds — fully static, no
 
 ### Step 2 — Add the MCP server
 
-**For Windsurf** — add to `~/.codeium/windsurf/mcp_config.json`:
+Add to `~/.codeium/windsurf/mcp_config.json` (merge if the file already exists):
 
 ```json
 {
@@ -298,13 +300,22 @@ Produces `.sprang/knowledge-graph.json` in under 60 seconds — fully static, no
 }
 ```
 
-> In `mcp_config.json`, `${workspaceFolder}` is **not** resolved — use the full absolute path for `SPRANG_ROOT`.
+> Use full absolute paths. `${workspaceFolder}` is **not** resolved in `mcp_config.json`.
 
-### Step 3 — Restart Windsurf
+### Step 3 — Copy workflows, skills, and rules
 
-Reload the window to pick up the new MCP server. You should see "sprang" in the MCP tools list.
+```bash
+mkdir -p .windsurf/workflows .windsurf/skills .devin/rules
+cp /path/to/sprang/.windsurf/workflows/*.md .windsurf/workflows/
+cp -r /path/to/sprang/.windsurf/skills/sprang* .windsurf/skills/
+cp /path/to/sprang/.devin/rules/*.md .devin/rules/
+ln -sf ../.windsurf/workflows .devin/workflows
+ln -sf ../.windsurf/skills .devin/skills
+```
 
-### Step 4 — Run onboarding
+### Step 4 — Reload Windsurf and run onboarding
+
+Reload the window (`Cmd/Ctrl+Shift+P` → *Reload Window*) to activate the MCP server, then:
 
 ```
 /sprang-onboard
@@ -384,7 +395,7 @@ flowchart TB
         G2[tour-builder · risk-scorer update] --> GR[graph-reviewer]
         GR --> FG[final graph + SPRANG_REPORT.md]
     end
-    SG -->|"fork background process"| Phase2
+    SG -->|"Phase 2 via /sprang-analyze"| Phase2
 ```
 
 **Cascade is the intelligence layer.** There is no external API. Phase 2 enrichment is performed by Cascade using its own context window — it reads the graph, writes summaries, and calls `sprang_annotate` to record what it learns.
@@ -486,8 +497,6 @@ sequenceDiagram
     participant F as filesystem
 
     D->>C: /sprang-onboard
-    C->>F: sprang scan (Phase 1)
-    F-->>C: knowledge-graph.json written
     C->>M: sprang_health {}
     M-->>C: { smells, risk_top10, orphans }
     C->>M: sprang_why { node_id: "src/auth.ts" }
@@ -708,4 +717,4 @@ MIT
 
 ---
 
-*The name Sprang comes from Kierkegaard's concept of the* qualitative spring *— the leap that cannot be reached by gradual accumulation alone, but only by a discontinuous jump in understanding. The git-layer, smell-detector, risk-scorer agents and the Devin Desktop integration are original work. Sprang was inspired by the open-source codebase comprehension space, particularly the work in [Understand-Anything](https://github.com/adamcohenhillel/understand-anything).*
+*The name Sprang comes from Kierkegaard's concept of the* qualitative spring *— the leap that cannot be reached by gradual accumulation alone, but only by a discontinuous jump in understanding. The git-layer, smell-detector, risk-scorer agents and the Devin Desktop integration are original work. Sprang was inspired by the open-source codebase comprehension space, particularly the work in [Understand-Anything](https://github.com/Lum1104/Understand-Anything).*
