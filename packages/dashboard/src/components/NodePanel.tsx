@@ -14,9 +14,11 @@ import {
   Users,
   ExternalLink,
   ChevronRight,
+  HelpCircle,
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
+import { Tooltip } from './ui/Tooltip';
 import { SmellBadge } from './SmellBadge';
 import { getRiskColor, getRiskLabel } from '../api/graphApi';
 import type { SprangNode, KnowledgeGraph, NodeType, RiskFactor } from '../types';
@@ -44,6 +46,11 @@ const NODE_ICONS: Record<NodeType, React.ComponentType<{ className?: string }>> 
   domain: Globe,
   flow: Circle,
   step: ChevronRight,
+  article: FileText,
+  entity: Globe,
+  topic: Circle,
+  claim: Circle,
+  source: FileText,
 };
 
 function NodeIcon({ type, className }: { type: NodeType; className?: string }) {
@@ -76,10 +83,10 @@ function AuthorAvatar({ name }: { name: string }) {
     .join('');
 
   const colors = [
-    'bg-sprang-800 text-sprang-200',
-    'bg-blue-900 text-blue-200',
-    'bg-green-900 text-green-200',
-    'bg-amber-900 text-amber-200',
+    'bg-surface-700 text-sprang-300',
+    'bg-surface-700 text-blue-300',
+    'bg-surface-700 text-green-300',
+    'bg-surface-700 text-amber-300',
   ];
   const colorIdx =
     name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % colors.length;
@@ -96,16 +103,23 @@ function AuthorAvatar({ name }: { name: string }) {
 
 function Section({
   title,
+  tooltip,
   children,
 }: {
   title: string;
+  tooltip?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-surface-500">
-        {title}
-      </h3>
+    <div className="space-y-2 pt-1">
+      <div className="flex items-center gap-1.5 border-t border-surface-800 pt-3 -mt-1">
+        <h3 className="text-[11px] font-medium text-surface-400">{title}</h3>
+        {tooltip && (
+          <Tooltip content={tooltip} side="right" delayDuration={200}>
+            <HelpCircle className="w-3 h-3 text-surface-600 hover:text-surface-400 cursor-help transition-colors flex-shrink-0" />
+          </Tooltip>
+        )}
+      </div>
       {children}
     </div>
   );
@@ -186,7 +200,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
 
             {/* Risk score */}
             {node.risk_score != null && (
-              <Section title="Risk Score">
+              <Section title="Risk Score" tooltip="Likelihood that a change to this node causes downstream failures. Composite of blast radius (0.35), coupling (0.25), test coverage (0.25), and churn (0.15). Above 0.7 is high risk.">
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-surface-400">
@@ -223,7 +237,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
 
             {/* Risk factors */}
             {node.risk_factors && node.risk_factors.length > 0 && (
-              <Section title="Risk Factors">
+              <Section title="Risk Factors" tooltip="Specific signals that drove the risk score up. Address 'no_test_coverage' and 'large_blast_radius' first — they have the highest weight.">
                 <div className="flex flex-wrap gap-1.5">
                   {node.risk_factors.map((factor) => (
                     <span
@@ -240,7 +254,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
 
             {/* Structural warnings */}
             {node.structural_warnings && node.structural_warnings.length > 0 && (
-              <Section title="Structural Warnings">
+              <Section title="Structural Warnings" tooltip="Heuristic code smells detected by static analysis — no LLM involved. god_node, circular_dependency, and unstable_interface are the most critical to address.">
                 <div className="space-y-2">
                   {node.structural_warnings.map((warning, i) => (
                     <div
@@ -262,7 +276,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
 
             {/* Decision context */}
             {node.decision_context && (
-              <Section title="Decision Context">
+              <Section title="Decision Context" tooltip="Git history analysis: who changed this file and why, extracted from commit messages. Rationale snippets are LLM-summarized commit message patterns.">
                 <div className="space-y-3">
                   {/* Authors */}
                   {node.decision_context.primary_authors.length > 0 && (
@@ -279,7 +293,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
                   {/* Last changed + frequency */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="p-2 rounded-lg bg-surface-800 border border-surface-700">
-                      <p className="text-[10px] text-surface-500 uppercase tracking-wide">
+                      <p className="text-[10px] text-surface-500">
                         Last Changed
                       </p>
                       <p className="text-xs text-surface-200 mt-0.5 font-medium">
@@ -290,7 +304,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
                       </p>
                     </div>
                     <div className="p-2 rounded-lg bg-surface-800 border border-surface-700">
-                      <p className="text-[10px] text-surface-500 uppercase tracking-wide">
+                      <p className="text-[10px] text-surface-500">
                         90-Day Changes
                       </p>
                       <p className="text-xs text-surface-200 mt-0.5 font-bold">
@@ -302,14 +316,14 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
                   {/* Rationale snippets */}
                   {node.decision_context.rationale_snippets.slice(0, 3).map(
                     (snippet, i) => (
-                      <blockquote
+                      <div
                         key={i}
-                        className="border-l-2 border-sprang-700 pl-3 py-0.5"
+                        className="bg-surface-800/60 rounded-md px-3 py-2"
                       >
                         <p className="text-xs text-surface-400 italic leading-relaxed">
                           "{snippet}"
                         </p>
-                      </blockquote>
+                      </div>
                     ),
                   )}
 
@@ -383,32 +397,17 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
               );
             })()}
 
-            {/* Annotations */}
+            {/* Annotations (stored as raw markdown strings) */}
             {node.annotations && node.annotations.length > 0 && (
               <Section title="Annotations">
                 <div className="space-y-2">
                   {node.annotations.map((annotation, i) => (
                     <div
                       key={i}
-                      className="p-3 rounded-lg bg-surface-800 border border-surface-700 space-y-1.5"
+                      className="p-3 rounded-lg bg-surface-800 border border-surface-700"
                     >
-                      <div className="flex items-center gap-2">
-                        {annotation.annotated_by && (
-                          <span className="text-xs text-surface-400">
-                            {annotation.annotated_by}
-                          </span>
-                        )}
-                        <span className="text-[10px] text-surface-600">
-                          {new Date(annotation.annotated_at).toLocaleDateString()}
-                        </span>
-                        {annotation.tags?.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-[10px]">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
                       <p className="text-xs text-surface-300 leading-relaxed whitespace-pre-wrap">
-                        {annotation.content}
+                        {annotation}
                       </p>
                     </div>
                   ))}

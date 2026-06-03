@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ProjectScannerAgent } from '../../src/agents/project-scanner.js';
 import { createEmptyGraph } from '../../src/graph/store.js';
-import { LLMClient } from '../../src/llm/client.js';
+import { NullLLMClient } from '../../src/llm/client.js';
 import type { AgentContext, SprangOptions } from '../../src/agents/base.js';
 import type { ScanResult } from '../../src/schema/types.js';
 import { readJsonFileOrNull } from '../../src/utils/fs.js';
@@ -24,7 +24,7 @@ describe('ProjectScannerAgent', () => {
     const graph = createEmptyGraph(FIXTURE_ROOT, 'simple-ts-fixture');
     const options: SprangOptions = { skipLLM: true };
     // LLMClient with no key — won't be called in phase 1
-    const llm = new LLMClient('test-key');
+    const llm = new NullLLMClient();
 
     ctx = {
       projectRoot: FIXTURE_ROOT,

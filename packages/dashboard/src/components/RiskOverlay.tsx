@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Flame } from 'lucide-react';
 import { Button } from './ui/Button';
+import { Tooltip } from './ui/Tooltip';
 import type { GraphStats } from '../types';
 
 interface RiskOverlayProps {
@@ -19,21 +20,26 @@ const DOT_COLORS = {
 export function RiskOverlay({ enabled, onToggle, stats }: RiskOverlayProps) {
   return (
     <div className="flex items-center gap-2">
-      <Button
-        variant={enabled ? 'default' : 'outline'}
-        size="sm"
-        onClick={onToggle}
-        className={
-          enabled
-            ? 'bg-risk-high hover:bg-red-600 shadow-sm shadow-red-900/40 border-0'
-            : ''
-        }
-        aria-pressed={enabled}
-        aria-label="Toggle risk heatmap"
+      <Tooltip
+        content="Color all nodes by risk score — green (safe) → yellow (moderate) → red (high risk). Based on coupling, blast radius, test coverage, and churn. Keyboard: R"
+        side="bottom"
       >
-        <Flame className="w-3.5 h-3.5" />
-        Risk Heatmap
-      </Button>
+        <Button
+          variant={enabled ? 'default' : 'outline'}
+          size="sm"
+          onClick={onToggle}
+          className={
+            enabled
+              ? 'bg-risk-high hover:bg-red-600 shadow-sm shadow-red-900/40 border-0'
+              : ''
+          }
+          aria-pressed={enabled}
+          aria-label="Toggle risk heatmap (R)"
+        >
+          <Flame className="w-3.5 h-3.5" />
+          Risk Heatmap
+        </Button>
+      </Tooltip>
 
       <AnimatePresence>
         {enabled && (

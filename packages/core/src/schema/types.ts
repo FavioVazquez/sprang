@@ -1,13 +1,18 @@
-// Node types from Understand Anything (16) — unchanged
+// 21 node types: 5 code + 8 non-code + 3 domain + 5 knowledge (matches Understand-Anything)
 export const NODE_TYPES = [
+  // code
   'file', 'function', 'class', 'module', 'concept',
+  // non-code
   'config', 'document', 'service', 'table', 'endpoint',
   'pipeline', 'schema', 'resource',
+  // domain
   'domain', 'flow', 'step',
+  // knowledge
+  'article', 'entity', 'topic', 'claim', 'source',
 ] as const;
 export type NodeType = typeof NODE_TYPES[number];
 
-// Edge types (29)
+// Edge types (35 total in 8 categories — matches Understand-Anything)
 export const EDGE_TYPES = [
   // structural
   'imports', 'exports', 'contains', 'inherits', 'implements',
@@ -16,14 +21,16 @@ export const EDGE_TYPES = [
   // data flow
   'reads_from', 'writes_to', 'transforms', 'validates',
   // dependencies
-  'depends_on', 'tests', 'configures',
+  'depends_on', 'tested_by', 'configures',
   // semantic
   'related', 'similar_to',
-  // infrastructure
+  // infrastructure / schema
   'deploys', 'serves', 'provisions', 'triggers', 'migrates',
   'documents', 'routes', 'defines_schema',
   // domain
   'contains_flow', 'flow_step', 'cross_domain',
+  // knowledge
+  'cites', 'contradicts', 'builds_on', 'exemplifies', 'categorized_under', 'authored_by',
 ] as const;
 export type EdgeType = typeof EDGE_TYPES[number];
 
@@ -83,27 +90,59 @@ export interface NodeLocation {
   end_line?: number;
 }
 
+// Optional metadata for knowledge nodes (article/entity/topic/claim/source)
+export interface KnowledgeMeta {
+  wikilinks?: string[];
+  backlinks?: string[];
+  category?: string;
+  content?: string;
+}
+
+// Optional metadata for domain nodes (domain/flow/step)
+export interface DomainNodeMeta {
+  entities?: string[];
+  businessRules?: string[];
+  crossDomainInteractions?: string[];
+  entryPoint?: string;
+  entryType?: 'http' | 'cli' | 'event' | 'cron' | 'manual';
+}
+
 export interface SprangNode {
   id: string;
   type: NodeType;
+  /** Canonical identifier name (e.g. filename, function name). Optional for backward compat. */
+  name?: string;
+  /** Display label — falls back to name if not set. */
   label: string;
   location?: NodeLocation;
+  /** File path relative to project root (present on file-level nodes). */
+  filePath?: string;
+  lineRange?: [number, number];
+  /** LLM-written 2-3 sentence description of what this node does. */
   summary?: string;
   complexity?: 'simple' | 'moderate' | 'complex';
   tags?: string[];
+  /** Interesting patterns, idioms, or language-specific notes about this file. */
+  languageNotes?: string;
   layer?: string;
   metadata?: Record<string, unknown>;
-  // Sprang extensions
+  domainMeta?: DomainNodeMeta;
+  knowledgeMeta?: KnowledgeMeta;
+  // Sprang-unique extensions
   decision_context?: DecisionContext;
   structural_warnings?: StructuralWarning[];
   risk_score?: number;       // 0.0–1.0
   risk_factors?: RiskFactor[];
+  /** Human-written team annotations loaded from .sprang/annotations/. */
+  annotations?: string[];
 }
 
 export interface SprangEdge {
   source: string;
   target: string;
   type: EdgeType;
+  direction?: 'forward' | 'backward' | 'bidirectional';
+  description?: string;
   weight?: number;
   metadata?: Record<string, unknown>;
 }
@@ -116,9 +155,14 @@ export interface Layer {
 }
 
 export interface TourStep {
-  node_id: string;
+  /** Primary node this step focuses on (kept for backward compat). */
+  node_id?: string;
+  /** All nodes highlighted in this step (use this for multi-node steps). */
+  node_ids?: string[];
   step_title: string;
   explanation: string;
+  /** Optional language lesson surfaced in LearnPanel. */
+  language_lesson?: string;
   highlight?: boolean;
 }
 
@@ -163,6 +207,8 @@ export interface GraphStats {
   llm_token_usage?: number;
   generated_at: string;
   phase2_completed_at?: string;
+  /** Git commit hash at analysis time — used for incremental rebuild detection. */
+  gitCommitHash?: string;
 }
 
 export type GraphPhase = 'skeleton' | 'complete';

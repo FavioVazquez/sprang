@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight,
@@ -8,7 +8,11 @@ import {
   Info,
   Layers,
   Terminal,
+  LayoutList,
+  Workflow,
 } from 'lucide-react';
+import { ReactFlow, Background, Controls, MiniMap, type Node, type Edge } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { Badge } from '../components/ui/Badge';
 import type { KnowledgeGraph, Domain, DomainFlow, DomainStep } from '../types';
 
@@ -317,7 +321,119 @@ function DomainCard({
   );
 }
 
+// ─── React Flow domain graph ─────────────────────────────────────────────────
+
+const DOMAIN_COLORS = [
+  '#d946ef', '#3b82f6', '#22c55e', '#f59e0b',
+  '#ec4899', '#06b6d4', '#84cc16', '#f97316',
+];
+
+function DomainFlowGraph({
+  domains,
+  onNodeSelect,
+}: {
+  domains: Domain[];
+  onNodeSelect: (id: string) => void;
+}) {
+  const { nodes, edges } = useMemo(() => {
+    const rfNodes: Node[] = [];
+    const rfEdges: Edge[] = [];
+    const DOMAIN_GAP_X = 340;
+    const FLOW_GAP_Y = 90;
+    const DOMAIN_HEADER_H = 60;
+
+    domains.forEach((domain, di) => {
+      const domainColor = DOMAIN_COLORS[di % DOMAIN_COLORS.length];
+      const domainX = di * DOMAIN_GAP_X;
+
+      rfNodes.push({
+        id: `domain:${domain.id}`,
+        type: 'default',
+        position: { x: domainX, y: 0 },
+        data: { label: domain.label },
+        style: {
+          background: domainColor + '18',
+          border: `1.5px solid ${domainColor}50`,
+          borderRadius: 12,
+          color: domainColor,
+          fontWeight: 700,
+          fontSize: 12,
+          padding: '6px 12px',
+          minWidth: 160,
+          textAlign: 'center',
+        },
+      });
+
+      domain.flows.forEach((flow, fi) => {
+        const flowY = DOMAIN_HEADER_H + fi * FLOW_GAP_Y;
+        rfNodes.push({
+          id: `flow:${flow.id}`,
+          type: 'default',
+          position: { x: domainX + 20, y: flowY },
+          data: { label: flow.label },
+          style: {
+            background: '#18181b',
+            border: `1px solid #3f3f46`,
+            borderRadius: 8,
+            color: '#a1a1aa',
+            fontSize: 11,
+            padding: '4px 10px',
+            minWidth: 140,
+          },
+        });
+        rfEdges.push({
+          id: `e-domain-${domain.id}-flow-${flow.id}`,
+          source: `domain:${domain.id}`,
+          target: `flow:${flow.id}`,
+          style: { stroke: domainColor + '60', strokeWidth: 1 },
+          animated: false,
+        });
+      });
+    });
+
+    return { nodes: rfNodes, edges: rfEdges };
+  }, [domains]);
+
+  return (
+    <div className="w-full h-full">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodeClick={(_e, node) => {
+          if (node.id.startsWith('flow:')) {
+            const flowId = node.id.replace('flow:', '');
+            for (const domain of domains) {
+              const flow = domain.flows.find((f) => f.id === flowId);
+              if (flow?.steps[0]?.node_ids[0]) {
+                onNodeSelect(flow.steps[0].node_ids[0]);
+              }
+            }
+          }
+        }}
+        fitView
+        colorMode="dark"
+        proOptions={{ hideAttribution: true }}
+        style={{ background: '#09090b' }}
+      >
+        <Background color="#27272a" gap={20} size={1} />
+        <Controls
+          style={{ background: '#18181b', border: '1px solid #3f3f46', color: '#a1a1aa' }}
+        />
+        <MiniMap
+          style={{ background: '#18181b', border: '1px solid #3f3f46' }}
+          nodeColor="#3f3f46"
+          maskColor="rgba(0,0,0,0.7)"
+        />
+      </ReactFlow>
+    </div>
+  );
+}
+
+// ─── Main view ────────────────────────────────────────────────────────────────
+
 export function DomainView({ graph, onNodeSelect }: DomainViewProps) {
+  const [viewMode, setViewMode] = useState<'list' | 'flow'>('list');
+
   if (!graph.domains || graph.domains.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center bg-surface-950">
@@ -344,36 +460,69 @@ export function DomainView({ graph, onNodeSelect }: DomainViewProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-surface-950">
-      <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
-        {/* Heading */}
-        <div className="space-y-1">
-          <h1 className="text-xl font-bold text-surface-50">Business Domain Explorer</h1>
-          <p className="text-sm text-surface-500">
+    <div className="flex-1 flex flex-col overflow-hidden bg-surface-950">
+      {/* Sub-nav */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-surface-800 shrink-0">
+        <div>
+          <h1 className="text-sm font-bold text-surface-100">Business Domain Explorer</h1>
+          <p className="text-xs text-surface-500 mt-0.5">
             {graph.domains.length} domain{graph.domains.length !== 1 ? 's' : ''} ·{' '}
-            {graph.domains.reduce((sum, d) => sum + d.flows.length, 0)} flows mapped
+            {graph.domains.reduce((sum, d) => sum + d.flows.length, 0)} flows
           </p>
         </div>
-
-        {/* Info banner */}
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-blue-950/50 border border-blue-900/50">
-          <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-blue-300">
-            Click any node chip to jump to it in the graph view. Expand flows to see step
-            details and entry points.
-          </p>
+        <div className="flex items-center gap-1 bg-surface-800 rounded-lg p-0.5 border border-surface-700">
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              viewMode === 'list'
+                ? 'bg-surface-700 text-surface-100'
+                : 'text-surface-500 hover:text-surface-300'
+            }`}
+          >
+            <LayoutList className="w-3.5 h-3.5" />
+            List
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('flow')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              viewMode === 'flow'
+                ? 'bg-surface-700 text-surface-100'
+                : 'text-surface-500 hover:text-surface-300'
+            }`}
+          >
+            <Workflow className="w-3.5 h-3.5" />
+            Graph
+          </button>
         </div>
-
-        {/* Domain cards */}
-        {graph.domains.map((domain) => (
-          <DomainCard
-            key={domain.id}
-            domain={domain}
-            graph={graph}
-            onNodeSelect={onNodeSelect}
-          />
-        ))}
       </div>
+
+      {viewMode === 'list' ? (
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
+            {/* Info banner */}
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-blue-950/50 border border-blue-900/50">
+              <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-300">
+                Click any node chip to jump to it in the graph view. Expand flows to see step details and entry points.
+              </p>
+            </div>
+            {graph.domains.map((domain) => (
+              <DomainCard
+                key={domain.id}
+                domain={domain}
+                graph={graph}
+                onNodeSelect={onNodeSelect}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0">
+          <DomainFlowGraph domains={graph.domains} onNodeSelect={onNodeSelect} />
+        </div>
+      )}
     </div>
   );
 }

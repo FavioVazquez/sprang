@@ -30,7 +30,15 @@ export async function sprangDiffImpact(
     return { error: 'Knowledge graph not found', code: 'GRAPH_NOT_FOUND' };
   }
 
-  const { files } = input;
+  if (!Array.isArray(input.files) || input.files.length === 0) {
+    return { error: 'files must be a non-empty array', code: 'INVALID_INPUT' };
+  }
+  if (input.files.length > 500) {
+    return { error: 'files array exceeds maximum of 500 entries', code: 'INVALID_INPUT' };
+  }
+  const files = input.files
+    .filter((f): f is string => typeof f === 'string' && f.length > 0 && f.length <= 500)
+    .map((f) => f.replace(/\\/g, '/'));
 
   // Find all nodes corresponding to the changed files
   const changedNodeIds = new Set<string>();

@@ -117,9 +117,12 @@ export class RiskScorerAgent extends BaseAgent {
     for (const tour of graph.tours) {
       const seenInTour = new Set<string>();
       for (const step of tour.steps) {
-        if (!seenInTour.has(step.node_id)) {
-          seenInTour.add(step.node_id);
-          tourAppearances.set(step.node_id, (tourAppearances.get(step.node_id) ?? 0) + 1);
+        const nodeIds = step.node_ids ?? (step.node_id ? [step.node_id] : []);
+        for (const nid of nodeIds) {
+          if (!seenInTour.has(nid)) {
+            seenInTour.add(nid);
+            tourAppearances.set(nid, (tourAppearances.get(nid) ?? 0) + 1);
+          }
         }
       }
     }
@@ -159,7 +162,7 @@ export class RiskScorerAgent extends BaseAgent {
       // ── test_gap_score ──────────────────────────────────────────────────────
       const hasDirectTest = graph.edges.some((e) => {
         if (e.target !== node.id) return false;
-        if (e.type !== 'tests' && e.type !== 'calls') return false;
+        if (e.type !== 'tested_by' && e.type !== 'calls') return false;
         return testNodeIds.has(e.source);
       });
 

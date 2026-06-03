@@ -6,7 +6,15 @@ dist/
 # Sprang runtime outputs — only keep committed artifacts
 .sprang/intermediate/
 .sprang/cache/
+.sprang/tmp/
 .sprang/*.tmp
+
+# Self-scan outputs (this repo scanning itself — not shipped with the platform)
+# NOTE: projects that USE Sprang should commit these files in their own repos.
+# This .gitignore only applies to the Sprang source repo itself.
+.sprang/knowledge-graph.json
+.sprang/SPRANG_REPORT.md
+.sprang/config.json
 
 # Dashboard build
 packages/dashboard/dist/
@@ -23,3 +31,18 @@ Thumbs.db
 # Editor
 .vscode/settings.json
 .idea/
+packages/core/tests/fixtures/git-repo/.git/
+
+# Playwright test artifacts
+test-results/
+playwright-report/
+packages/dashboard/test-results/
+packages/dashboard/playwright-report/
+
+# Development tool artifacts (never commit)
+.claude/
+.impeccable/
+.agents/skills/impeccable/
+
+# Brand image generation script (local dev tool — uses .env API key)
+generate_images.py

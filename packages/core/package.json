@@ -12,14 +12,13 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --sourcemap",
+    "build": "tsup src/index.ts src/orchestrator/phase2-runner.ts --format esm --dts --sourcemap",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.51.0",
     "chokidar": "^4.0.3",
     "fast-glob": "^3.3.3",
     "lru-cache": "^11.0.2",
@@ -34,9 +33,9 @@
     "@types/micromatch": "^4.0.9",
     "@types/node": "^22.0.0",
     "@types/object-hash": "^3.0.6",
-    "@vitest/coverage-v8": "^2.1.8",
+    "@vitest/coverage-v8": "^4.1.8",
     "tsup": "^8.3.5",
     "typescript": "^5.7.0",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.8"
   }
 }

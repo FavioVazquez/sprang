@@ -50,10 +50,10 @@ export async function sprangHealth(
     n.structural_warnings?.some((w) => w.category === 'circular_dependency')
   ).length;
 
-  // Nodes without tests: non-test nodes with no 'tests' edge pointing to them
+  // Nodes without tests: non-test nodes with no 'tested_by' edge pointing to them
   const testedNodeIds = new Set<string>();
   for (const edge of graph.edges) {
-    if (edge.type === 'tests') {
+    if (edge.type === 'tested_by') {
       testedNodeIds.add(edge.target);
     }
   }

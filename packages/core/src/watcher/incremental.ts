@@ -2,7 +2,7 @@ import path from 'node:path';
 import { stat } from 'node:fs/promises';
 import type { KnowledgeGraph, SprangNode, ScanResult } from '../schema/types.js';
 import type { SprangOptions } from '../agents/base.js';
-import { LLMClient } from '../llm/client.js';
+import { NullLLMClient } from '../llm/client.js';
 import { loadGraph, saveGraph } from '../graph/store.js';
 import { FileAnalyzerAgent } from '../agents/file-analyzer.js';
 import { writeFileAtomic, ensureDir } from '../utils/fs.js';
@@ -33,7 +33,7 @@ export async function runIncrementalUpdate(
   onProgress?.(`Incrementally updating ${changed.length} changed file(s)...`);
 
   let graph = await loadGraph(sprangDir);
-  const llm = new LLMClient(process.env['ANTHROPIC_API_KEY']);
+  const llm = new NullLLMClient();
 
   // Convert to project-relative paths
   const relativeChanged = changed.map(f =>

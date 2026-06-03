@@ -11,6 +11,10 @@ export class GraphLoader {
     this.sprangRoot = sprangRoot;
   }
 
+  getRoot(): string {
+    return this.sprangRoot;
+  }
+
   async getGraph(): Promise<KnowledgeGraph | null> {
     await this.checkAndReload();
     return this.graphCache;
@@ -37,7 +41,14 @@ export class GraphLoader {
       return;
     }
 
+    const MAX_GRAPH_BYTES = 50 * 1024 * 1024; // 50 MB safety limit
     try {
+      const fileStats = await stat(filePath);
+      if (fileStats.size > MAX_GRAPH_BYTES) {
+        this.graphCache = null;
+        this.lastMtime = 0;
+        return;
+      }
       const raw = await readFile(filePath, 'utf-8');
       const parsed = JSON.parse(raw) as KnowledgeGraph;
       this.graphCache = parsed;

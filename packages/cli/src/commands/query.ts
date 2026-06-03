@@ -32,7 +32,8 @@ export function makeQueryCommand(): Command {
         return;
       }
 
-      const limit = parseInt(options.limit, 10) || 20;
+      const rawLimit = parseInt(options.limit, 10);
+      const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(rawLimit, 1000)) : 20;
       const nodeTypes = options.types
         ? options.types.split(',').map((t) => t.trim()).filter(Boolean)
         : undefined;

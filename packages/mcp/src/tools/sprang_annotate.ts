@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { GraphLoader } from '../graph-loader.js';
 import type { SprangNode } from '@sprang/core';
 
@@ -17,7 +17,11 @@ export interface SprangAnnotateResult {
 }
 
 function sanitizeNodeId(nodeId: string): string {
-  return nodeId.replace(/[:/]/g, '-');
+  // Replace all path-unsafe and shell-special chars; then strip to basename to prevent traversal
+  const sanitized = nodeId
+    .replace(/[:/\\<>"|?*\x00-\x1f]/g, '-')
+    .replace(/\.{2,}/g, '-');
+  return basename(sanitized) || 'unknown-node';
 }
 
 export async function sprangAnnotate(

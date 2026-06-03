@@ -14,8 +14,18 @@ export async function loadGraph(_graphPath?: string): Promise<KnowledgeGraph | n
     try {
       const res = await fetch(path);
       if (res.ok) {
-        const data = await res.json();
-        return data as KnowledgeGraph;
+        const data: unknown = await res.json();
+        if (
+          data !== null &&
+          typeof data === 'object' &&
+          !Array.isArray(data) &&
+          'nodes' in data &&
+          'edges' in data &&
+          Array.isArray((data as Record<string, unknown>)['nodes']) &&
+          Array.isArray((data as Record<string, unknown>)['edges'])
+        ) {
+          return data as KnowledgeGraph;
+        }
       }
     } catch {
       // Try next path
