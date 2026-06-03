@@ -66,10 +66,24 @@ Steps:
    Replace <ABSOLUTE_PATH_TO_SPRANG> with the real path where you cloned it,
    and <ABSOLUTE_PATH_TO_THIS_PROJECT> with the current workspace root.
 
-5. Copy the Cascade rules into this project so Sprang runs automatically:
-   cp ~/tools/sprang/.devin/rules/sprang-context.md .devin/rules/
-   cp ~/tools/sprang/.devin/rules/sprang-highrisk.md .devin/rules/
-   (create .devin/rules/ if it does not exist)
+5. Copy the rules, workflows, and skills into this project:
+
+   Rules (tell Cascade to use Sprang automatically before/after every edit):
+     mkdir -p .devin/rules
+     cp ~/tools/sprang/.devin/rules/sprang-context.md .devin/rules/
+     cp ~/tools/sprang/.devin/rules/sprang-highrisk.md .devin/rules/
+
+   Workflows (the /sprang-* slash commands for Windsurf / Cascade):
+     mkdir -p .windsurf/workflows
+     cp ~/tools/sprang/.windsurf/workflows/*.md .windsurf/workflows/
+
+   Skills (the same /sprang-* commands for Devin Desktop):
+     mkdir -p .windsurf/skills
+     cp -r ~/tools/sprang/.windsurf/skills/sprang* .windsurf/skills/
+
+   Symlink .devin/workflows and .devin/skills so Devin Desktop also finds them:
+     ln -sf ../.windsurf/workflows .devin/workflows
+     ln -sf ../.windsurf/skills .devin/skills
 
 6. Run the initial scan on this project:
    sprang scan . --phase1-only
