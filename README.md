@@ -37,7 +37,7 @@ Cascade is the intelligence layer. Sprang is the data layer. Together they answe
 
 ## Quick install — just ask Cascade
 
-Paste this prompt into Cascade (or any AI agent with terminal access). It will do everything — clone, build, wire up the MCP server, copy the slash commands and rules, and run the first scan. When it finishes, you reload Windsurf once and you're live.
+Paste this prompt into Cascade (or any AI agent with terminal access). It will do everything — clone, build, wire up the MCP server, copy the slash commands and rules, run the first scan, and start the dashboard. When it finishes, you reload Windsurf once and you're live.
 
 ```
 Please install the Sprang knowledge graph platform for this project.
@@ -46,12 +46,17 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 1. Clone Sprang to ~/tools/sprang (skip if it already exists):
    git clone https://github.com/FavioVazquez/sprang.git ~/tools/sprang
 
-2. Install dependencies and build all packages:
-   pnpm install  (run in ~/tools/sprang)
-   pnpm build    (run in ~/tools/sprang)
+2. Install dependencies and build all packages (run both in ~/tools/sprang):
+   pnpm install
+   pnpm build
 
-3. Link the CLI globally so `sprang` works from any terminal:
-   pnpm --filter @sprang/cli link --global  (run in ~/tools/sprang)
+3. Link the CLI globally so `sprang` works from any terminal.
+   Run these commands in ~/tools/sprang/packages/cli:
+     pnpm setup
+     export PNPM_HOME="$HOME/.local/share/pnpm"
+     export PATH="$PNPM_HOME:$PATH"
+     pnpm link --global
+   Verify: which sprang  (should print a path ending in /sprang)
 
 4. Determine the two absolute paths you need:
    SPRANG_DIR = the absolute path where you cloned sprang (~/tools/sprang resolved)
@@ -92,13 +97,21 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 
 6. Run the initial scan of this project (Phase 1 — fully static, under 60s):
    sprang scan . --phase1-only
+   (If `sprang` is not yet in PATH, use: node ~/tools/sprang/packages/cli/dist/index.js scan . --phase1-only)
 
-7. Report a summary of what was installed and where. Then tell me:
+7. Start the dashboard (run in ~/tools/sprang, non-blocking).
+   Set SPRANG_ROOT so the dashboard finds the right knowledge-graph.json:
+   SPRANG_ROOT="PROJECT_DIR" pnpm --filter @sprang/dashboard preview
+   The dashboard will be available at http://localhost:7777
+   It reads PROJECT_DIR/.sprang/knowledge-graph.json automatically.
+
+8. Report a summary of what was installed and where. Then tell me:
    "Please reload Windsurf now (Cmd/Ctrl+Shift+P → Reload Window) so the
-   MCP server activates. Once reloaded, type /sprang-onboard to begin."
+   MCP server activates. Dashboard is live at http://localhost:7777.
+   Once reloaded, type /sprang-onboard to begin."
 ```
 
-> After Cascade finishes, **reload Windsurf once** (`Cmd/Ctrl+Shift+P` → *Reload Window*), then type `/sprang-onboard` in the chat.
+> After Cascade finishes, **reload Windsurf once** (`Cmd/Ctrl+Shift+P` → *Reload Window*), then type `/sprang-onboard` in the chat. The dashboard is immediately available at **http://localhost:7777** — no extra steps needed.
 
 ---
 
@@ -216,8 +229,8 @@ graph LR
 
 ```bash
 # 1. Clone
-git clone https://github.com/FavioVazquez/sprang.git
-cd sprang
+git clone https://github.com/FavioVazquez/sprang.git ~/tools/sprang
+cd ~/tools/sprang
 
 # 2. Install all dependencies
 pnpm install
@@ -226,13 +239,27 @@ pnpm install
 pnpm build
 
 # 4. Link CLI globally (so `sprang` works from anywhere)
-pnpm --filter @sprang/cli link --global
+#    pnpm setup adds PNPM_HOME to your shell profile automatically
+cd packages/cli
+pnpm setup
+export PNPM_HOME="$HOME/.local/share/pnpm"
+export PATH="$PNPM_HOME:$PATH"
+pnpm link --global
+cd ../..
 ```
 
 ```bash
 # Verify
-sprang --version   # 0.1.0
+which sprang        # should print $PNPM_HOME/sprang
+sprang --version    # 0.1.1
 sprang --help
+```
+
+```bash
+# 5. Start the dashboard (serves the pre-built dist/ — instant, no compilation)
+#    Set SPRANG_ROOT to tell the dashboard which project's graph to load
+SPRANG_ROOT="/path/to/your/project" pnpm --filter @sprang/dashboard preview
+# Open http://localhost:7777
 ```
 
 ---
@@ -314,7 +341,17 @@ ln -sf ../.windsurf/workflows .devin/workflows
 ln -sf ../.windsurf/skills .devin/skills
 ```
 
-### Step 4 — Reload Windsurf and run onboarding
+### Step 4 — Start the dashboard
+
+The dashboard serves the pre-built `dist/` — no compilation, instant startup:
+
+```bash
+SPRANG_ROOT="$(pwd)" pnpm --filter @sprang/dashboard preview
+```
+
+Open **http://localhost:7777**. It reads `.sprang/knowledge-graph.json` directly from your project.
+
+### Step 5 — Reload Windsurf and run onboarding
 
 Reload the window (`Cmd/Ctrl+Shift+P` → *Reload Window*) to activate the MCP server, then:
 
