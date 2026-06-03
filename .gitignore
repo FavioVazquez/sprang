@@ -9,6 +9,13 @@ dist/
 .sprang/tmp/
 .sprang/*.tmp
 
+# Self-scan outputs (this repo scanning itself — not shipped with the platform)
+# NOTE: projects that USE Sprang should commit these files in their own repos.
+# This .gitignore only applies to the Sprang source repo itself.
+.sprang/knowledge-graph.json
+.sprang/SPRANG_REPORT.md
+.sprang/config.json
+
 # Dashboard build
 packages/dashboard/dist/
 
