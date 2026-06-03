@@ -1,0 +1,42 @@
+{
+  "name": "@sprang/core",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --sourcemap",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.51.0",
+    "chokidar": "^4.0.3",
+    "fast-glob": "^3.3.3",
+    "lru-cache": "^11.0.2",
+    "micromatch": "^4.0.8",
+    "object-hash": "^3.0.0",
+    "p-queue": "^8.0.1",
+    "simple-git": "^3.27.0",
+    "web-tree-sitter": "^0.24.7",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/micromatch": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "@types/object-hash": "^3.0.6",
+    "@vitest/coverage-v8": "^2.1.8",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.8"
+  }
+}

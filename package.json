@@ -1,0 +1,23 @@
+{
+  "name": "sprang",
+  "private": true,
+  "type": "module",
+  "description": "The qualitative leap — a knowledge graph for Devin Desktop that turns codebase comprehension into a single discontinuous moment.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm -r --filter './packages/*' build",
+    "test": "pnpm -r --filter './packages/*' test",
+    "typecheck": "pnpm -r --filter './packages/*' typecheck",
+    "lint": "eslint .",
+    "dev:dashboard": "pnpm --filter @sprang/dashboard dev",
+    "clean": "pnpm -r --filter './packages/*' exec rm -rf dist *.tsbuildinfo"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^16.0.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.0.0"
+  }
+}

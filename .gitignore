@@ -1,0 +1,25 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.turbo/
+
+# Sprang runtime outputs — only keep committed artifacts
+.sprang/intermediate/
+.sprang/cache/
+.sprang/*.tmp
+
+# Dashboard build
+packages/dashboard/dist/
+
+# Local env
+.env
+.env.local
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/

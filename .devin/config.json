@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sprang": {
+      "command": "npx",
+      "args": ["sprang-mcp"],
+      "env": {
+        "SPRANG_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}
