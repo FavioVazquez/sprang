@@ -17,7 +17,7 @@
   <a href="#manual-installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-8_tools-7C3AED?style=flat-square" alt="8 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-202_passing-10B981?style=flat-square" alt="202 unit tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-277_passing-10B981?style=flat-square" alt="277 unit tests passing"/>
   <img src="https://img.shields.io/badge/e2e_tests-15_passing-10B981?style=flat-square" alt="15 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
@@ -645,7 +645,7 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 202 unit tests across core/dashboard/mcp, zero failures
+pnpm test              # 277 unit tests across core/dashboard/mcp, zero failures
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at localhost:5173
 pnpm --filter @sprang/dashboard test:e2e   # 15 Playwright e2e tests (15 parallel workers)
@@ -655,10 +655,10 @@ pnpm --filter @sprang/dashboard test:e2e   # 15 Playwright e2e tests (15 paralle
 
 | Package | Runner | Count | What is tested |
 |---|---|---|---|
-| `@sprang/core` | Vitest | 120 | Schema validators, all 6 agents, pipeline integration |
+| `@sprang/core` | Vitest | 228 | Schema validators, all 6 agents, pipeline integration, multi-language |
 | `@sprang/dashboard` | Vitest | 33 | Zustand store (26), BFS pathfinder (7) |
 | `@sprang/mcp` | Vitest | 49 | GraphLoader (3), sprang_node + sprang_annotate (11), all 8 MCP tools (35) |
-| **Total unit** | | **202** | |
+| **Total unit** | | **277** | |
 | `@sprang/dashboard` | Playwright | 15 | Full UI e2e — loading, nav, keyboard shortcuts, health, domains, search, onboarding |
 
 ```
@@ -666,14 +666,18 @@ packages/core/tests/
 ├── schema/
 │   └── validators.test.ts        21 tests — Zod schema, round-trip serialization
 ├── agents/
-│   ├── project-scanner.test.ts    6 tests — file discovery, language detection
-│   ├── file-analyzer.test.ts      5 tests — AST parsing, edge extraction
-│   ├── smell-detector.test.ts    14 tests — circular-deps, god-node, clean baseline
-│   ├── risk-scorer.test.ts       15 tests — formula weights, factor tags
-│   ├── git-layer.test.ts          6 tests — commit association, PR refs
-│   └── architecture-analyzer.test.ts  8 tests — layer clustering
+│   ├── project-scanner.test.ts      6 tests — file discovery, language detection
+│   ├── file-analyzer.test.ts        5 tests — AST parsing, edge extraction
+│   ├── smell-detector.test.ts      14 tests — circular-deps, god-node, clean baseline
+│   ├── risk-scorer.test.ts         15 tests — formula weights, factor tags
+│   ├── git-layer.test.ts            6 tests — commit association, PR refs
+│   ├── architecture-analyzer.test.ts  8 tests — layer clustering
+│   ├── multi-lang-imports.test.ts  50 tests — per-language import extraction + resolver
+│   └── multi-lang-symbols.test.ts  34 tests — per-language symbol parsing
 └── integration/
-    └── pipeline.test.ts          13 tests — full Phase 1 against simple-ts/ fixture
+    ├── pipeline.test.ts            13 tests — full Phase 1 against simple-ts/ fixture
+    ├── pipeline-python.test.ts      8 tests — full Phase 1 against simple-python/ fixture
+    └── pipeline-multilang.test.ts  16 tests — Go, Rust, Java, Ruby, C, Kotlin pipelines
 
 packages/dashboard/src/
 ├── store.test.ts           26 tests — Zustand store state transitions
@@ -708,6 +712,15 @@ packages/mcp/tests/
 
 | Fixture | Purpose |
 |---|---|
+| `simple-python/` | Python import edges, def/class nodes |
+| `simple-go/` | Go func/struct nodes, block imports |
+| `simple-rust/` | Rust fn/struct/enum nodes, mod edges |
+| `simple-java/` | Java class/method nodes, import edges |
+| `simple-ruby/` | Ruby class/def nodes, require_relative edges |
+| `simple-php/` | PHP class/function nodes, require edges |
+| `simple-c/` | C function nodes, #include edges |
+| `simple-csharp/` | C# class/method nodes, using edges |
+| `simple-kotlin/` | Kotlin fun/class nodes, import edges |
 | `simple-ts/` | 3 clean TS files — baseline |
 | `circular-deps/` | A→B→C→A cycle for smell detection |
 | `god-node/` | 30+ imports, 300+ LOC |

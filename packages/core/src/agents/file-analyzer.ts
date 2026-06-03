@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { join, basename, relative } from 'node:path';
+import { join } from 'node:path';
 import { ensureDir } from '../utils/fs.js';
 import type {
   KnowledgeGraph,
@@ -13,23 +13,8 @@ import type {
 import { BaseAgent } from './base.js';
 import type { AgentContext, AgentResult } from './base.js';
 import { writeFileAtomic } from '../utils/fs.js';
-
-// Regex patterns for extracting code symbols
-const FUNCTION_DECL_RE =
-  /^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(/gm;
-const ARROW_FN_RE =
-  /^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*(?::\s*[^=>{]+)?\s*=>/gm;
-// Arrow with single param (no parens): export const foo = async x =>
-const ARROW_FN_SINGLE_RE =
-  /^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(\w+)\s*=>/gm;
-const CLASS_RE =
-  /^(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+(\w+)/gm;
-const METHOD_RE =
-  /^\s+(?:(?:public|private|protected|static|async|override)\s+)*(\w+)\s*\([^)]*\)\s*(?::\s*[^{]+)?\s*\{/gm;
-
-function countLines(source: string): number {
-  return source.split('\n').length;
-}
+import { resolveLanguageImport } from './project-scanner.js';
+import { parseSymbols } from './language-parsers/index.js';
 
 function complexityFromLoc(loc: number): 'simple' | 'moderate' | 'complex' {
   if (loc < 20) return 'simple';
@@ -164,10 +149,11 @@ export class FileAnalyzerAgent extends BaseAgent {
       const analysisDir = join(ctx.intermediateDir, 'file-analysis');
       await ensureDir(analysisDir);
 
-      const tsJsFiles = scanResult.files.filter((f) => {
-        const lang = f.language;
-        return lang === 'typescript' || lang === 'javascript';
-      });
+      const SUPPORTED_LANGS = new Set([
+        'typescript', 'javascript', 'python', 'go', 'rust',
+        'java', 'kotlin', 'ruby', 'php', 'c', 'cpp', 'csharp',
+      ]);
+      const tsJsFiles = scanResult.files.filter((f) => SUPPORTED_LANGS.has(f.language));
 
       for (const fileRecord of tsJsFiles) {
         let source: string;
@@ -181,8 +167,10 @@ export class FileAnalyzerAgent extends BaseAgent {
         const totalLines = lines.length;
         const fileNodeId = `file:${fileRecord.path}`;
 
-        const fnMatches = findFunctions(source);
-        const classMatches = findClasses(source);
+        const lang = fileRecord.language;
+        const isNative = lang === 'typescript' || lang === 'javascript';
+        const fnMatches = isNative ? findFunctions(source) : parseSymbols(lang, source).functions;
+        const classMatches = isNative ? findClasses(source) : parseSymbols(lang, source).classes;
 
         const functions: FunctionRecord[] = [];
         const classes: ClassRecord[] = [];
@@ -295,57 +283,24 @@ export class FileAnalyzerAgent extends BaseAgent {
         );
       }
 
-      // Also add import edges from importMap
+      // Add import edges from importMap using language-aware resolver
+      const allRelPaths = new Set(scanResult.files.map((f) => f.path));
+      const langByPath = new Map(scanResult.files.map((f) => [f.path, f.language]));
       for (const [fromRelPath, importPaths] of Object.entries(scanResult.importMap)) {
         const fromNodeId = `file:${fromRelPath}`;
+        const lang = langByPath.get(fromRelPath) ?? 'unknown';
         for (const importPath of importPaths) {
-          // Only create edges for relative imports
-          if (!importPath.startsWith('.')) continue;
-          // Resolve the import path relative to the importing file
-          // Strip .js extension and try to match an existing node
-          const normalized = importPath.replace(/\.js$/, '');
-          // Try to find a matching file node
-          const candidatePaths = [
-            normalized + '.ts',
-            normalized + '.tsx',
-            normalized + '.js',
-            normalized + '/index.ts',
-            normalized + '/index.js',
-          ];
-
-          const fromDir = fromRelPath.split('/').slice(0, -1).join('/');
-          for (const candidate of candidatePaths) {
-            const relCandidate = fromDir
-              ? fromDir + '/' + candidate.replace(/^\.\//, '')
-              : candidate.replace(/^\.\//, '');
-            // Clean up any ../
-            const parts = relCandidate.split('/');
-            const resolved: string[] = [];
-            for (const part of parts) {
-              if (part === '..') {
-                resolved.pop();
-              } else if (part !== '.') {
-                resolved.push(part);
-              }
-            }
-            const resolvedPath = resolved.join('/');
-            const targetNodeId = `file:${resolvedPath}`;
-            // Check if target exists in graph or in the new nodes
-            const existsInGraph = graph.nodes.some((n) => n.id === targetNodeId);
-            const existsInNew = newNodes.some((n) => n.id === targetNodeId);
-            if (existsInGraph || existsInNew) {
-              // Check for duplicate edge
-              const alreadyExists = newEdges.some(
-                (e) => e.source === fromNodeId && e.target === targetNodeId && e.type === 'imports'
-              );
-              if (!alreadyExists) {
-                newEdges.push({
-                  source: fromNodeId,
-                  target: targetNodeId,
-                  type: 'imports',
-                });
-              }
-              break;
+          const resolvedPath = resolveLanguageImport(lang, importPath, fromRelPath, allRelPaths);
+          if (!resolvedPath) continue;
+          const targetNodeId = `file:${resolvedPath}`;
+          const existsInGraph = graph.nodes.some((n) => n.id === targetNodeId);
+          const existsInNew = newNodes.some((n) => n.id === targetNodeId);
+          if (existsInGraph || existsInNew) {
+            const alreadyExists = newEdges.some(
+              (e) => e.source === fromNodeId && e.target === targetNodeId && e.type === 'imports'
+            );
+            if (!alreadyExists) {
+              newEdges.push({ source: fromNodeId, target: targetNodeId, type: 'imports' });
             }
           }
         }

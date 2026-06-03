@@ -6,6 +6,48 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.1.1] — 2026-06-03
+
+Multi-language support — Phase 1 pipeline now covers Python, Go, Rust, Java, Ruby, PHP, C/C++, C#, and Kotlin.
+
+### Added
+
+- **Import edge extraction** for all 9 new languages in `@sprang/core` `project-scanner`:
+  - Python (`import`, `from … import`, relative dot imports)
+  - Go (single and block `import (…)` declarations)
+  - Rust (`use crate::`, `use super::`, `mod name;`)
+  - Java / Kotlin (`import com.example.Class`)
+  - Ruby (`require_relative`, `require`)
+  - PHP (`require`, `include`, `use`)
+  - C / C++ (`#include "local.h"` — quoted only, system headers skipped)
+  - C# (`using Namespace.Class`)
+- **Language-aware import path resolver** `resolveLanguageImport()` — maps raw import strings to relative file paths in the project for BFS blast-radius
+- **Symbol extraction** (function/class nodes) for all 9 new languages via new `language-parsers/` module:
+  - Python: `def`, `async def`, `class` (with export = top-level + not underscore-prefixed)
+  - Go: `func`, `type X struct`, `type X interface`
+  - Rust: `fn`, `pub fn`, `async fn`, `struct`, `enum`, `trait`
+  - Java: `class`, `interface`, `enum`, `record`; method signatures
+  - Kotlin: `fun`, `suspend fun`, `class`, `data class`, `object`, `interface`
+  - Ruby: `def`, `def self.`, `class`, `module`
+  - PHP: `function`, `class`, `interface`, `trait`, `abstract class`
+  - C / C++: function definitions, `struct`, `class`, `union`
+  - C#: `class`, `interface`, `struct`, `record`; method signatures; `async` detection
+- **`ENTRY_POINT_PATTERNS`** expanded to cover Python (`main.py`, `app.py`, `__main__.py`, `manage.py`), Go (`main.go`), Rust (`src/main.rs`, `src/lib.rs`), Java/Kotlin, Ruby, PHP, C/C++, C#
+- **9 language test fixtures**: `simple-python`, `simple-go`, `simple-rust`, `simple-java`, `simple-ruby`, `simple-php`, `simple-c`, `simple-csharp`, `simple-kotlin`
+- **108 new tests** (228 total in `@sprang/core`):
+  - `tests/agents/multi-lang-imports.test.ts` — 50 tests (per-language extraction + resolver)
+  - `tests/agents/multi-lang-symbols.test.ts` — 34 tests (per-language symbol parsing)
+  - `tests/integration/pipeline-python.test.ts` — 8 tests (full Phase 1 pipeline)
+  - `tests/integration/pipeline-multilang.test.ts` — 16 tests (Go, Rust, Java, Ruby, C, Kotlin)
+
+### Changed
+
+- `FileAnalyzerAgent` now processes all 10 source languages (was TS/JS only); TS/JS use existing regex-based extractors, all others use new `language-parsers/` dispatch
+- `ProjectScannerAgent` sets `fileCategory=source` for all languages in `SOURCE_LANGUAGES` (was TS/JS only)
+- `file-analyzer.ts` import edge resolution replaced with language-aware `resolveLanguageImport()` (backwards compatible)
+
+---
+
 ## [0.1.0] — 2026-06-03
 
 Initial public release of the Sprang knowledge graph platform.
