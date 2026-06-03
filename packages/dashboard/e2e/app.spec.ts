@@ -109,6 +109,11 @@ async function gotoApp(page: Page) {
   await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
 }
 
+// Scope tab clicks to the desktop nav to avoid strict-mode collision with MobileBottomNav
+function navTab(page: Page, name: string) {
+  return page.getByRole('navigation').getByRole('button', { name: new RegExp(`^${name}$`, 'i') });
+}
+
 // Legacy helper kept for error-state tests that call goto directly
 async function waitForAppLoaded(page: Page) {
   await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
@@ -151,13 +156,13 @@ test('loaded state – nav and tabs visible', async ({ page }) => {
   await gotoApp(page);
 
   // Graph tab visible
-  await expect(page.getByRole('button', { name: /^Graph$/i })).toBeVisible();
+  await expect(navTab(page, 'Graph')).toBeVisible();
 
   // Health tab
-  await expect(page.getByRole('button', { name: /^Health$/i })).toBeVisible();
+  await expect(navTab(page, 'Health')).toBeVisible();
 
   // Domains tab
-  await expect(page.getByRole('button', { name: /^Domains$/i })).toBeVisible();
+  await expect(navTab(page, 'Domains')).toBeVisible();
 
   // Search button (in GraphView toolbar)
   await expect(page.getByRole('button', { name: /search/i })).toBeVisible();
@@ -173,19 +178,19 @@ test('navigation – switching between graph, health, and domains tabs', async (
   await gotoApp(page);
 
   // Switch to Health
-  await page.getByRole('button', { name: /^Health$/i }).click();
+  await navTab(page, 'Health').click();
   await expect(
     page.getByRole('heading', { name: 'Structural Health Report' }),
   ).toBeVisible({ timeout: 10000 });
 
   // Switch to Domains
-  await page.getByRole('button', { name: /^Domains$/i }).click();
+  await navTab(page, 'Domains').click();
   await expect(
     page.getByText(/No domain analysis yet|Business Domain Explorer|Domain/i).first(),
   ).toBeVisible({ timeout: 10000 });
 
   // Switch back to Graph
-  await page.getByRole('button', { name: /^Graph$/i }).click();
+  await navTab(page, 'Graph').click();
   // The GraphView toolbar shows the project name
   await expect(page.getByText('Test Project')).toBeVisible({ timeout: 10000 });
 });
@@ -261,7 +266,7 @@ test('keyboard shortcut – d switches to domains view', async ({ page }) => {
   await page.keyboard.press('d');
 
   await expect(
-    page.getByRole('button', { name: /^Domains$/i }),
+    navTab(page, 'Domains'),
   ).toBeVisible({ timeout: 5000 });
   // Domains view shows the domain name or "Business Domain" text
   await expect(
@@ -295,7 +300,7 @@ test('health view – shows smell summary and risk counts', async ({ page }) => 
   await mockGraphRoute(page);
   await gotoApp(page);
 
-  await page.getByRole('button', { name: /^Health$/i }).click();
+  await navTab(page, 'Health').click();
 
   const heading = page.getByRole('heading', { name: 'Structural Health Report' });
   await expect(heading).toBeVisible({ timeout: 10000 });
@@ -311,7 +316,7 @@ test('domains view – renders domain from graph', async ({ page }) => {
   await mockGraphRoute(page);
   await gotoApp(page);
 
-  await page.getByRole('button', { name: /^Domains$/i }).click();
+  await navTab(page, 'Domains').click();
 
   await expect(
     page.getByText(/Authentication|No domain/i).first(),
@@ -375,7 +380,7 @@ test('graph view – project name visible in toolbar', async ({ page }) => {
   await gotoApp(page);
 
   // Make sure we're on the graph view
-  await page.getByRole('button', { name: /^Graph$/i }).click();
+  await navTab(page, 'Graph').click();
   await expect(page.getByText('Test Project')).toBeVisible({ timeout: 10000 });
 });
 
@@ -387,7 +392,7 @@ test('nav bar – logo persists across all view switches', async ({ page }) => {
   await gotoApp(page);
 
   for (const tab of ['Health', 'Domains', 'Graph']) {
-    await page.getByRole('button', { name: new RegExp(`^${tab}$`, 'i') }).click();
+    await navTab(page, tab).click();
     await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 5000 });
   }
 });
