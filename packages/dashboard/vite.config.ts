@@ -52,6 +52,24 @@ const EXT_TO_LANG: Record<string, string> = {
 
 type ConnectServer = { middlewares: import('vite').Connect.Server };
 
+// ---------------------------------------------------------------------------
+// Cascade Bridge helpers
+// ---------------------------------------------------------------------------
+function getTriggerFilePath(): string {
+  return path.join(getSprangRoot(), '.cascade-trigger');
+}
+
+function getResponseFilePath(): string {
+  return path.join(getSprangRoot(), '.sprang', 'cascade-response.json');
+}
+
+/** Write a message to .cascade-trigger so the cascade-bridge extension picks it up */
+function writeCascadeTrigger(message: string): void {
+  const tmp = getTriggerFilePath() + '.tmp';
+  fs.writeFileSync(tmp, message, 'utf-8');
+  fs.renameSync(tmp, getTriggerFilePath());
+}
+
 function attachSprangMiddlewares(server: ConnectServer) {
   // GET /knowledge-graph.json
   server.middlewares.use('/knowledge-graph.json', (_req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
@@ -138,6 +156,66 @@ function attachSprangMiddlewares(server: ConnectServer) {
 
     res.end(JSON.stringify({ path: normalized, language, content }));
   });
+
+  // POST /cascade-ask  { "message": "..." }
+  // Writes the message to .cascade-trigger so cascade-bridge picks it up.
+  server.middlewares.use('/cascade-ask', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
+    if (req.method !== 'POST') { res.statusCode = 405; res.end(JSON.stringify({ error: 'POST only' })); return; }
+
+    let body = '';
+    req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+    req.on('end', () => {
+      try {
+        const { message } = JSON.parse(body) as { message?: string };
+        if (!message || typeof message !== 'string' || message.trim() === '') {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'message field required' }));
+          return;
+        }
+        // Clear previous response before asking
+        const responsePath = getResponseFilePath();
+        if (fs.existsSync(responsePath)) fs.unlinkSync(responsePath);
+
+        writeCascadeTrigger(message.trim());
+        res.statusCode = 200;
+        res.end(JSON.stringify({ ok: true, sent: message.trim() }));
+      } catch {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+      }
+    });
+  });
+
+  // GET /cascade-response
+  // Polls for the response written by the sprang_respond MCP tool.
+  server.middlewares.use('/cascade-response', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    if (req.method === 'DELETE') {
+      const responsePath = getResponseFilePath();
+      if (fs.existsSync(responsePath)) fs.unlinkSync(responsePath);
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    const responsePath = getResponseFilePath();
+    if (fs.existsSync(responsePath)) {
+      try {
+        const data = fs.readFileSync(responsePath, 'utf-8');
+        res.statusCode = 200;
+        res.end(data);
+      } catch {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: 'Failed to read response' }));
+      }
+    } else {
+      res.statusCode = 204;
+      res.end();
+    }
+  });
 }
 
 // Serve knowledge-graph.json, file-content.json, and diff-overlay.json
@@ -164,5 +242,6 @@ export default defineConfig({
   },
   preview: {
     port: 7777,
+    host: true,
   },
 });
