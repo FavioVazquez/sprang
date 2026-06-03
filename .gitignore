@@ -36,3 +36,6 @@ packages/dashboard/playwright-report/
 .claude/
 .impeccable/
 .agents/skills/impeccable/
+
+# Brand image generation script (local dev tool — uses .env API key)
+generate_images.py
