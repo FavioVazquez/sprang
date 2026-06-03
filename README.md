@@ -17,7 +17,8 @@
   <a href="#manual-installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-8_tools-7C3AED?style=flat-square" alt="8 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/tests-167_passing-10B981?style=flat-square" alt="167 tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-202_passing-10B981?style=flat-square" alt="202 unit tests passing"/>
+  <img src="https://img.shields.io/badge/e2e_tests-15_passing-10B981?style=flat-square" alt="15 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
 </p>
@@ -644,33 +645,63 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 167 tests, zero failures
+pnpm test              # 202 unit tests across core/dashboard/mcp, zero failures
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at localhost:5173
-pnpm --filter @sprang/dashboard test:e2e   # Playwright E2E tests
+pnpm --filter @sprang/dashboard test:e2e   # 15 Playwright e2e tests (15 parallel workers)
 ```
 
 ### Test structure
 
+| Package | Runner | Count | What is tested |
+|---|---|---|---|
+| `@sprang/core` | Vitest | 120 | Schema validators, all 6 agents, pipeline integration |
+| `@sprang/dashboard` | Vitest | 33 | Zustand store (26), BFS pathfinder (7) |
+| `@sprang/mcp` | Vitest | 49 | GraphLoader (3), sprang_node + sprang_annotate (11), all 8 MCP tools (35) |
+| **Total unit** | | **202** | |
+| `@sprang/dashboard` | Playwright | 15 | Full UI e2e — loading, nav, keyboard shortcuts, health, domains, search, onboarding |
+
 ```
 packages/core/tests/
-├── schema/                 Zod validators, round-trip
+├── schema/
+│   └── validators.test.ts        21 tests — Zod schema, round-trip serialization
 ├── agents/
-│   ├── project-scanner.test.ts
-│   ├── file-analyzer.test.ts
-│   ├── smell-detector.test.ts    circular-deps, god-node, clean baseline
-│   ├── risk-scorer.test.ts       formula weights, factor tags
-│   ├── git-layer.test.ts         commit association, PR refs
-│   └── architecture-analyzer.test.ts
+│   ├── project-scanner.test.ts    6 tests — file discovery, language detection
+│   ├── file-analyzer.test.ts      5 tests — AST parsing, edge extraction
+│   ├── smell-detector.test.ts    14 tests — circular-deps, god-node, clean baseline
+│   ├── risk-scorer.test.ts       15 tests — formula weights, factor tags
+│   ├── git-layer.test.ts          6 tests — commit association, PR refs
+│   └── architecture-analyzer.test.ts  8 tests — layer clustering
 └── integration/
-    └── pipeline.test.ts          full Phase 1 against simple-ts/ fixture
+    └── pipeline.test.ts          13 tests — full Phase 1 against simple-ts/ fixture
 
 packages/dashboard/src/
-├── store.test.ts           Zustand store unit tests
-└── pathfinder.test.ts      BFS pathfinder unit tests
+├── store.test.ts           26 tests — Zustand store state transitions
+└── pathfinder.test.ts       7 tests — BFS shortest path
 
-packages/dashboard/e2e/     Playwright UI tests
-packages/mcp/tests/         MCP tool integration tests
+packages/dashboard/e2e/
+└── app.spec.ts             15 tests — Playwright, 15 parallel workers
+    ├── error state (no graph, retry button)
+    ├── loaded state (nav, tabs)
+    ├── navigation (graph → health → domains)
+    ├── keyboard shortcuts (Ctrl+K, h, g, d, ?)
+    ├── health view (heading, god_node smell)
+    ├── domains view (domain label rendered)
+    ├── search dialog (open, type, filter, close)
+    ├── onboarding overlay (dismiss)
+    ├── graph toolbar (project name)
+    └── nav bar (logo persistence)
+
+packages/mcp/tests/
+├── graph-loader.test.ts     3 tests — load, null-on-missing, hot-reload
+├── sprang-node.test.ts     11 tests — sprang_node enrichment, sprang_annotate
+└── mcp-tools.test.ts       35 tests — all 8 MCP tools:
+    ├── sprang_health  (7)  — counts, risk summary, smells, orphan detection
+    ├── sprang_tour    (7)  — default/id, junior/senior/pm persona, step enrichment
+    ├── sprang_query   (6)  — label/summary match, empty, type filter, limit
+    ├── sprang_diff    (5)  — changed nodes, BFS blast radius, unknown files
+    ├── sprang_domain  (4)  — list all, detail by name, unknown error
+    └── sprang_why     (6)  — label/summary, decision_context, graceful no-context
 ```
 
 ### Test fixtures
