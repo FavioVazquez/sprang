@@ -40,3 +40,6 @@ export {
 export const VERSION = '1.1.0';
 export const VERSION = '1.2.0';
 export const VERSION = '1.3.0';
+export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
+export const VERSION = '1.3.0';

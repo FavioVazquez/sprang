@@ -109,3 +109,8 @@ export async function apiLogout(): Promise<ApiResponse<void>> {
 // health check endpoint
 // audit log
 // pagination
+// api v1.1
+// rate limiting
+// health check endpoint
+// audit log
+// pagination

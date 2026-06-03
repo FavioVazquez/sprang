@@ -1,14 +1,14 @@
 # Sprang Report: sprang
 
-> Generated at: 2026-06-03T08:59:13.568Z
+> Generated at: 2026-06-03T16:45:04.414Z
 
 ## Summary
 
 - **Project**: sprang
-- **Root**: /home/user/sprang
-- **Files scanned**: 313
-- **Graph nodes**: 2106
-- **Graph edges**: 1985
+- **Root**: /home/ec2-user/favio/sprang
+- **Files scanned**: 169
+- **Graph nodes**: 446
+- **Graph edges**: 516
 
 ## Languages
 
@@ -19,7 +19,6 @@
 - html
 - javascript
 - css
-- toml
 - bash
 
 ## Frameworks

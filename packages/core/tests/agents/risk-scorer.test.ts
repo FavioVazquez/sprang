@@ -113,7 +113,7 @@ describe('RiskScorerAgent', () => {
       const testFile = testFileNode('file:service.test.ts', 'service.test.ts');
 
       const graph = makeGraph([sourceFile, testFile], [
-        edge('file:service.test.ts', 'file:service.ts', 'tests'),
+        edge('file:service.test.ts', 'file:service.ts', 'tested_by'),
       ]);
 
       const result = await agent.run(makeCtx(graph));
@@ -148,7 +148,7 @@ describe('RiskScorerAgent', () => {
 
       const graph = makeGraph([leaf, dep, testFile], [
         edge('file:leaf.ts', 'file:dep.ts', 'imports'),
-        edge('file:leaf.test.ts', 'file:leaf.ts', 'tests'),
+        edge('file:leaf.test.ts', 'file:leaf.ts', 'tested_by'),
       ]);
 
       const result = await agent.run(makeCtx(graph));
@@ -167,7 +167,7 @@ describe('RiskScorerAgent', () => {
       const testFile = testFileNode('file:src.test.ts', 'src.test.ts');
 
       const graph = makeGraph([src, testFile], [
-        edge('file:src.test.ts', 'file:src.ts', 'tests'),
+        edge('file:src.test.ts', 'file:src.ts', 'tested_by'),
       ]);
 
       const result = await agent.run(makeCtx(graph));
@@ -351,7 +351,7 @@ describe('RiskScorerAgent', () => {
       // Low risk: isolated with test
       const lowRisk = fileNode('file:low.ts', 'low.ts');
       const lowTest = testFileNode('file:low.test.ts', 'low.test.ts');
-      edges.push(edge('file:low.test.ts', 'file:low.ts', 'tests'));
+      edges.push(edge('file:low.test.ts', 'file:low.ts', 'tested_by'));
 
       const graph = makeGraph([highRisk, ...dependents, lowRisk, lowTest], edges);
       const result = await agent.run(makeCtx(graph));

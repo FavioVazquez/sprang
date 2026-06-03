@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
   Globe,
   Network,
   RefreshCw,
   Terminal,
-  Loader2,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { Button } from './components/ui/Button';
@@ -15,10 +15,17 @@ import { Badge } from './components/ui/Badge';
 import { GraphView } from './pages/GraphView';
 import { HealthView } from './pages/HealthView';
 import { DomainView } from './pages/DomainView';
+import { LearnPanel } from './components/LearnPanel';
+import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
+import { WarningBanner } from './components/WarningBanner';
+import { ThemePicker, useTheme } from './components/ThemePicker';
+import { OnboardingOverlay, useOnboarding } from './components/OnboardingOverlay';
+import { MobileBottomNav } from './components/MobileLayout';
 import { loadGraph } from './api/graphApi';
-import type { KnowledgeGraph, Tour } from './types';
+import { useDashboardStore } from './store';
+import type { KnowledgeGraph } from './types';
 
-type View = 'graph' | 'health' | 'domain';
+type View = 'graph' | 'health' | 'domain' | 'learn';
 
 const NAV_ITEMS: Array<{
   id: View;
@@ -28,6 +35,7 @@ const NAV_ITEMS: Array<{
   { id: 'graph', label: 'Graph', icon: Network },
   { id: 'health', label: 'Health', icon: Activity },
   { id: 'domain', label: 'Domains', icon: Globe },
+  { id: 'learn', label: 'Learn', icon: BookOpen },
 ];
 
 function LoadingScreen() {
@@ -100,61 +108,83 @@ function ErrorScreen({ onRetry }: { onRetry: () => void }) {
 }
 
 export default function App() {
-  const [graph, setGraph] = useState<KnowledgeGraph | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [currentView, setCurrentView] = useState<View>('graph');
-  const [selectedNodeId, setSelectedNodeId] = useState<string>('');
   const [showRiskOverlay, setShowRiskOverlay] = useState(false);
-  const [activeTour, setActiveTour] = useState<Tour | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [schemaWarnings, setSchemaWarnings] = useState<string[]>([]);
+  const [theme, setTheme] = useTheme();
+  const [showOnboarding, dismissOnboarding] = useOnboarding();
 
-  const fetchGraph = useCallback(async () => {
-    setLoading(true);
+  const { graph, setGraph, selectedNodeId, navigateToNode, selectNode, startTour, stopTour } =
+    useDashboardStore();
+
+  const fetchGraph = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setHasError(false);
     try {
       const g = await loadGraph();
       if (g) {
-        setGraph(g);
+        setGraph(g as KnowledgeGraph);
+        // Collect schema warnings from stats
+        const warns: string[] = [];
+        if ((g as KnowledgeGraph).stats.node_count !== (g as KnowledgeGraph).nodes.length) {
+          warns.push(`stats.node_count (${(g as KnowledgeGraph).stats.node_count}) differs from actual node count (${(g as KnowledgeGraph).nodes.length})`);
+        }
+        setSchemaWarnings(warns);
       } else {
-        setHasError(true);
+        if (!silent) setHasError(true);
       }
     } catch {
-      setHasError(true);
+      if (!silent) setHasError(true);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, []);
+  }, [setGraph]);
 
   useEffect(() => {
-    void fetchGraph();
+    void fetchGraph(false);
   }, [fetchGraph]);
 
-  // Poll while phase is 'skeleton'
+  // Poll while phase is 'skeleton'. Stop after 3 unchanged polls.
+  const graphTsRef = React.useRef(graph?.generated_at ?? '');
+  const unchangedPollsRef = React.useRef(0);
+  useEffect(() => {
+    graphTsRef.current = graph?.generated_at ?? '';
+  }, [graph?.generated_at]);
   useEffect(() => {
     if (!graph || graph.phase === 'complete') return;
-    const id = setInterval(() => void fetchGraph(), 5000);
+    unchangedPollsRef.current = 0;
+    const id = setInterval(async () => {
+      const tsBefore = graphTsRef.current;
+      await fetchGraph(true);
+      if (graphTsRef.current === tsBefore) {
+        unchangedPollsRef.current += 1;
+        if (unchangedPollsRef.current >= 3) clearInterval(id);
+      } else {
+        unchangedPollsRef.current = 0;
+      }
+    }, 5000);
     return () => clearInterval(id);
   }, [graph?.phase, fetchGraph]);
 
   const handleNodeSelect = useCallback(
     (nodeId: string) => {
-      setSelectedNodeId(nodeId);
-      if (nodeId && currentView !== 'graph') {
-        setCurrentView('graph');
-      }
+      navigateToNode(nodeId);
+      if (nodeId && currentView !== 'graph') setCurrentView('graph');
     },
-    [currentView],
+    [navigateToNode, currentView],
   );
 
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ignore when typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       switch (e.key) {
         case 'Escape':
-          if (selectedNodeId) setSelectedNodeId('');
+          if (selectedNodeId) selectNode(null);
           break;
         case 'g': case '1':
           setCurrentView('graph'); break;
@@ -162,20 +192,25 @@ export default function App() {
           setCurrentView('health'); break;
         case 'd': case '3':
           setCurrentView('domain'); break;
+        case 'l': case '4':
+          setCurrentView('learn'); break;
         case 'r':
           setShowRiskOverlay((v) => !v); break;
+        case '?':
+          setShowShortcuts((v) => !v); break;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedNodeId]);
+  }, [selectedNodeId, selectNode]);
 
   if (loading) return <LoadingScreen />;
   if (hasError || !graph) return <ErrorScreen onRetry={fetchGraph} />;
 
   return (
     <TooltipProvider>
-      <div className="h-screen flex flex-col bg-surface-950 overflow-hidden font-sans">
+      <div className="h-full flex flex-col bg-surface-950 overflow-hidden font-sans">
+        <WarningBanner errors={schemaWarnings} />
         {/* Global nav */}
         <nav className="flex items-center gap-1 px-3 py-2 bg-surface-900 border-b border-surface-800 flex-shrink-0 z-10">
           {/* Logo */}
@@ -213,11 +248,15 @@ export default function App() {
 
           {/* Phase + metadata */}
           <div className="hidden md:flex items-center gap-2 mr-2">
+            {graph.kind === 'knowledge' && (
+              <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/40">
+                knowledge
+              </Badge>
+            )}
             {graph.phase === 'skeleton' && (
-              <span className="flex items-center gap-1 text-xs text-sprang-400">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                enriching…
-              </span>
+              <Badge variant="outline" className="text-[10px] text-sprang-400 border-sprang-500/40">
+                skeleton
+              </Badge>
             )}
             {graph.languages && graph.languages.length > 0 && (
               <Badge variant="outline" className="text-[10px]">
@@ -226,6 +265,9 @@ export default function App() {
             )}
             <span className="text-xs text-surface-600">v{graph.version}</span>
           </div>
+
+          {/* Theme picker */}
+          <ThemePicker theme={theme} onChange={setTheme} />
 
           <button
             onClick={() => void fetchGraph()}
@@ -250,13 +292,13 @@ export default function App() {
               >
                 <GraphView
                   graph={graph}
-                  selectedNodeId={selectedNodeId}
+                  selectedNodeId={selectedNodeId ?? ''}
                   onNodeSelect={handleNodeSelect}
                   showRiskOverlay={showRiskOverlay}
                   onToggleRisk={() => setShowRiskOverlay((v) => !v)}
-                  activeTour={activeTour}
-                  onStartTour={(tour) => setActiveTour(tour)}
-                  onEndTour={() => setActiveTour(null)}
+                  activeTour={graph.tours?.[0] ?? null}
+                  onStartTour={startTour}
+                  onEndTour={stopTour}
                 />
               </motion.div>
             )}
@@ -286,8 +328,30 @@ export default function App() {
                 <DomainView graph={graph} onNodeSelect={handleNodeSelect} />
               </motion.div>
             )}
+
+            {currentView === 'learn' && (
+              <motion.div
+                key="learn"
+                className="flex-1 flex overflow-hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+              >
+                <div className="flex-1 max-w-xl mx-auto w-full h-full overflow-hidden border-x border-surface-800">
+                  <LearnPanel />
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </main>
+        <KeyboardShortcutsHelp open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+        {/* Mobile bottom nav */}
+        <MobileBottomNav activeView={currentView} onChange={setCurrentView} />
+        {/* Onboarding overlay — first run only */}
+        <AnimatePresence>
+          {showOnboarding && <OnboardingOverlay onDone={dismissOnboarding} />}
+        </AnimatePresence>
       </div>
     </TooltipProvider>
   );

@@ -1,22 +1,36 @@
 // Essential types mirrored from @sprang/core — used directly in browser build
 
 export const NODE_TYPES = [
+  // code
   'file', 'function', 'class', 'module', 'concept',
+  // non-code
   'config', 'document', 'service', 'table', 'endpoint',
   'pipeline', 'schema', 'resource',
+  // domain
   'domain', 'flow', 'step',
+  // knowledge
+  'article', 'entity', 'topic', 'claim', 'source',
 ] as const;
 export type NodeType = typeof NODE_TYPES[number];
 
 export const EDGE_TYPES = [
+  // structural
   'imports', 'exports', 'contains', 'inherits', 'implements',
+  // behavioral
   'calls', 'subscribes', 'publishes', 'middleware',
+  // data flow
   'reads_from', 'writes_to', 'transforms', 'validates',
-  'depends_on', 'tests', 'configures',
+  // dependencies
+  'depends_on', 'tested_by', 'configures',
+  // semantic
   'related', 'similar_to',
+  // infrastructure / schema
   'deploys', 'serves', 'provisions', 'triggers', 'migrates',
   'documents', 'routes', 'defines_schema',
+  // domain
   'contains_flow', 'flow_step', 'cross_domain',
+  // knowledge
+  'cites', 'contradicts', 'builds_on', 'exemplifies', 'categorized_under', 'authored_by',
 ] as const;
 export type EdgeType = typeof EDGE_TYPES[number];
 
@@ -72,27 +86,50 @@ export interface NodeLocation {
   end_line?: number;
 }
 
+export interface KnowledgeMeta {
+  wikilinks?: string[];
+  backlinks?: string[];
+  category?: string;
+  content?: string;
+}
+
+export interface DomainNodeMeta {
+  entities?: string[];
+  businessRules?: string[];
+  crossDomainInteractions?: string[];
+  entryPoint?: string;
+  entryType?: 'http' | 'cli' | 'event' | 'cron' | 'manual';
+}
+
 export interface SprangNode {
   id: string;
   type: NodeType;
+  name?: string;
   label: string;
+  filePath?: string;
+  lineRange?: [number, number];
   location?: NodeLocation;
   summary?: string;
   complexity?: 'simple' | 'moderate' | 'complex';
   tags?: string[];
+  languageNotes?: string;
   layer?: string;
   metadata?: Record<string, unknown>;
+  domainMeta?: DomainNodeMeta;
+  knowledgeMeta?: KnowledgeMeta;
   decision_context?: DecisionContext;
   structural_warnings?: StructuralWarning[];
   risk_score?: number;
   risk_factors?: RiskFactor[];
-  annotations?: Annotation[];
+  annotations?: string[];
 }
 
 export interface SprangEdge {
   source: string;
   target: string;
   type: EdgeType;
+  direction?: 'forward' | 'backward' | 'bidirectional';
+  description?: string;
   weight?: number;
   metadata?: Record<string, unknown>;
 }
@@ -105,9 +142,11 @@ export interface Layer {
 }
 
 export interface TourStep {
-  node_id: string;
+  node_id?: string;
+  node_ids?: string[];
   step_title: string;
   explanation: string;
+  language_lesson?: string;
   highlight?: boolean;
 }
 
@@ -152,12 +191,17 @@ export interface GraphStats {
   llm_token_usage?: number;
   generated_at: string;
   phase2_completed_at?: string;
+  gitCommitHash?: string;
 }
 
 export type GraphPhase = 'skeleton' | 'complete';
 
+export type GraphKind = 'codebase' | 'knowledge';
+
 export interface KnowledgeGraph {
   version: string;
+  /** Graph kind: 'codebase' (default) or 'knowledge' for markdown note graphs. */
+  kind?: GraphKind;
   generated_at: string;
   project_root: string;
   project_name: string;
@@ -180,4 +224,51 @@ export interface Annotation {
   annotated_at: string;
   tags?: string[];
   content: string;
+}
+
+// ─── Dashboard-specific types ─────────────────────────────────────────────────
+
+export type Persona = 'non-technical' | 'junior' | 'experienced';
+export type ViewMode = 'structural' | 'domain' | 'knowledge';
+export type NodeCategory = 'code' | 'config' | 'docs' | 'infra' | 'data' | 'domain' | 'knowledge';
+export type Complexity = 'simple' | 'moderate' | 'complex';
+export type EdgeCategory = 'structural' | 'behavioral' | 'data-flow' | 'dependencies' | 'semantic' | 'infrastructure' | 'domain' | 'knowledge';
+
+export const NODE_TYPE_TO_CATEGORY: Record<NodeType, NodeCategory> = {
+  file: 'code', function: 'code', class: 'code', module: 'code', concept: 'code',
+  config: 'config', document: 'docs',
+  service: 'infra', table: 'data', endpoint: 'infra', pipeline: 'infra',
+  schema: 'data', resource: 'infra',
+  domain: 'domain', flow: 'domain', step: 'domain',
+  article: 'knowledge', entity: 'knowledge', topic: 'knowledge', claim: 'knowledge', source: 'knowledge',
+};
+
+export const EDGE_CATEGORY_MAP: Record<EdgeCategory, EdgeType[]> = {
+  structural: ['imports', 'exports', 'contains', 'inherits', 'implements'],
+  behavioral: ['calls', 'subscribes', 'publishes', 'middleware'],
+  'data-flow': ['reads_from', 'writes_to', 'transforms', 'validates'],
+  dependencies: ['depends_on', 'tested_by', 'configures'],
+  semantic: ['related', 'similar_to'],
+  infrastructure: ['deploys', 'serves', 'provisions', 'triggers', 'migrates', 'documents', 'routes', 'defines_schema', 'contains_flow', 'flow_step', 'cross_domain'],
+  domain: ['contains_flow', 'flow_step', 'cross_domain'],
+  knowledge: ['cites', 'contradicts', 'builds_on', 'exemplifies', 'categorized_under', 'authored_by'],
+};
+
+export interface FilterState {
+  nodeTypes: Set<NodeType>;
+  complexities: Set<Complexity>;
+  layerIds: Set<string>;
+  edgeCategories: Set<EdgeCategory>;
+  riskLevels: Set<'high' | 'medium' | 'low'>;
+}
+
+export interface DiffOverlay {
+  version: string;
+  generatedAt: string;
+  baseBranch: string;
+  changedFiles: string[];
+  changedNodeIds: string[];
+  affectedNodeIds: string[];
+  blastRadius?: number;
+  crossLayerChanges?: number;
 }

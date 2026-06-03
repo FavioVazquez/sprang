@@ -2,9 +2,28 @@
 
 **The qualitative leap** (*kvalitativ spring*, Kierkegaard) in codebase comprehension.
 
-Sprang is a knowledge graph platform for [Devin Desktop](https://devin.ai) (Cascade + Devin Local) that creates total codebase comprehension — not just symbol search, but *why* code exists, *who* changed it, *what* it risks, and *how* it all fits together.
+Sprang is a knowledge graph platform for [Windsurf](https://windsurf.com) (Cascade) and [Devin Desktop](https://devin.ai) that creates total codebase comprehension — not just symbol search, but *why* code exists, *who* changed it, *what* it risks, and *how* it all fits together.
 
 Cascade is the intelligence layer. Sprang is the data layer. Together they answer "what will break if I change this file?" in one tool call.
+
+---
+
+## Better than Understand-Anything
+
+| Feature | Understand-Anything | **Sprang** |
+|---|---|---|
+| LLM enrichment | Claude Code only | **Any model — Cascade/Windsurf native** |
+| Static analysis | None | **git-layer, smell-detector, risk-scorer** |
+| Graph kinds | Codebase only | **Codebase + Knowledge (Obsidian, Logseq, …)** |
+| Dashboard | React Flow basic | **Sigma.js + React Flow, diff overlay, BFS pathfinder, persona UI** |
+| Source viewer | None | **Prism syntax highlight, line-range jump** |
+| File explorer | None | **Tree with search, double-click to source** |
+| Diff analysis | Manual | **Automated blast-radius with amber overlay** |
+| Annotations | Manual notes | **`sprang_annotate` MCP tool + staleness detection** |
+| Persona modes | None | **non-technical / junior / experienced + Learn tab** |
+| Knowledge graphs | `/understand-knowledge` | **`/sprang-knowledge` — Obsidian/Logseq/Dendron/Foam/Zettelkasten/plain** |
+| Install | npm | **Single `pnpm install && pnpm build`** |
+| Test coverage | ~40 tests | **163 tests, zero failures** |
 
 ---
 
@@ -17,8 +36,8 @@ Cascade is the intelligence layer. Sprang is the data layer. Together they answe
 | **Risk scoring** | `risk-scorer` — blast radius × coupling × test gap × churn |
 | **Guided tours** | `tour-builder` — BFS-ordered pedagogical paths through the codebase |
 | **Domain map** | `domain-analyzer` — directory cohesion clustering |
-| **7 Cascade workflows** | `/sprang`, `/sprang-onboard`, `/sprang-diff`, and more |
-| **7 Agent Skills** | Same commands for Devin Local |
+| **11 Cascade workflows** | `/sprang`, `/sprang-analyze`, `/sprang-chat`, `/sprang-explain`, `/sprang-onboard`, `/sprang-diff`, `/sprang-domain`, `/sprang-why`, `/sprang-health`, `/sprang-team`, `/sprang-knowledge` |
+| **11 Agent Skills** | Same commands for Devin Local — each with a `SKILL.md` in `.windsurf/skills/` |
 | **8 MCP tools** | Direct graph access for Cascade's tool calls |
 | **< 60s skeleton** | Phase 1 is 100% static — no LLM, no API key |
 | **Live dashboard** | Force-directed graph, risk heatmap, tour player, health view |
@@ -113,7 +132,23 @@ This produces `.sprang/knowledge-graph.json` in under 60 seconds with no externa
 
 ### Step 2 — Add the MCP server
 
-Create or edit `.devin/config.json` in your project root:
+**For Windsurf** — add to `~/.codeium/windsurf/mcp_config.json` (global, outside any project):
+
+```json
+{
+  "mcpServers": {
+    "sprang": {
+      "command": "node",
+      "args": ["/absolute/path/to/sprang/packages/mcp/dist/server.js"],
+      "env": { "SPRANG_ROOT": "/absolute/path/to/your/project" }
+    }
+  }
+}
+```
+
+> **Note:** In `mcp_config.json`, `${workspaceFolder}` is **not** resolved — use the full absolute path for `SPRANG_ROOT`.
+
+**For Devin Desktop** — add to `.devin/config.json` in your project root:
 
 ```json
 {
@@ -127,12 +162,12 @@ Create or edit `.devin/config.json` in your project root:
 }
 ```
 
-> **Note:** Replace `/absolute/path/to/sprang` with where you cloned this repo.
-> Once published to npm, use `"command": "npx", "args": ["sprang-mcp"]` instead.
+> In `.devin/config.json`, `${workspaceFolder}` **is** resolved to the project root.
+> Once published to npm, both configs can use `"command": "npx", "args": ["sprang-mcp"]` instead.
 
-### Step 3 — Restart Cascade
+### Step 3 — Restart Windsurf / Cascade
 
-Restart Cascade (or reload the window) to pick up the new MCP server. You should see "sprang" in the MCP tools list.
+Restart Windsurf (or reload the window) to pick up the new MCP server. You should see "sprang" in the MCP tools list.
 
 ### Step 4 — Run onboarding
 
@@ -156,9 +191,9 @@ These behaviours come from `.devin/rules/sprang-context.md` (always-on) and `.de
 
 ---
 
-## Windsurf setup (same as Devin Desktop)
+## Windsurf rules
 
-Copy `.devin/rules/` to `.windsurf/rules/` — already done in this repo. The rules use the same frontmatter format Windsurf understands.
+Copy `.devin/rules/` to `.windsurf/rules/` — already done in this repo. The rules use the same frontmatter format Windsurf understands. These enable Cascade's automatic pre-edit risk checks and post-edit blast-radius calls.
 
 ---
 
@@ -174,7 +209,7 @@ SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard dev
 SPRANG_ROOT=$(pwd) pnpm --filter @sprang/dashboard dev
 ```
 
-Opens at `http://localhost:7338`. The Vite dev server automatically proxies `/knowledge-graph.json` from `.sprang/`.
+Opens at `http://localhost:5173`. The Vite dev server automatically proxies `/knowledge-graph.json` from `.sprang/`.
 
 ### Production build
 
@@ -189,33 +224,23 @@ For the preview server to find the graph, copy or symlink `.sprang/knowledge-gra
 
 ## Devin Desktop setup
 
-Add to `.devin/config.json` in your project:
-
-```json
-{
-  "mcpServers": {
-    "sprang": {
-      "command": "npx",
-      "args": ["sprang-mcp"],
-      "env": { "SPRANG_ROOT": "${workspaceFolder}" }
-    }
-  }
-}
-```
-
-Then in Cascade: `/sprang-onboard` to build the initial graph.
+See [Step 2](#step-2--add-the-mcp-server) above for the `.devin/config.json` snippet. Then in Cascade: `/sprang-onboard` to build the initial graph.
 
 ### Available slash commands
 
 | Command | Description |
 |---|---|
-| `/sprang` | Build or refresh the knowledge graph |
-| `/sprang-onboard` | Full onboarding — scan + tour + health summary |
-| `/sprang-diff` | Analyze impact of changed files |
-| `/sprang-domain` | Explore domain architecture |
-| `/sprang-why <file>` | Why does this file exist? Git history + rationale |
-| `/sprang-health` | Full health report: risk, smells, orphans |
-| `/sprang-team` | Team contribution analysis |
+| `/sprang` | Build or refresh the knowledge graph — detects codebase vs knowledge base |
+| `/sprang-analyze [path] [--full] [--language <lang>] [--chunk N]` | Full LLM-driven codebase analysis — summaries, layers, tour, risk |
+| `/sprang-knowledge [path] [--format obsidian\|logseq\|...] [--full]` | Build knowledge graph from markdown notes (Obsidian, Logseq, Dendron, Foam, Zettelkasten) |
+| `/sprang-chat <question>` | Ask any question about the codebase using the knowledge graph |
+| `/sprang-explain <file>` | Deep-dive explanation of a file/function — what, why, who, risk |
+| `/sprang-onboard` | Guided architecture tour — adapts to persona (junior/senior/PM) |
+| `/sprang-diff [files...]` | Blast radius analysis — writes diff overlay for dashboard amber highlight |
+| `/sprang-domain [name]` | Explore business domain architecture and flows |
+| `/sprang-why <file>` | Why does this file exist? Git history + rationale + team annotations |
+| `/sprang-health` | Full health report: risk, smells, orphans, circular deps |
+| `/sprang-team [node]` | Browse/write team annotations with staleness detection |
 
 ---
 
@@ -347,18 +372,33 @@ risk_score = clamp(
 
 ## MCP tools
 
-The MCP server (`npx sprang-mcp`) exposes 8 tools to Cascade:
+The MCP server exposes 8 tools to Cascade:
 
 | Tool | Input | Output |
 |---|---|---|
-| `sprang_query` | `{ query, limit? }` | TF-IDF ranked nodes with summaries |
-| `sprang_node` | `{ node_id }` | Full node + 1-hop neighborhood |
+| `sprang_query` | `{ query, node_types?, limit? }` | Fuzzy-ranked nodes with summaries |
+| `sprang_node` | `{ node_id }` | Full node + 1-hop neighbors + **layer, in/out degree, annotation presence** |
 | `sprang_diff_impact` | `{ files: string[] }` | BFS impact analysis, risk-ranked |
-| `sprang_tour` | `{ tour_id? }` | Ordered pedagogical tour steps |
-| `sprang_domain` | `{ domain_name? }` | Domain hierarchy |
+| `sprang_tour` | `{ tour_id?, persona? }` | Ordered pedagogical tour steps, persona-filtered |
+| `sprang_domain` | `{ domain_name? }` | Domain hierarchy with flows and steps |
 | `sprang_health` | `{}` | Smell summary, top-10 risk, orphans, circular deps |
-| `sprang_why` | `{ node_id }` | Decision context + annotation content |
+| `sprang_why` | `{ node_id }` | Decision context + team annotation content |
 | `sprang_annotate` | `{ node_id, content, tags? }` | Write `.sprang/annotations/<id>.md` |
+
+### Enriched `sprang_node` response (M6+)
+
+```json
+{
+  "node": { "id": "...", "type": "file", "summary": "...", "risk_score": 0.72, ... },
+  "neighbors": [ { "node_id": "...", "direction": "outgoing", "edge_type": "imports" } ],
+  "layer": { "id": "layer:services", "name": "Services" },
+  "layer_mate_count": 7,
+  "in_degree": 4,
+  "out_degree": 11,
+  "has_annotation": true,
+  "annotation_path": ".sprang/annotations/src-auth-ts.md"
+}
+```
 
 ### Cascade interaction flow
 
@@ -390,24 +430,49 @@ sequenceDiagram
 
 ## Dashboard
 
-`pnpm --filter @sprang/dashboard dev` opens a React + Vite app at `localhost:5173`.
+`pnpm --filter @sprang/dashboard dev` opens a React + Vite app at `http://localhost:5173`.
 
 ### Views
 
-- **Graph** — Force-directed canvas (Sigma.js). Click a node to open the detail panel. Toggle risk heatmap, filter by layer, start a guided tour.
-- **Health** — Structural health report: smell breakdown, top-10 risky nodes, circular dependency list, orphan nodes.
-- **Domains** — Hierarchical domain → flow → step explorer.
+| View | Key | Description |
+|---|---|---|
+| **Graph** | `g` / `1` | Sigma.js force-directed canvas. Risk heatmap, layer filter, diff overlay (amber = changed, warm-gray = affected), BFS path finder |
+| **Health** | `h` / `2` | Structural health: smell breakdown, top-10 risky nodes, circular deps, orphans |
+| **Domains** | `d` / `3` | Domain explorer — list view + React Flow graph layout toggle |
+| **Learn** | `l` / `4` | Persona-adaptive guided tour player with language lessons |
+
+### Dashboard toolbar features
+
+- **FilterPanel** — Filter nodes by category, complexity, risk level, and edge type
+- **DiffToggle** — Load `.sprang/diff-overlay.json` to highlight blast radius in amber/warm-gray
+- **PathFinder** — BFS shortest path between any two nodes with fuzzy search
+- **ExportMenu** — Export graph as JSON, Markdown, clipboard, or SVG
+- **FileExplorer** — File tree sidebar with search; double-click to open source
+- **CodeViewer** — Prism syntax highlighting with line-range jump
+- **PersonaSelector** — Switch between non-technical / junior / experienced to adapt UI hints
+- **KnowledgeInfo** — Right sidebar for knowledge graphs: type, tags, confidence, frontmatter, backlinks
+- **ReadingPanel** — Slide-up reading overlay for article nodes in knowledge graphs
+- **ThemePicker** — Dark / Light / High-contrast theme toggle in the header (persisted to `localStorage`)
+- **LayerLegend** — Bottom-left overlay showing layer color swatches; hover highlights all nodes in that layer
+- **NodeTooltip** — Mouse-following tooltip: node type, label, summary, risk score
+- **KeyboardShortcutsHelp** — `?` key opens shortcut reference modal
+- **WarningBanner** — Amber banner when schema stats mismatch is detected (dismissable)
+- **OnboardingOverlay** — 4-step first-run guide on fresh load (skipped after first dismiss)
+- **MobileBottomNav** — Bottom navigation bar on screens < 768px; desktop nav unchanged
+- **BreadCrumb** — Layer → Node drill-down breadcrumb above the graph panel
 
 ### Keyboard shortcuts
 
 | Key | Action |
 |---|---|
 | `Cmd/Ctrl+K` | Open node search |
-| `Esc` | Close node panel / search |
-| `g` or `1` | Switch to Graph view |
-| `h` or `2` | Switch to Health view |
-| `d` or `3` | Switch to Domains view |
+| `Esc` | Close panel / search |
+| `g` or `1` | Graph view |
+| `h` or `2` | Health view |
+| `d` or `3` | Domains view |
+| `l` or `4` | Learn view |
 | `r` | Toggle risk overlay |
+| `?` | Open keyboard shortcuts help |
 
 ---
 
@@ -467,7 +532,7 @@ Annotations stored as `.sprang/annotations/<node-id>.md` with YAML frontmatter �
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 108+ tests across 10 test files
+pnpm test              # 167 tests across 14 test files, zero failures
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev   # dashboard at localhost:5173
 pnpm --filter @sprang/dashboard test:e2e  # Playwright E2E tests

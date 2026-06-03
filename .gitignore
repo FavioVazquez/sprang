@@ -6,6 +6,7 @@ dist/
 # Sprang runtime outputs — only keep committed artifacts
 .sprang/intermediate/
 .sprang/cache/
+.sprang/tmp/
 .sprang/*.tmp
 
 # Dashboard build

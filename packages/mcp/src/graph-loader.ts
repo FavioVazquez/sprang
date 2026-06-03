@@ -11,6 +11,10 @@ export class GraphLoader {
     this.sprangRoot = sprangRoot;
   }
 
+  getRoot(): string {
+    return this.sprangRoot;
+  }
+
   async getGraph(): Promise<KnowledgeGraph | null> {
     await this.checkAndReload();
     return this.graphCache;

@@ -10,6 +10,10 @@ import {
   BookOpen,
   X,
   Keyboard,
+  PanelLeft,
+  FolderTree,
+  FileCode,
+  Route,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -19,7 +23,18 @@ import { NodePanel } from '../components/NodePanel';
 import { RiskOverlay } from '../components/RiskOverlay';
 import { TourPlayer } from '../components/TourPlayer';
 import { SearchBar } from '../components/SearchBar';
-import type { KnowledgeGraph, Tour } from '../types';
+import { useDashboardStore } from '../store';
+import { CodeViewer } from '../components/CodeViewer';
+import { FileExplorer } from '../components/FileExplorer';
+import { FilterPanel } from '../components/FilterPanel';
+import { DiffToggle } from '../components/DiffToggle';
+import { ExportMenu } from '../components/ExportMenu';
+import { PathFinderModal } from '../components/PathFinderModal';
+import { KnowledgeInfo } from '../components/KnowledgeInfo';
+import { ReadingPanel } from '../components/ReadingPanel';
+import { LayerLegend } from '../components/LayerLegend';
+import { NodeTooltip } from '../components/NodeTooltip';
+import type { KnowledgeGraph } from '../types';
 
 interface GraphViewProps {
   graph: KnowledgeGraph;
@@ -27,9 +42,10 @@ interface GraphViewProps {
   onNodeSelect: (nodeId: string) => void;
   showRiskOverlay: boolean;
   onToggleRisk: () => void;
-  activeTour: Tour | null;
-  onStartTour: (tour: Tour) => void;
-  onEndTour: () => void;
+  /** Kept for compatibility — tour state now driven by store. */
+  activeTour?: unknown;
+  onStartTour?: () => void;
+  onEndTour?: () => void;
 }
 
 export function GraphView({
@@ -38,13 +54,25 @@ export function GraphView({
   onNodeSelect,
   showRiskOverlay,
   onToggleRisk,
-  activeTour,
-  onStartTour,
-  onEndTour,
 }: GraphViewProps) {
+  const {
+    tourActive,
+    currentTourStep,
+    startTour,
+    stopTour,
+    setTourStep,
+    codeViewerOpen,
+    openCodeViewer,
+    diffMode,
+    changedNodeIds,
+    affectedNodeIds,
+  } = useDashboardStore();
   const [showSearch, setShowSearch] = useState(false);
-  const [tourStep, setTourStep] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<'files' | 'source'>('files');
   const [hoveredLayerId, setHoveredLayerId] = useState<string | undefined>();
+  const [tooltipNodeId, setTooltipNodeId] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [showTourMenu, setShowTourMenu] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -70,20 +98,23 @@ export function GraphView({
     onNodeSelect(nodeId);
   };
 
-  const handleTourStart = (tour: Tour) => {
-    onStartTour(tour);
-    setTourStep(0);
+  const handleTourStart = () => {
+    startTour();
     // Navigate to first step's node
-    if (tour.steps[0]) {
-      onNodeSelect(tour.steps[0].node_id);
-    }
+    const firstStep = graph.tours?.[0]?.steps?.[0];
+    const firstNodeId = firstStep?.node_ids?.[0] ?? firstStep?.node_id;
+    if (firstNodeId) onNodeSelect(firstNodeId);
   };
 
   const handleTourStep = (step: number) => {
     setTourStep(step);
-    const tourNode = activeTour?.steps[step]?.node_id;
-    if (tourNode) onNodeSelect(tourNode);
+    const s = graph.tours?.[0]?.steps?.[step];
+    const nodeId = s?.node_ids?.[0] ?? s?.node_id;
+    if (nodeId) onNodeSelect(nodeId);
   };
+
+  const activeTour = tourActive ? (graph.tours?.[0] ?? null) : null;
+  const tourStep = currentTourStep;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -111,6 +142,19 @@ export function GraphView({
           </span>
           <span>{graph.stats.edge_count} edges</span>
         </div>
+
+        {/* Sidebar toggle */}
+        <button
+          onClick={() => setSidebarOpen((v) => !v)}
+          className={`p-1.5 rounded transition-colors ${
+            sidebarOpen
+              ? 'text-sprang-400 bg-sprang-500/10'
+              : 'text-surface-500 hover:text-surface-300 hover:bg-surface-800'
+          }`}
+          title="Toggle file explorer"
+        >
+          <PanelLeft className="w-3.5 h-3.5" />
+        </button>
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -234,7 +278,7 @@ export function GraphView({
                     key={tour.id}
                     role="menuitem"
                     className="w-full flex items-start gap-2 px-3 py-2.5 text-left hover:bg-surface-700/50 transition-colors focus-visible:outline-none focus-visible:bg-surface-700/50"
-                    onClick={() => { handleTourStart(tour); setShowTourMenu(false); }}
+                    onClick={() => { handleTourStart(); setShowTourMenu(false); }}
                   >
                     <Play className="w-3 h-3 text-sprang-400 flex-shrink-0 mt-0.5" />
                     <div>
@@ -252,6 +296,32 @@ export function GraphView({
             )}
           </div>
         )}
+
+        {/* Path finder */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => useDashboardStore.getState().togglePathFinder()}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border border-surface-700 text-surface-500 hover:text-surface-300 hover:border-surface-600 transition-colors"
+            title="Find shortest path between two nodes"
+          >
+            <Route className="w-3.5 h-3.5" />
+            Path
+          </button>
+        </div>
+
+        {/* Diff toggle */}
+        <div className="relative">
+          <DiffToggle />
+        </div>
+
+        {/* Filters */}
+        <div className="relative">
+          <FilterPanel />
+        </div>
+
+        {/* Export */}
+        <ExportMenu />
 
         {/* Search trigger */}
         <Tooltip
@@ -287,28 +357,109 @@ export function GraphView({
         </Tooltip>
       </header>
 
+      {/* Path finder modal — rendered outside header so it overlays the whole view */}
+      <PathFinderModal />
+
       {/* Phase 2 enrichment banner */}
       {graph.phase === 'skeleton' && (
         <div className="flex items-center gap-2 px-4 py-1.5 bg-sprang-500/10 border-b border-sprang-500/20 text-xs text-sprang-300 flex-shrink-0">
           <span className="relative flex h-2 w-2 flex-shrink-0">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-sprang-400 opacity-75 animate-ping" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-sprang-500" />
           </span>
-          Phase 2 running in background — adding git history, code smell detection, and risk scores to each node. Refresh to pick up new data.
+          Skeleton graph ready — run <code className="mx-1 px-1 py-0.5 rounded bg-surface-800 text-sprang-200 font-mono">/sprang</code> in Cascade to enrich with git history, risk scores, and code smell analysis.
         </div>
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Graph canvas */}
-        <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden">
+        {/* Left sidebar: FileExplorer + CodeViewer */}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: codeViewerOpen ? 560 : 240, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="relative h-full flex-shrink-0 border-r border-surface-800 bg-surface-950 z-10 overflow-hidden flex"
+            >
+              {/* File tree pane */}
+              <div className="w-60 shrink-0 h-full flex flex-col border-r border-surface-800">
+                {/* Pane tabs */}
+                <div className="flex items-center border-b border-surface-800 bg-surface-900 shrink-0">
+                  <button
+                    onClick={() => setSidebarTab('files')}
+                    className={`flex items-center gap-1 px-3 py-2 text-[11px] font-medium transition-colors ${
+                      sidebarTab === 'files'
+                        ? 'text-surface-200 border-b-2 border-sprang-400 -mb-px'
+                        : 'text-surface-500 hover:text-surface-300'
+                    }`}
+                  >
+                    <FolderTree className="w-3 h-3" />
+                    Files
+                  </button>
+                  <button
+                    onClick={() => { setSidebarTab('source'); if (!codeViewerOpen && selectedNodeId) openCodeViewer(selectedNodeId); }}
+                    className={`flex items-center gap-1 px-3 py-2 text-[11px] font-medium transition-colors ${
+                      sidebarTab === 'source'
+                        ? 'text-surface-200 border-b-2 border-sprang-400 -mb-px'
+                        : 'text-surface-500 hover:text-surface-300'
+                    }`}
+                  >
+                    <FileCode className="w-3 h-3" />
+                    Source
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0">
+                  {sidebarTab === 'files' ? <FileExplorer /> : (
+                    <CodeViewer
+                      presentation="sidebar"
+                      onClose={() => setSidebarTab('files')}
+                      onExpand={() => setSidebarOpen(false)}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Expanded code viewer pane (shows alongside file tree) */}
+              {codeViewerOpen && sidebarTab === 'files' && (
+                <div className="flex-1 min-w-0 h-full">
+                  <CodeViewer
+                    presentation="sidebar"
+                    onClose={() => useDashboardStore.getState().closeCodeViewer()}
+                  />
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Graph canvas — always fills full width */}
+        <div
+          className="absolute inset-0"
+          style={{ left: sidebarOpen ? (codeViewerOpen ? 560 : 240) : 0 }}
+          onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
+        >
           <GraphCanvas
             graph={graph}
             selectedNodeId={selectedNodeId}
             onNodeSelect={handleNodeSelect}
             showRiskOverlay={showRiskOverlay}
             hoveredLayerId={hoveredLayerId}
+            diffMode={diffMode}
+            changedNodeIds={changedNodeIds}
+            affectedNodeIds={affectedNodeIds}
           />
+
+          {/* Layer legend — bottom-left of canvas */}
+          {graph.kind !== 'knowledge' && (
+            <LayerLegend
+              hoveredLayerId={hoveredLayerId ?? null}
+              onHover={(id) => setHoveredLayerId(id ?? undefined)}
+            />
+          )}
+
+          {/* Node tooltip — follows mouse */}
+          <NodeTooltip nodeId={tooltipNodeId} x={tooltipPos.x} y={tooltipPos.y} />
 
           {/* Empty state overlay if no nodes */}
           {graph.nodes.length === 0 && (
@@ -370,12 +521,23 @@ export function GraphView({
           </AnimatePresence>
         </div>
 
-        {/* Node panel */}
-        <NodePanel
-          node={selectedNode}
-          graph={graph}
-          onClose={() => onNodeSelect('')}
-        />
+        {/* Node panel / Knowledge info — absolute overlay on the right */}
+        <div className="absolute top-0 right-0 h-full z-20 pointer-events-none">
+          <div className="pointer-events-auto h-full">
+            {graph.kind === 'knowledge' ? (
+              <KnowledgeInfo />
+            ) : (
+              <NodePanel
+                node={selectedNode}
+                graph={graph}
+                onClose={() => onNodeSelect('')}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Reading panel — slides up from bottom for knowledge article nodes */}
+        <ReadingPanel />
       </div>
 
       {/* Tour player */}
@@ -385,7 +547,7 @@ export function GraphView({
             tour={activeTour}
             currentStep={tourStep}
             onStepChange={handleTourStep}
-            onClose={onEndTour}
+            onClose={stopTour}
             graph={graph}
           />
         )}

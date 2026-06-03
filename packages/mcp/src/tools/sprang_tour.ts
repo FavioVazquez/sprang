@@ -57,7 +57,7 @@ function filterStepsForPersona(
   if (persona === 'pm') {
     // Filter to only domain/service nodes
     return steps.filter((step) => {
-      const node = nodeMap.get(step.node_id);
+      const node = nodeMap.get(step.node_id ?? '');
       if (!node) return false;
       return node.type === 'domain' || node.type === 'service' || node.type === 'flow';
     });
@@ -98,7 +98,7 @@ export async function sprangTour(
   const filteredSteps = filterStepsForPersona(tour.steps, persona, graph);
 
   const stepsWithNodes: TourStepWithNode[] = filteredSteps.map((step, idx) => {
-    const node = nodeMap.get(step.node_id);
+    const node = nodeMap.get(step.node_id ?? '');
     return {
       step_number: idx + 1,
       step_title: step.step_title,

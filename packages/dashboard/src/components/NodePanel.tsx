@@ -46,6 +46,11 @@ const NODE_ICONS: Record<NodeType, React.ComponentType<{ className?: string }>> 
   domain: Globe,
   flow: Circle,
   step: ChevronRight,
+  article: FileText,
+  entity: Globe,
+  topic: Circle,
+  claim: Circle,
+  source: FileText,
 };
 
 function NodeIcon({ type, className }: { type: NodeType; className?: string }) {
@@ -392,32 +397,17 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
               );
             })()}
 
-            {/* Annotations */}
+            {/* Annotations (stored as raw markdown strings) */}
             {node.annotations && node.annotations.length > 0 && (
               <Section title="Annotations">
                 <div className="space-y-2">
                   {node.annotations.map((annotation, i) => (
                     <div
                       key={i}
-                      className="p-3 rounded-lg bg-surface-800 border border-surface-700 space-y-1.5"
+                      className="p-3 rounded-lg bg-surface-800 border border-surface-700"
                     >
-                      <div className="flex items-center gap-2">
-                        {annotation.annotated_by && (
-                          <span className="text-xs text-surface-400">
-                            {annotation.annotated_by}
-                          </span>
-                        )}
-                        <span className="text-[10px] text-surface-600">
-                          {new Date(annotation.annotated_at).toLocaleDateString()}
-                        </span>
-                        {annotation.tags?.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-[10px]">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
                       <p className="text-xs text-surface-300 leading-relaxed whitespace-pre-wrap">
-                        {annotation.content}
+                        {annotation}
                       </p>
                     </div>
                   ))}

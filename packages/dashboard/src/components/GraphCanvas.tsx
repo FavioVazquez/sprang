@@ -12,6 +12,9 @@ interface GraphCanvasProps {
   onNodeSelect: (nodeId: string) => void;
   showRiskOverlay: boolean;
   hoveredLayerId?: string;
+  diffMode?: boolean;
+  changedNodeIds?: Set<string>;
+  affectedNodeIds?: Set<string>;
 }
 
 const NODE_TYPE_COLORS: Record<NodeType | 'default', string> = {
@@ -31,6 +34,11 @@ const NODE_TYPE_COLORS: Record<NodeType | 'default', string> = {
   resource: '#14b8a6',
   flow: '#6366f1',
   step: '#78716c',
+  article: '#f59e0b',
+  entity: '#10b981',
+  topic: '#8b5cf6',
+  claim: '#ef4444',
+  source: '#06b6d4',
   default: '#71717a',
 };
 
@@ -57,6 +65,9 @@ export function GraphCanvas({
   onNodeSelect,
   showRiskOverlay,
   hoveredLayerId,
+  diffMode = false,
+  changedNodeIds = new Set(),
+  affectedNodeIds = new Set(),
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<Sigma | null>(null);
@@ -202,6 +213,18 @@ export function GraphCanvas({
 
     sigmaRef.current = renderer;
 
+    // Re-measure container after first paint (handles iframe/proxy contexts where
+    // h-full resolves to 0 at mount time)
+    const rafId = requestAnimationFrame(() => {
+      renderer.refresh();
+    });
+
+    // Re-render whenever the container is resized (panel open/close, proxy wrapping, etc.)
+    const ro = new ResizeObserver(() => {
+      renderer.refresh();
+    });
+    if (containerRef.current) ro.observe(containerRef.current);
+
     // Node click handler
     renderer.on('clickNode', ({ node }) => {
       onNodeSelect(node);
@@ -213,6 +236,8 @@ export function GraphCanvas({
     });
 
     return () => {
+      cancelAnimationFrame(rafId);
+      ro.disconnect();
       renderer.kill();
       sigmaRef.current = null;
       graphologyRef.current = null;
@@ -221,7 +246,7 @@ export function GraphCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph]);
 
-  // Update colors when risk overlay or hovered layer changes
+  // Update colors when risk overlay, hovered layer, or diff mode changes
   useEffect(() => {
     showRiskRef.current = showRiskOverlay;
     hoveredLayerRef.current = hoveredLayerId;
@@ -241,7 +266,16 @@ export function GraphCanvas({
 
     g.forEachNode((nodeId, attrs) => {
       let color: string;
-      if (showRiskOverlay) {
+      // Diff mode takes priority
+      if (diffMode) {
+        if (changedNodeIds.has(nodeId)) {
+          color = '#f59e0b'; // amber — directly changed
+        } else if (affectedNodeIds.has(nodeId)) {
+          color = '#78716c'; // warm gray — transitively affected
+        } else {
+          color = '#27272a'; // dimmed — unrelated
+        }
+      } else if (showRiskOverlay) {
         color = getRiskColor(attrs.riskScore ?? 0);
       } else if (hoveredLayerId && attrs.layer === hoveredLayerId) {
         color = '#d946ef';
@@ -256,29 +290,31 @@ export function GraphCanvas({
     });
 
     renderer.refresh();
-  }, [showRiskOverlay, hoveredLayerId, graph]);
+  }, [showRiskOverlay, hoveredLayerId, diffMode, changedNodeIds, affectedNodeIds, graph]);
 
-  // Highlight selected node
+  // Highlight selected node by boosting its size slightly; no camera move
+  // (camera animation in graph-space coords caused the graph to fly off-screen)
   useEffect(() => {
     const g = graphologyRef.current;
     const renderer = sigmaRef.current;
     if (!g || !renderer) return;
 
-    if (selectedNodeId && g.hasNode(selectedNodeId)) {
-      const camera = renderer.getCamera();
-      const nodeAttrs = g.getNodeAttributes(selectedNodeId);
-      camera.animate(
-        { x: nodeAttrs.x, y: nodeAttrs.y, ratio: 0.3 },
-        { duration: 500, easing: 'cubicInOut' },
-      );
-    }
+    g.forEachNode((nodeId, attrs) => {
+      const isSelected = nodeId === selectedNodeId;
+      g.mergeNodeAttributes(nodeId, {
+        highlighted: isSelected,
+        borderColor: isSelected ? '#d946ef' : (attrs.hasWarnings ? '#f59e0b' : undefined),
+      });
+    });
+    renderer.refresh();
   }, [selectedNodeId]);
 
   return (
-    <div className="relative w-full h-full" style={{ background: '#09090b' }}>
+    <div className="relative w-full h-full" style={{ background: '#09090b', minHeight: '400px' }}>
       <div
         ref={containerRef}
         className="sigma-container w-full h-full"
+        style={{ minHeight: '400px' }}
         role="img"
         aria-label={`Knowledge graph: ${graph.nodes.length} nodes, ${graph.edges.length} edges. Click a node to inspect it.`}
       />

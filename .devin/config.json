@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "sprang": {
-      "command": "npx",
-      "args": ["sprang-mcp"],
+      "command": "node",
+      "args": ["/home/ec2-user/favio/sprang/packages/mcp/dist/server.js"],
       "env": {
         "SPRANG_ROOT": "${workspaceFolder}"
       }

@@ -62,8 +62,11 @@ export class GraphReviewerAgent extends BaseAgent {
       // 6. Tours reference valid nodes
       for (const tour of graph.tours) {
         for (const step of tour.steps) {
-          if (!nodeIds.has(step.node_id)) {
-            issues.push({ severity: 'critical', message: `Tour "${tour.id}" step references missing node: ${step.node_id}` });
+          const stepNodeIds = step.node_ids ?? (step.node_id ? [step.node_id] : []);
+          for (const nid of stepNodeIds) {
+            if (!nodeIds.has(nid)) {
+              issues.push({ severity: 'critical', message: `Tour "${tour.id}" step references missing node: ${nid}` });
+            }
           }
         }
       }
@@ -108,7 +111,10 @@ export class GraphReviewerAgent extends BaseAgent {
           })),
           tours: graph.tours.map(t => ({
             ...t,
-            steps: t.steps.filter(s => nodeIds.has(s.node_id)),
+            steps: t.steps.filter(s => {
+            const ids = s.node_ids ?? (s.node_id ? [s.node_id] : []);
+            return ids.length > 0 && ids.every(id => nodeIds.has(id));
+          }),
           })).filter(t => t.steps.length >= 2),
         };
         return this.success(ctx, fixedGraph);

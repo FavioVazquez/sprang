@@ -31,6 +31,7 @@
 
   html {
     font-size: 16px;
+    height: 100%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -42,12 +43,12 @@
     color: var(--surface-50);
     margin: 0;
     padding: 0;
-    min-height: 100vh;
+    height: 100%;
     overflow: hidden;
   }
 
   #root {
-    height: 100vh;
+    height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -106,6 +107,48 @@
   .border-subtle {
     border-color: var(--surface-700);
   }
+}
+
+/* ─── Light theme ──────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --surface-950: #ffffff;
+  --surface-900: #f4f4f5;
+  --surface-800: #e4e4e7;
+  --surface-700: #d4d4d8;
+  --surface-600: #a1a1aa;
+  --surface-500: #71717a;
+  --surface-400: #52525b;
+  --surface-300: #3f3f46;
+  --surface-200: #27272a;
+  --surface-100: #18181b;
+  --surface-50: #09090b;
+  --sprang-500: #a21caf;
+  --sprang-700: #d946ef;
+}
+
+[data-theme="light"] body {
+  background-color: #ffffff;
+  color: #09090b;
+}
+
+/* ─── High-contrast theme ───────────────────────────────────────────────────── */
+[data-theme="high-contrast"] {
+  --surface-950: #000000;
+  --surface-900: #0a0a0a;
+  --surface-800: #1a1a1a;
+  --surface-700: #2a2a2a;
+  --surface-600: #4a4a4a;
+  --surface-500: #8a8a8a;
+  --surface-400: #cacaca;
+  --surface-300: #e0e0e0;
+  --surface-200: #f0f0f0;
+  --surface-100: #f8f8f8;
+  --surface-50: #ffffff;
+  --risk-low: #00ff7f;
+  --risk-medium: #ffcc00;
+  --risk-high: #ff2d2d;
+  --sprang-500: #ff40ff;
+  --sprang-700: #cc00cc;
 }
 
 /* Reduced motion: collapse all transitions and animations to crossfades */

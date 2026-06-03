@@ -30,17 +30,12 @@ export function makeScanCommand(): Command {
           skipLLM: false,
           background: options.background !== false,
         });
-
-        // Re-read the written graph for stats
-        const graph = await runPhase1Only(projectRoot, { skipLLM: true });
-        const fileCount = graph.nodes.filter((n) => n.type === 'file').length;
-
-        spinner.succeed('Phase 1 complete');
+        
+        spinner.succeed(options.background !== false ? 'Phase 1 complete, Phase 2 in background' : 'Analysis complete');
         process.stdout.write(
-          `\n Scanned ${fileCount} files, ${graph.nodes.length} nodes created` +
-            (options.background !== false
-              ? ' (Phase 2 analysis running in background)\n'
-              : '\n')
+          (options.background !== false
+              ? '\nPhase 2 analysis is running in background. It will update the knowledge graph when done.\n'
+              : '\nPhase 2 analysis complete.\n')
         );
         process.stdout.write(`\nGraph:  ${projectRoot}/.sprang/knowledge-graph.json\n`);
         process.stdout.write(`Report: ${projectRoot}/.sprang/SPRANG_REPORT.md\n\n`);
