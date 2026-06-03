@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers playwright test"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -28,6 +29,7 @@
     "fuse.js": "^7.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

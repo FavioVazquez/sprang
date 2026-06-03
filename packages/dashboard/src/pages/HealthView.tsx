@@ -40,7 +40,7 @@ function StatCard({
     <div className="p-4 rounded-xl bg-surface-900 border border-surface-800 space-y-3">
       <div className="flex items-center gap-2">
         <Icon className="w-4 h-4 text-surface-500" />
-        <span className="text-xs text-surface-500 uppercase tracking-widest font-medium">
+        <span className="text-xs text-surface-500 font-medium">
           {label}
         </span>
       </div>
@@ -245,7 +245,7 @@ export function HealthView({ graph, onNodeSelect }: HealthViewProps) {
 
         {/* Risk summary bar */}
         <div className="p-4 rounded-xl bg-surface-900 border border-surface-800 space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-surface-500">
+          <h2 className="text-xs font-semibold text-surface-400">
             Risk Distribution
           </h2>
           <div className="flex rounded-full overflow-hidden h-3 bg-surface-800 gap-px">

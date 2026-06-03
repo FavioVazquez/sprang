@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { ProjectScannerAgent } from '../../src/agents/project-scanner.js';
 import { FileAnalyzerAgent } from '../../src/agents/file-analyzer.js';
 import { createEmptyGraph } from '../../src/graph/store.js';
-import { LLMClient } from '../../src/llm/client.js';
+import { NullLLMClient } from '../../src/llm/client.js';
 import type { AgentContext, SprangOptions } from '../../src/agents/base.js';
 import type { KnowledgeGraph } from '../../src/schema/types.js';
 
@@ -24,7 +24,7 @@ describe('FileAnalyzerAgent', () => {
 
     const graph = createEmptyGraph(FIXTURE_ROOT, 'simple-ts-fixture');
     const options: SprangOptions = { skipLLM: true };
-    const llm = new LLMClient('test-key');
+    const llm = new NullLLMClient();
 
     baseCtx = {
       projectRoot: FIXTURE_ROOT,

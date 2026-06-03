@@ -85,7 +85,7 @@ function ErrorScreen({ onRetry }: { onRetry: () => void }) {
           </p>
         </div>
         <div className="px-4 py-3 rounded-xl bg-surface-900 border border-surface-800 text-left space-y-1">
-          <p className="text-[10px] uppercase tracking-widest text-surface-600 font-medium">
+          <p className="text-[10px] text-surface-600 font-medium">
             Run in your project root
           </p>
           <code className="text-sm text-surface-300 font-mono">sprang scan</code>
@@ -145,6 +145,30 @@ export default function App() {
     },
     [currentView],
   );
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ignore when typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      switch (e.key) {
+        case 'Escape':
+          if (selectedNodeId) setSelectedNodeId('');
+          break;
+        case 'g': case '1':
+          setCurrentView('graph'); break;
+        case 'h': case '2':
+          setCurrentView('health'); break;
+        case 'd': case '3':
+          setCurrentView('domain'); break;
+        case 'r':
+          setShowRiskOverlay((v) => !v); break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedNodeId]);
 
   if (loading) return <LoadingScreen />;
   if (hasError || !graph) return <ErrorScreen onRetry={fetchGraph} />;

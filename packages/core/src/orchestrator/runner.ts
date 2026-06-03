@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { fork } from 'node:child_process';
-import { LLMClient } from '../llm/client.js';
+import { NullLLMClient } from '../llm/client.js';
 import { runPhase1 } from './phase1.js';
 import type { KnowledgeGraph } from '../schema/types.js';
 import type { SprangOptions } from '../agents/base.js';
@@ -11,8 +11,7 @@ export async function runSprangAnalysis(
   options: SprangOptions & { background?: boolean }
 ): Promise<void> {
   const sprangDir = join(projectRoot, SPRANG_DIR);
-  const apiKey = process.env['ANTHROPIC_API_KEY'];
-  const llm = new LLMClient(apiKey);
+  const llm = new NullLLMClient();
 
   const log = (msg: string) => process.stdout.write(msg + '\n');
 
@@ -70,8 +69,7 @@ export async function runPhase1Only(
   options?: SprangOptions
 ): Promise<KnowledgeGraph> {
   const sprangDir = join(projectRoot, SPRANG_DIR);
-  const apiKey = process.env['ANTHROPIC_API_KEY'];
-  const llm = new LLMClient(apiKey);
+  const llm = new NullLLMClient();
   const log = (msg: string) => process.stdout.write(msg + '\n');
 
   return runPhase1(projectRoot, sprangDir, options ?? {}, llm, log);

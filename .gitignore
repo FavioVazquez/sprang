@@ -24,3 +24,9 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 packages/core/tests/fixtures/git-repo/.git/
+
+# Playwright test artifacts
+test-results/
+playwright-report/
+packages/dashboard/test-results/
+packages/dashboard/playwright-report/

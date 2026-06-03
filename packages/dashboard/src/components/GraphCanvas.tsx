@@ -162,7 +162,7 @@ export function GraphCanvas({
     graphologyRef.current = g;
 
     // Run ForceAtlas2 for layout (synchronous, limited iterations)
-    if (g.order > 0 && g.order < 2000) {
+    if (g.order > 0 && g.order < 3000) {
       try {
         forceAtlas2.assign(g, {
           iterations: 100,
@@ -187,13 +187,15 @@ export function GraphCanvas({
       defaultNodeColor: '#71717a',
       labelColor: { color: '#a1a1aa' },
       labelSize: 11,
-      labelFont: 'Inter Variable, Inter, system-ui, sans-serif',
+      labelFont: 'Outfit, system-ui, sans-serif',
       labelWeight: '500',
       edgeLabelSize: 9,
       minCameraRatio: 0.05,
       maxCameraRatio: 10,
       nodeProgramClasses: {},
       edgeProgramClasses: {},
+      // Allow rendering even when container has no height (e.g. headless test environments)
+      allowInvalidContainer: true,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 

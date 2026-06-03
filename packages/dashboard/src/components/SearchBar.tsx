@@ -176,8 +176,8 @@ export function SearchBar({ graph, onSelect, onClose }: SearchBarProps) {
           ) : (
             <>
               {query === '' && (
-                <p className="px-4 pt-1 pb-2 text-[10px] uppercase tracking-widest text-surface-600 font-medium">
-                  Top by Risk Score
+                <p className="px-4 pt-1 pb-2 text-[10px] text-surface-600 font-medium">
+                  Top by risk score
                 </p>
               )}
               {results.map(({ item: node }, idx) => (

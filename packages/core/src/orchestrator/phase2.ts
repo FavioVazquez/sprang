@@ -2,7 +2,7 @@ import path from 'node:path';
 import { writeFile, mkdir, readFile } from 'node:fs/promises';
 import type { KnowledgeGraph } from '../schema/types.js';
 import type { AgentContext, SprangOptions } from '../agents/base.js';
-import { LLMClient } from '../llm/client.js';
+import { NullLLMClient } from '../llm/client.js';
 import { loadGraph, saveGraph } from '../graph/store.js';
 import { createEmptyGraph } from '../graph/store.js';
 import { GRAPH_VERSION } from '../schema/constants.js';
@@ -49,7 +49,7 @@ export async function runPhase2(
   await mkdir(intermediateDir, { recursive: true });
   await mkdir(cacheDir, { recursive: true });
 
-  const llm = new LLMClient(process.env['ANTHROPIC_API_KEY']);
+  const llm = new NullLLMClient();
 
   // Load skeleton graph from Phase 1
   let graph = await loadGraph(sprangDir);

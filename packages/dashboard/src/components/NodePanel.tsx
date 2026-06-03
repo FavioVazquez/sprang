@@ -76,10 +76,10 @@ function AuthorAvatar({ name }: { name: string }) {
     .join('');
 
   const colors = [
-    'bg-sprang-800 text-sprang-200',
-    'bg-blue-900 text-blue-200',
-    'bg-green-900 text-green-200',
-    'bg-amber-900 text-amber-200',
+    'bg-surface-700 text-sprang-300',
+    'bg-surface-700 text-blue-300',
+    'bg-surface-700 text-green-300',
+    'bg-surface-700 text-amber-300',
   ];
   const colorIdx =
     name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % colors.length;
@@ -102,8 +102,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-surface-500">
+    <div className="space-y-2 pt-1">
+      <h3 className="text-[11px] font-medium text-surface-400 border-t border-surface-800 pt-3 -mt-1">
         {title}
       </h3>
       {children}
@@ -302,14 +302,14 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
                   {/* Rationale snippets */}
                   {node.decision_context.rationale_snippets.slice(0, 3).map(
                     (snippet, i) => (
-                      <blockquote
+                      <div
                         key={i}
-                        className="border-l-2 border-sprang-700 pl-3 py-0.5"
+                        className="bg-surface-800/60 rounded-md px-3 py-2"
                       >
                         <p className="text-xs text-surface-400 italic leading-relaxed">
                           "{snippet}"
                         </p>
-                      </blockquote>
+                      </div>
                     ),
                   )}
 

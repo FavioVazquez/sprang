@@ -12,14 +12,6 @@ export function makeScanCommand(): Command {
     .option('--skip-llm', 'Phase 1 only — no LLM calls (fast skeleton graph)')
     .action(async (pathArg: string | undefined, options: { background: boolean; skipLlm: boolean }) => {
       const projectRoot = resolve(pathArg ?? process.cwd());
-
-      if (!process.env['ANTHROPIC_API_KEY'] && !options.skipLlm) {
-        process.stdout.write(
-          'Note: ANTHROPIC_API_KEY is not set. Phase 2 LLM enrichment will be skipped.\n' +
-            'Set ANTHROPIC_API_KEY to enable full analysis, or pass --skip-llm to suppress this message.\n\n'
-        );
-      }
-
       const spinner = ora('Phase 1: Scanning files...').start();
 
       try {

@@ -1,4 +1,4 @@
-// Node types from Understand Anything (16) — unchanged
+// 16 node types covering files, code constructs, and architectural concepts
 export const NODE_TYPES = [
   'file', 'function', 'class', 'module', 'concept',
   'config', 'document', 'service', 'table', 'endpoint',
