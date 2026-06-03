@@ -72,7 +72,7 @@ Steps:
    (create .devin/rules/ if it does not exist)
 
 6. Run the initial scan on this project:
-   sprang scan . --skip-llm
+   sprang scan . --phase1-only
 
 7. Tell me when done. I will reload the MCP server and run /sprang-onboard
    to give you a full architecture walkthrough.
@@ -141,7 +141,7 @@ sprang_health {}
 | Capability | How |
 |---|---|
 | **Git decision context** | `git-layer` — who changed each file, why, PR references, change frequency |
-| **Code smell detection** | `smell-detector` — 8 deterministic heuristics, zero LLM required |
+| **Code smell detection** | `smell-detector` — 8 deterministic heuristics, fully deterministic |
 | **Risk scoring** | `risk-scorer` — blast radius × coupling × test gap × churn, 0.0–1.0 per node |
 | **Guided tours** | `tour-builder` — BFS-ordered pedagogical paths through the codebase |
 | **Domain map** | `domain-analyzer` — directory cohesion clustering into named business layers |
@@ -330,7 +330,7 @@ Skills and workflows live in `.windsurf/skills/` and `.windsurf/workflows/`, sym
 | Command | Description |
 |---|---|
 | `/sprang` | Build or refresh the knowledge graph — auto-detects codebase vs knowledge base |
-| `/sprang-analyze [path] [--full] [--language <lang>] [--chunk N]` | Full LLM-driven codebase analysis — summaries, layers, tour, risk |
+| `/sprang-analyze [path] [--full] [--language <lang>] [--chunk N]` | Full Cascade-driven codebase analysis — summaries, layers, tour, risk |
 | `/sprang-knowledge [path] [--format obsidian\|logseq\|...] [--full]` | Build knowledge graph from markdown notes |
 | `/sprang-chat <question>` | Ask any question about the codebase using the knowledge graph |
 | `/sprang-explain <file>` | Deep-dive: what, why, who, risk, history for a file or function |
@@ -353,7 +353,7 @@ Skills and workflows live in `.windsurf/skills/` and `.windsurf/workflows/`, sym
 
 ```mermaid
 flowchart TB
-    subgraph Phase1 ["Phase 1 — Skeleton (< 60s, zero LLM)"]
+    subgraph Phase1 ["Phase 1 — Skeleton (< 60s, fully static)"]
         PS[project-scanner] --> FA[file-analyzer]
         FA --> SD[smell-detector]
         FA --> RS[risk-scorer]
@@ -391,7 +391,7 @@ node.decision_context: { commits, primary_authors, last_changed,
                           change_frequency, rationale_snippets, pr_references }
 ```
 
-### `smell-detector` — 8 deterministic heuristics, zero LLM
+### `smell-detector` — 8 deterministic heuristics, fully deterministic
 
 | Smell | Trigger |
 |---|---|
@@ -409,7 +409,7 @@ node.decision_context: { commits, primary_authors, last_changed,
 <!-- Risk formula — generated with Gemini gemini-3.1-flash-image-preview -->
 <p align="center">
   <img src="assets/risk-formula.png" alt="risk_score = blast_radius×0.35 + coupling×0.25 + test_gap×0.25 + churn×0.15" width="100%" />
-  <em>Deterministic, no LLM. Every factor is traceable — risk_factors[] lists the exact contributors per node.</em>
+  <em>Deterministic. Every factor is traceable — risk_factors[] lists the exact contributors per node.</em>
 </p>
 
 ```
