@@ -75,6 +75,7 @@ export const DEFAULT_EXCLUDES = [
   '**/build/**',
   '**/.sprang/intermediate/**',
   '**/.sprang/cache/**',
+  '**/.sprang/tmp/**',
   '**/.next/**',
   '**/.nuxt/**',
   '**/coverage/**',
@@ -85,6 +86,13 @@ export const DEFAULT_EXCLUDES = [
   '**/*.min.js',
   '**/*.min.css',
   '**/*.map',
+  // Sprang installation artifacts — workflows, skills, and rules copied into
+  // the target project should not appear in the project's knowledge graph.
+  '**/.windsurf/workflows/**',
+  '**/.windsurf/skills/**',
+  '**/.devin/rules/**',
+  '**/.devin/workflows/**',
+  '**/.devin/skills/**',
 ];
 
 // Entry point patterns for tour-builder (TypeScript/JavaScript + multi-language)
