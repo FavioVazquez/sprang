@@ -21,8 +21,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,9 +35,7 @@ jobs:
         run: pnpm build
 
       - name: Run Sprang scan
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: npx sprang scan .
+        run: node packages/cli/dist/index.js scan . --skip-llm
 
       - name: Commit updated graph files
         run: |

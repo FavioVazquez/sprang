@@ -287,6 +287,17 @@ export function GraphView({
         </Tooltip>
       </header>
 
+      {/* Phase 2 enrichment banner */}
+      {graph.phase === 'skeleton' && (
+        <div className="flex items-center gap-2 px-4 py-1.5 bg-sprang-500/10 border-b border-sprang-500/20 text-xs text-sprang-300 flex-shrink-0">
+          <span className="relative flex h-2 w-2 flex-shrink-0">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-sprang-400 opacity-75 animate-ping" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-sprang-500" />
+          </span>
+          Phase 2 running in background — adding git history, code smell detection, and risk scores to each node. Refresh to pick up new data.
+        </div>
+      )}
+
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Graph canvas */}

@@ -25,24 +25,165 @@ Cascade is the intelligence layer. Sprang is the data layer. Together they answe
 
 ---
 
-## Quick start
+## Prerequisites
+
+- **Node.js 20+** — `node --version`
+- **pnpm 10+** — `npm install -g pnpm` (or `corepack enable && corepack prepare pnpm@latest`)
+- **Git** — required for the `git-layer` agent to extract decision context
+
+---
+
+## Installation
+
+### Build from source
 
 ```bash
-# Scan your project (< 60s, no API key, no LLM)
-npx sprang scan /path/to/your/project
+# 1. Clone the repository
+git clone https://github.com/faviovazquez/sprang.git
+cd sprang
 
-# Check health
-npx sprang health
+# 2. Install dependencies
+pnpm install
 
-# Query the graph
-npx sprang query "authentication"
+# 3. Build all packages
+pnpm build
 
-# Watch for changes
-npx sprang watch
-
-# Check pipeline status
-npx sprang status
+# 4. Link the CLI globally (so `sprang` works from anywhere)
+pnpm --filter @sprang/cli link --global
 ```
+
+After this, `sprang` is available as a global command.
+
+### Verify the install
+
+```bash
+sprang --version   # should print 0.1.0
+sprang --help      # list all commands
+```
+
+---
+
+## Using the CLI
+
+```bash
+# Scan a project (< 60s, Phase 1 only — no LLM, no API key)
+sprang scan /path/to/your/project --skip-llm
+
+# Full scan (Phase 1 + Phase 2 enrichment by Cascade in background)
+sprang scan /path/to/your/project
+
+# Check graph age, phase, and node/edge count
+sprang status
+
+# Print health report: smells, risk table, orphans, circular deps
+sprang health
+
+# Fuzzy-search nodes by name or summary
+sprang query "authentication"
+
+# Watch for file changes and incrementally update the graph
+sprang watch
+```
+
+The scan writes to `.sprang/` in the project root:
+
+```
+your-project/
+└── .sprang/
+    ├── knowledge-graph.json   ← main graph (nodes, edges, risk scores, smells)
+    ├── SPRANG_REPORT.md       ← human-readable architecture summary
+    ├── annotations/           ← Cascade-written node annotations (commit these)
+    ├── config.json            ← optional thresholds + excludes
+    └── intermediate/          ← Phase 2 progress (gitignored)
+```
+
+---
+
+## Setting up with Windsurf / Cascade
+
+### Step 1 — Scan your project
+
+From your project root in Windsurf's terminal:
+
+```bash
+sprang scan . --skip-llm
+```
+
+This produces `.sprang/knowledge-graph.json` in under 60 seconds with no external API calls.
+
+### Step 2 — Add the MCP server
+
+Create or edit `.devin/config.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "sprang": {
+      "command": "node",
+      "args": ["/absolute/path/to/sprang/packages/mcp/dist/server.js"],
+      "env": { "SPRANG_ROOT": "${workspaceFolder}" }
+    }
+  }
+}
+```
+
+> **Note:** Replace `/absolute/path/to/sprang` with where you cloned this repo.
+> Once published to npm, use `"command": "npx", "args": ["sprang-mcp"]` instead.
+
+### Step 3 — Restart Cascade
+
+Restart Cascade (or reload the window) to pick up the new MCP server. You should see "sprang" in the MCP tools list.
+
+### Step 4 — Run onboarding
+
+In the Cascade chat:
+
+```
+/sprang-onboard
+```
+
+This runs the scan, shows the health summary, and offers a guided tour.
+
+### What Cascade gets automatically
+
+Once the MCP server is active and `.devin/rules/` files are present, Cascade:
+
+- **Before editing any file** — calls `sprang_node` to check its `risk_score` and `structural_warnings`
+- **On high-risk files (risk > 0.7)** — calls `sprang_why` to understand the decision context
+- **After changes** — calls `sprang_diff_impact` to assess blast radius
+
+These behaviours come from `.devin/rules/sprang-context.md` (always-on) and `.devin/rules/sprang-highrisk.md` (glob trigger on source files).
+
+---
+
+## Windsurf setup (same as Devin Desktop)
+
+Copy `.devin/rules/` to `.windsurf/rules/` — already done in this repo. The rules use the same frontmatter format Windsurf understands.
+
+---
+
+## Viewing the dashboard
+
+### Development (live reload)
+
+```bash
+# From the project you scanned
+SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard dev
+
+# Or from inside the sprang repo, pointing at itself
+SPRANG_ROOT=$(pwd) pnpm --filter @sprang/dashboard dev
+```
+
+Opens at `http://localhost:7338`. The Vite dev server automatically proxies `/knowledge-graph.json` from `.sprang/`.
+
+### Production build
+
+```bash
+pnpm --filter @sprang/dashboard build
+pnpm --filter @sprang/dashboard preview
+```
+
+For the preview server to find the graph, copy or symlink `.sprang/knowledge-graph.json` to `packages/dashboard/public/knowledge-graph.json`, or set `SPRANG_ROOT` before building.
 
 ---
 
