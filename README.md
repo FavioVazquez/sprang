@@ -627,24 +627,6 @@ packages/mcp/tests/         MCP tool integration tests
 
 ---
 
-## Regenerating brand assets
-
-Brand images live in `assets/` and are committed to the repo. To regenerate them:
-
-```bash
-# Requires: GOOGLE_CLOUD_API_KEY in .env
-pip install google-genai python-dotenv
-
-python generate_images.py           # regenerate all 8 images
-python generate_images.py --list    # list available images
-python generate_images.py --only banner   # regenerate a single image
-```
-
-> `generate_images.py` is gitignored (it reads `.env` and is a local dev tool).
-> The `assets/` directory and its contents are committed and tracked.
-
----
-
 ## License
 
 MIT
