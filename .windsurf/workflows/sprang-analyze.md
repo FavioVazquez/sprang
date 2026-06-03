@@ -182,21 +182,19 @@ Report: `[Phase 2/6] Analyzing files — <N> files in batches of up to 20...`
 - `moderate`: 50-200 lines, clear structure, some business logic
 - `complex`: >200 lines, multiple responsibilities, nested logic, many dependencies
 
-**Write each batch:**
-```bash
-cat > "$SPRANG_ROOT/intermediate/batch-<N>.json" << 'EOF'
-{
-  "nodes": [...],
-  "edges": [...]
-}
-EOF
+**Write each batch — use write_to_file per batch, max 100 nodes per file:**
+Never output more than 100 nodes in a single tool call. If a batch has >100 nodes, split into sub-batches:
 ```
+batch-1a.json  { nodes: [...up to 100...], edges: [...] }
+batch-1b.json  { nodes: [...next 100...], edges: [...] }
+```
+This prevents Cascade's output token limit from being hit mid-write.
 
 **Output chunking for large projects (>500 nodes):**
 If `--chunk <N>` was passed or node count exceeds 2000, write intermediate graph as chunks:
 ```bash
 cat > "$SPRANG_ROOT/intermediate/nodes-chunk-<K>.json" << 'EOF'
-[...up to N nodes...]
+[...up to 100 nodes...]
 EOF
 ```
 This prevents context overflow. Merge all chunks in the merge step below.
@@ -381,7 +379,37 @@ Report: `[Phase 6/6] Assembling final knowledge graph...`
    - No dangling edges
    - All nodes have summary, type, id
 
-5. Write to `$SPRANG_ROOT/knowledge-graph.json`
+5. **Safe write — ALWAYS use a script, never emit raw JSON directly.**
+   Cascade's output token limit will cause failures for graphs with >200 nodes if you try to write the JSON inline.
+   Instead, write node/edge data as intermediate chunk files, then merge with a script:
+
+   **Step 5a — Write nodes in chunks of 100:**
+   Write each chunk to `$SPRANG_ROOT/intermediate/final-nodes-chunk-<K>.json` (array of node objects).
+   Write edges to `$SPRANG_ROOT/intermediate/final-edges.json`.
+   Write layers to `$SPRANG_ROOT/intermediate/final-layers.json`.
+   Write tours to `$SPRANG_ROOT/intermediate/final-tours.json`.
+   Write the graph envelope (everything except nodes/edges) to `$SPRANG_ROOT/intermediate/final-envelope.json`.
+
+   **Step 5b — Merge with Python (run via run_command):**
+   ```python
+   import json, glob, os
+   root = "$SPRANG_ROOT"
+   inter = os.path.join(root, "intermediate")
+   env = json.load(open(os.path.join(inter, "final-envelope.json")))
+   nodes = []
+   for f in sorted(glob.glob(os.path.join(inter, "final-nodes-chunk-*.json"))):
+       nodes.extend(json.load(open(f)))
+   edges = json.load(open(os.path.join(inter, "final-edges.json")))
+   layers = json.load(open(os.path.join(inter, "final-layers.json")))
+   tours = json.load(open(os.path.join(inter, "final-tours.json")))
+   graph = {**env, "nodes": nodes, "edges": edges, "layers": layers, "tours": tours}
+   graph["stats"]["node_count"] = len(nodes)
+   graph["stats"]["edge_count"] = len(edges)
+   out = json.dumps(graph, indent=2, ensure_ascii=False)
+   open(os.path.join(root, "knowledge-graph.json"), "w").write(out)
+   print(f"OK: {len(nodes)} nodes, {len(edges)} edges, {len(out)} bytes")
+   ```
+   This bypasses Cascade's output token limit entirely — Python writes the file directly.
 
 6. Write `$SPRANG_ROOT/SPRANG_REPORT.md`:
    ```markdown
