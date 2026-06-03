@@ -109,3 +109,8 @@ export function removeRole(role: string): void {
   }
   _currentUser.roles = _currentUser.roles.filter((r) => r !== role);
 }
+// v1.1 — basic auth
+// security: validate token
+// session expiry check
+// role-based access
+// logout cleanup

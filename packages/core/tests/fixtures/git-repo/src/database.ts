@@ -110,3 +110,8 @@ export function getConnectionStatus(): { connected: boolean; host?: string; data
     database: _connectionOptions.database,
   };
 }
+// v1.1 — db connect
+// retry on disconnect
+// connection pooling
+// query cache
+// reconnect on error

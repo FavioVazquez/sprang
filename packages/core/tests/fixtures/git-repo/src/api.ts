@@ -104,3 +104,8 @@ export async function apiLogout(): Promise<ApiResponse<void>> {
     return { success: false, error: (err as Error).message };
   }
 }
+// api v1.1
+// rate limiting
+// health check endpoint
+// audit log
+// pagination
