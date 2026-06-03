@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import Graph from 'graphology';
 import { Sigma } from 'sigma';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
+import { Plus, Minus, Maximize2 } from 'lucide-react';
 import type { KnowledgeGraph, NodeType } from '../types';
 import { getRiskColor } from '../api/graphApi';
 
@@ -274,10 +275,41 @@ export function GraphCanvas({
   }, [selectedNodeId]);
 
   return (
-    <div
-      ref={containerRef}
-      className="sigma-container w-full h-full"
-      style={{ background: '#09090b' }}
-    />
+    <div className="relative w-full h-full" style={{ background: '#09090b' }}>
+      <div
+        ref={containerRef}
+        className="sigma-container w-full h-full"
+        role="img"
+        aria-label={`Knowledge graph: ${graph.nodes.length} nodes, ${graph.edges.length} edges. Click a node to inspect it.`}
+      />
+
+      {/* Zoom controls */}
+      <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">
+        <button
+          className="w-8 h-8 flex items-center justify-center rounded-md bg-surface-800/90 border border-surface-700 text-surface-400 hover:text-surface-200 hover:bg-surface-700 transition-colors backdrop-blur-sm"
+          onClick={() => sigmaRef.current?.getCamera().animatedZoom({ duration: 200 })}
+          title="Zoom in"
+          aria-label="Zoom in"
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+        <button
+          className="w-8 h-8 flex items-center justify-center rounded-md bg-surface-800/90 border border-surface-700 text-surface-400 hover:text-surface-200 hover:bg-surface-700 transition-colors backdrop-blur-sm"
+          onClick={() => sigmaRef.current?.getCamera().animatedUnzoom({ duration: 200 })}
+          title="Zoom out"
+          aria-label="Zoom out"
+        >
+          <Minus className="w-3.5 h-3.5" />
+        </button>
+        <button
+          className="w-8 h-8 flex items-center justify-center rounded-md bg-surface-800/90 border border-surface-700 text-surface-400 hover:text-surface-200 hover:bg-surface-700 transition-colors backdrop-blur-sm"
+          onClick={() => sigmaRef.current?.getCamera().animatedReset({ duration: 400 })}
+          title="Reset view"
+          aria-label="Reset zoom to fit graph"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   Search,
   Network,
@@ -8,9 +8,12 @@ import {
   ChevronDown,
   Play,
   BookOpen,
+  X,
+  Keyboard,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { Tooltip } from '../components/ui/Tooltip';
 import { GraphCanvas } from '../components/GraphCanvas';
 import { NodePanel } from '../components/NodePanel';
 import { RiskOverlay } from '../components/RiskOverlay';
@@ -44,6 +47,9 @@ export function GraphView({
   const [hoveredLayerId, setHoveredLayerId] = useState<string | undefined>();
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [showTourMenu, setShowTourMenu] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return !localStorage.getItem('sprang:onboarded'); } catch { return false; }
+  });
   const tourMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -119,16 +125,21 @@ export function GraphView({
         {/* Layers menu */}
         {graph.layers.length > 0 && (
           <div className="relative">
-            <Button
-              variant={hoveredLayerId ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setShowLayerMenu((v) => !v)}
-              className={hoveredLayerId ? 'bg-surface-700 border-0' : ''}
+            <Tooltip
+              content="Filter the graph by architectural layer. Click to highlight all nodes in that layer."
+              side="bottom"
             >
-              <Layers className="w-3.5 h-3.5" />
-              Layers
-              <ChevronDown className="w-3 h-3 opacity-60" />
-            </Button>
+              <Button
+                variant={hoveredLayerId ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowLayerMenu((v) => !v)}
+                className={hoveredLayerId ? 'bg-surface-700 border-0' : ''}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Layers
+                <ChevronDown className="w-3 h-3 opacity-60" />
+              </Button>
+            </Tooltip>
 
             <AnimatePresence>
               {showLayerMenu && (
@@ -194,17 +205,25 @@ export function GraphView({
         {/* Tours */}
         {graph.tours.length > 0 && !activeTour && (
           <div ref={tourMenuRef} className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowTourMenu((v) => !v)}
-              aria-expanded={showTourMenu}
-              aria-haspopup="menu"
+            <Tooltip
+              content={`${graph.tours.length} guided tour${graph.tours.length !== 1 ? 's' : ''} — step-by-step walkthroughs of key areas in this codebase.`}
+              side="bottom"
             >
-              <BookOpen className="w-3.5 h-3.5" />
-              Tours
-              <ChevronDown className="w-3 h-3 opacity-60" />
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTourMenu((v) => !v)}
+                aria-expanded={showTourMenu}
+                aria-haspopup="menu"
+                className="relative"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                Tours
+                <ChevronDown className="w-3 h-3 opacity-60" />
+                {/* Subtle indicator dot when tours are available */}
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-sprang-500" />
+              </Button>
+            </Tooltip>
             {showTourMenu && (
               <div
                 role="menu"
@@ -235,21 +254,37 @@ export function GraphView({
         )}
 
         {/* Search trigger */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowSearch(true)}
-          className="gap-2"
-          aria-label="Search (Cmd+K)"
+        <Tooltip
+          content={
+            <div className="space-y-1.5">
+              <p>Fuzzy-search all nodes by name or summary.</p>
+              <div className="pt-1 border-t border-surface-700 space-y-0.5 text-surface-400">
+                <p><kbd className="font-mono text-surface-300">⌘K</kbd> — open search</p>
+                <p><kbd className="font-mono text-surface-300">g</kbd> / <kbd className="font-mono text-surface-300">h</kbd> / <kbd className="font-mono text-surface-300">d</kbd> — switch views</p>
+                <p><kbd className="font-mono text-surface-300">r</kbd> — toggle risk heatmap</p>
+                <p><kbd className="font-mono text-surface-300">Esc</kbd> — close panel</p>
+              </div>
+            </div>
+          }
+          side="bottom"
+          align="end"
         >
-          <Search className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline text-surface-400 text-xs">
-            Search
-          </span>
-          <kbd className="hidden sm:inline text-[10px] font-mono text-surface-600 bg-surface-800 border border-surface-700 px-1 rounded">
-            ⌘K
-          </kbd>
-        </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSearch(true)}
+            className="gap-2"
+            aria-label="Search nodes (⌘K)"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-surface-400 text-xs">
+              Search
+            </span>
+            <kbd className="hidden sm:inline text-[10px] font-mono text-surface-600 bg-surface-800 border border-surface-700 px-1 rounded">
+              ⌘K
+            </kbd>
+          </Button>
+        </Tooltip>
       </header>
 
       {/* Main content */}
@@ -273,6 +308,55 @@ export function GraphView({
               </div>
             </div>
           )}
+
+          {/* First-run discovery callout */}
+          <AnimatePresence>
+            {showOnboarding && graph.nodes.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ delay: 0.6, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 w-full max-w-md px-4"
+              >
+                <div className="bg-surface-800/95 backdrop-blur-sm border border-surface-700 rounded-xl px-5 py-4 shadow-xl shadow-black/50">
+                  <div className="flex items-start gap-3">
+                    <Keyboard className="w-4 h-4 text-sprang-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-2.5">
+                      <p className="text-sm font-semibold text-surface-100">Explore your codebase</p>
+                      <div className="space-y-1.5 text-xs text-surface-400">
+                        <p><span className="text-surface-200 font-medium">Click any node</span> to inspect its risk score, git history, and structural warnings.</p>
+                        <p><span className="text-surface-200 font-medium">⌘K</span> to search — fuzzy-match nodes by name or summary.</p>
+                        {graph.tours.length > 0 && (
+                          <p><span className="text-surface-200 font-medium">Tours</span> (top-right) — guided walkthroughs of key areas.</p>
+                        )}
+                        <p className="text-surface-500"><span className="text-surface-300 font-medium">r</span> risk heatmap · <span className="text-surface-300 font-medium">h</span> health report · <span className="text-surface-300 font-medium">d</span> domains</p>
+                      </div>
+                    </div>
+                    <button
+                      className="flex-shrink-0 -mt-0.5 p-1 rounded text-surface-500 hover:text-surface-300 hover:bg-surface-700 transition-colors"
+                      onClick={() => {
+                        setShowOnboarding(false);
+                        try { localStorage.setItem('sprang:onboarded', '1'); } catch { /* ignore */ }
+                      }}
+                      aria-label="Dismiss"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <button
+                    className="mt-3 w-full text-xs text-center text-sprang-400 hover:text-sprang-300 transition-colors"
+                    onClick={() => {
+                      setShowOnboarding(false);
+                      try { localStorage.setItem('sprang:onboarded', '1'); } catch { /* ignore */ }
+                    }}
+                  >
+                    Got it
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Node panel */}

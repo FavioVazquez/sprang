@@ -14,9 +14,11 @@ import {
   Users,
   ExternalLink,
   ChevronRight,
+  HelpCircle,
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
+import { Tooltip } from './ui/Tooltip';
 import { SmellBadge } from './SmellBadge';
 import { getRiskColor, getRiskLabel } from '../api/graphApi';
 import type { SprangNode, KnowledgeGraph, NodeType, RiskFactor } from '../types';
@@ -96,16 +98,23 @@ function AuthorAvatar({ name }: { name: string }) {
 
 function Section({
   title,
+  tooltip,
   children,
 }: {
   title: string;
+  tooltip?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-2 pt-1">
-      <h3 className="text-[11px] font-medium text-surface-400 border-t border-surface-800 pt-3 -mt-1">
-        {title}
-      </h3>
+      <div className="flex items-center gap-1.5 border-t border-surface-800 pt-3 -mt-1">
+        <h3 className="text-[11px] font-medium text-surface-400">{title}</h3>
+        {tooltip && (
+          <Tooltip content={tooltip} side="right" delayDuration={200}>
+            <HelpCircle className="w-3 h-3 text-surface-600 hover:text-surface-400 cursor-help transition-colors flex-shrink-0" />
+          </Tooltip>
+        )}
+      </div>
       {children}
     </div>
   );
@@ -186,7 +195,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
 
             {/* Risk score */}
             {node.risk_score != null && (
-              <Section title="Risk Score">
+              <Section title="Risk Score" tooltip="Likelihood that a change to this node causes downstream failures. Composite of blast radius (0.35), coupling (0.25), test coverage (0.25), and churn (0.15). Above 0.7 is high risk.">
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-surface-400">
@@ -223,7 +232,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
 
             {/* Risk factors */}
             {node.risk_factors && node.risk_factors.length > 0 && (
-              <Section title="Risk Factors">
+              <Section title="Risk Factors" tooltip="Specific signals that drove the risk score up. Address 'no_test_coverage' and 'large_blast_radius' first — they have the highest weight.">
                 <div className="flex flex-wrap gap-1.5">
                   {node.risk_factors.map((factor) => (
                     <span
@@ -240,7 +249,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
 
             {/* Structural warnings */}
             {node.structural_warnings && node.structural_warnings.length > 0 && (
-              <Section title="Structural Warnings">
+              <Section title="Structural Warnings" tooltip="Heuristic code smells detected by static analysis — no LLM involved. god_node, circular_dependency, and unstable_interface are the most critical to address.">
                 <div className="space-y-2">
                   {node.structural_warnings.map((warning, i) => (
                     <div
@@ -262,7 +271,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
 
             {/* Decision context */}
             {node.decision_context && (
-              <Section title="Decision Context">
+              <Section title="Decision Context" tooltip="Git history analysis: who changed this file and why, extracted from commit messages. Rationale snippets are LLM-summarized commit message patterns.">
                 <div className="space-y-3">
                   {/* Authors */}
                   {node.decision_context.primary_authors.length > 0 && (
@@ -279,7 +288,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
                   {/* Last changed + frequency */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="p-2 rounded-lg bg-surface-800 border border-surface-700">
-                      <p className="text-[10px] text-surface-500 uppercase tracking-wide">
+                      <p className="text-[10px] text-surface-500">
                         Last Changed
                       </p>
                       <p className="text-xs text-surface-200 mt-0.5 font-medium">
@@ -290,7 +299,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
                       </p>
                     </div>
                     <div className="p-2 rounded-lg bg-surface-800 border border-surface-700">
-                      <p className="text-[10px] text-surface-500 uppercase tracking-wide">
+                      <p className="text-[10px] text-surface-500">
                         90-Day Changes
                       </p>
                       <p className="text-xs text-surface-200 mt-0.5 font-bold">
