@@ -16,7 +16,6 @@ The `sprang` MCP server provides 9 tools — use them in Copilot agent mode:
 | `sprang_health` | Full risk + smell + orphan report |
 | `sprang_why` | Git history + decision context for a file |
 | `sprang_annotate` | Write team knowledge to `.sprang/annotations/` |
-| `sprang_respond` | Write response to dashboard (cascade bridge) |
 
 ## Pre-edit checklist
 
