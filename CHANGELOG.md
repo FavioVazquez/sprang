@@ -26,6 +26,10 @@ Persistent dashboard chat — send messages from the Sprang dashboard to Cascade
 
 - `.gitignore` — runtime cascade files (`.cascade-trigger-session`, `.cascade-trigger`, `.cascade-session`, `.cascade-conversation.md`) and `packages/cascade-messaging/` source are now excluded. Only the compiled `.vsix` is committed.
 
+### Fixed
+
+- **Removed `sprang-refresh` CI workflow** — `knowledge-graph.json` and `SPRANG_REPORT.md` are gitignored (graph output is local to each project), so the nightly refresh job would always produce an empty commit. Workflow deleted.
+
 ---
 
 ## [0.1.2] — 2026-06-03
