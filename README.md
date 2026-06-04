@@ -135,6 +135,7 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 ## Contents
 
 - [Quick install — just ask Cascade](#quick-install--just-ask-cascade)
+- [Install script (windsurf / copilot / claude)](#install-script)
 - [What Sprang does](#what-sprang-does)
 - [Platform architecture](#platform-architecture)
 - [Prerequisites](#prerequisites)
@@ -155,6 +156,41 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 - [Live watcher](#live-watcher)
 - [Development](#development)
 - [Configuration](#configuration)
+
+---
+
+## Install script
+
+The fastest way to install for Windsurf, Copilot, or Claude Code:
+
+```bash
+# macOS / Linux — clones the repo, builds, and links skills in one command
+curl -fsSL https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.sh | bash -s windsurf
+# or: bash -s copilot  |  bash -s claude
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.ps1 | iex
+# Or with a platform arg:  .\install.ps1 windsurf  |  .\install.ps1 copilot
+```
+
+```bash
+# If you already have the repo cloned:
+./install.sh windsurf     # Devin Desktop / Windsurf — symlinks 11 skills into ~/.windsurf/skills/
+./install.sh copilot      # GitHub Copilot — symlinks 11 skills into ~/.copilot/skills/
+./install.sh claude       # Claude Code — prints per-project setup guide
+./install.sh --update     # pull latest + rebuild
+./install.sh --uninstall windsurf
+```
+
+Supported platforms:
+
+| Platform | Skills target | Description |
+|---|---|---|
+| `windsurf` | `~/.windsurf/skills/` | Devin Desktop and Windsurf AI |
+| `copilot` | `~/.copilot/skills/` | GitHub Copilot VS Code extension |
+| `claude` | project-local | Claude Code (per-project via `.mcp.json`) |
 
 ---
 
@@ -280,7 +316,7 @@ cd ../..
 ```bash
 # Verify
 which sprang        # should print $PNPM_HOME/sprang
-sprang --version    # 0.1.2
+sprang --version    # 0.2.0
 sprang --help
 ```
 
@@ -493,12 +529,15 @@ Claude Code picks up Sprang automatically when the repo is opened — no install
 
 | File | Purpose |
 |---|---|
-| `CLAUDE.md` | Imports `AGENTS.md` — Claude Code reads it before every session |
+| `CLAUDE.md` | Comprehensive Claude Code integration guide — MCP tools, rules, commands, workflows |
+| `AGENTS.md` | Platform-agnostic command reference — imported by `CLAUDE.md` |
 | `.mcp.json` | MCP server config — Claude Code auto-starts `packages/mcp/dist/server.js` |
 | `.claude/rules/sprang-context.md` | Always-on rule: use MCP tools before editing any file |
 | `.claude/rules/sprang-highrisk.md` | Glob rule: blast radius check when editing source files |
 | `.claude/commands/` | 11 slash commands (same as Cascade workflows) |
 | `.claude/settings.json` | Pre-approved permissions for sprang CLI and MCP tools |
+| `.claude-plugin/plugin.json` | Claude Code plugin discovery metadata |
+| `.claude-plugin/marketplace.json` | Plugin marketplace listing |
 
 **First use:**
 
@@ -523,6 +562,7 @@ The MCP server starts automatically when Claude Code opens the workspace. All 9 
 |---|---|
 | `.vscode/mcp.json` | MCP server in Copilot's `"servers"` format |
 | `.github/copilot-instructions.md` | Pre-edit checklist + tool reference — auto-loaded by Copilot |
+| `.copilot-plugin/plugin.json` | Copilot plugin discovery metadata with `skills`/`agents` paths |
 
 **Activation:**
 
@@ -833,7 +873,7 @@ pnpm install
 pnpm build             # build all packages
 pnpm test              # 496 unit tests across core/dashboard/mcp/cli, zero failures
 pnpm typecheck         # strict TypeScript, zero errors
-pnpm --filter @sprang/dashboard dev        # dashboard at localhost:5173
+pnpm --filter @sprang/dashboard dev        # dashboard at localhost:7338
 pnpm --filter @sprang/dashboard test:e2e   # 32 Playwright e2e tests
 ```
 
