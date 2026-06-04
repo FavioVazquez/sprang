@@ -1,5 +1,5 @@
 import type { GraphLoader } from '../graph-loader.js';
-import type { Tour, TourStep, SprangNode } from '@sprang/core';
+import type { Tour, TourStep, SprangNode, LanguageLesson } from '@sprang/core';
 
 export interface SprangTourInput {
   tour_id?: string;
@@ -11,6 +11,7 @@ export interface TourStepWithNode {
   step_title: string;
   explanation: string;
   highlight?: boolean;
+  languageLesson?: LanguageLesson;
   node?: {
     id: string;
     type: string;
@@ -104,6 +105,7 @@ export async function sprangTour(
       step_title: step.step_title,
       explanation: step.explanation,
       highlight: step.highlight,
+      languageLesson: step.languageLesson,
       node: node
         ? {
             id: node.id,

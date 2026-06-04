@@ -1,3 +1,24 @@
+export type LanguagePattern =
+  | 'closures'
+  | 'async_await'
+  | 'promises'
+  | 'generators'
+  | 'decorators'
+  | 'generics'
+  | 'streams'
+  | 'observers'
+  | 'dependency_injection'
+  | 'middleware'
+  | 'finite_state_machine'
+  | 'immutability';
+
+export interface LanguageLesson {
+  pattern: LanguagePattern;
+  title: string;
+  explanation: string;
+  lines?: [number, number];
+}
+
 // 21 node types: 5 code + 8 non-code + 3 domain + 5 knowledge (matches Understand-Anything)
 export const NODE_TYPES = [
   // code
@@ -135,6 +156,8 @@ export interface SprangNode {
   risk_factors?: RiskFactor[];
   /** Human-written team annotations loaded from .sprang/annotations/. */
   annotations?: string[];
+  /** Detected programming pattern lesson for this node. */
+  languageLesson?: LanguageLesson;
 }
 
 export interface SprangEdge {
@@ -161,8 +184,10 @@ export interface TourStep {
   node_ids?: string[];
   step_title: string;
   explanation: string;
-  /** Optional language lesson surfaced in LearnPanel. */
+  /** Optional language lesson surfaced in LearnPanel (legacy string form). */
   language_lesson?: string;
+  /** Structured language lesson detected for the node this step highlights. */
+  languageLesson?: LanguageLesson;
   highlight?: boolean;
 }
 
