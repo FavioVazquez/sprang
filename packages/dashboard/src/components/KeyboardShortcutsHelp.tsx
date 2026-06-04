@@ -8,7 +8,8 @@ const SHORTCUTS = [
   { keys: ['G', '1'], action: 'Graph view' },
   { keys: ['H', '2'], action: 'Health view' },
   { keys: ['D', '3'], action: 'Domains view' },
-  { keys: ['L', '4'], action: 'Learn view' },
+  { keys: ['A', '4'], action: 'Architecture view' },
+  { keys: ['L', '5'], action: 'Learn view' },
   { keys: ['R'], action: 'Toggle risk overlay' },
   { keys: ['?'], action: 'This help dialog' },
 ];

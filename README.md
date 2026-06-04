@@ -15,17 +15,17 @@
 
 <p align="center">
   <a href="#manual-installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
-  <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-8_tools-7C3AED?style=flat-square" alt="8 MCP tools"/></a>
+  <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-261_passing-10B981?style=flat-square" alt="261 unit tests passing"/>
-  <img src="https://img.shields.io/badge/e2e_tests-15_passing-10B981?style=flat-square" alt="15 e2e tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-496_passing-10B981?style=flat-square" alt="496 unit tests passing"/>
+  <img src="https://img.shields.io/badge/e2e_tests-32_passing-10B981?style=flat-square" alt="32 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
 </p>
 
 ---
 
-Sprang is a knowledge graph platform for [Windsurf](https://windsurf.com) (Cascade) and [Devin Desktop](https://devin.ai) that creates **total codebase comprehension** — not just symbol search, but *why* code exists, *who* changed it, *what* it risks, and *how* it all fits together.
+Sprang is a knowledge graph platform for [Windsurf](https://windsurf.com) (Cascade), [Devin Desktop](https://devin.ai), [Claude Code](https://claude.ai/code), and [GitHub Copilot](https://github.com/features/copilot) that creates **total codebase comprehension** — not just symbol search, but *why* code exists, *who* changed it, *what* it risks, and *how* it all fits together.
 
 Cascade is the intelligence layer. Sprang is the data layer. Together they answer **"what will break if I change this file?"** in a single tool call.
 
@@ -143,6 +143,8 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 - [Setup with Windsurf / Cascade](#setup-with-windsurf--cascade)
 - [Dashboard chat (cascade-messaging)](#dashboard-chat-cascade-messaging)
 - [Setup with Devin Desktop](#setup-with-devin-desktop)
+- [Setup with Claude Code](#setup-with-claude-code)
+- [Setup with GitHub Copilot](#setup-with-github-copilot)
 - [Slash commands](#slash-commands)
 - [Two-phase pipeline](#two-phase-pipeline)
 - [The three differentiating agents](#the-three-differentiating-agents)
@@ -199,9 +201,14 @@ sprang_health {}
 | **Blast-radius diff** | `sprang_diff_impact` — BFS over the graph before any edit, risk-ranked |
 | **Team annotations** | `sprang_annotate` — write `.sprang/annotations/<id>.md`, committed to the repo |
 | **Knowledge graphs** | `/sprang-knowledge` — Obsidian / Logseq / Dendron / Foam / Zettelkasten / plain markdown |
-| **11 slash commands** | Full workflow coverage for both Windsurf/Cascade and Devin Desktop |
-| **8 MCP tools** | Direct graph access — Cascade reads and writes the graph via MCP |
+| **11 slash commands** | Full workflow coverage for Windsurf/Cascade, Devin Desktop, and Claude Code |
+| **9 MCP tools** | Direct graph access — all agents read and write the graph via MCP |
 | **< 60s skeleton** | Phase 1 is fully static — runs anywhere, no network, no waiting |
+| **Architecture card view** | React Flow + ELK layer map — one card per layer, weighted cross-layer edges |
+| **Structural fingerprinting** | SHA-256 + signature extraction — SKIP/COSMETIC/STRUCTURAL per file, zero-token incremental |
+| **Language lessons** | 12 programming pattern detectors attached to tour steps and graph nodes |
+| **Semantic search** | Cosine similarity + TF-IDF fallback — `sprang_query mode:"semantic"` |
+| **Auto-update hooks** | `sprang install-hooks` — post-commit hook with `--if-stale` skip logic |
 | **Live dashboard** | Sigma.js force-directed graph, risk heatmap, diff overlay, BFS pathfinder, tour player |
 
 ---
@@ -216,10 +223,10 @@ sprang_health {}
 
 ```
 packages/
-├── core/       Pipeline: 9 agents, schema, watcher, graph store
-├── cli/        sprang scan | health | query | watch | status
-├── mcp/        stdio MCP server — 8 tools for Cascade
-└── dashboard/  React + Vite + Sigma.js — 4 views, 25 components
+├── core/       Pipeline: 9 agents, schema, watcher, graph store, fingerprinting, semantic search
+├── cli/        sprang scan | health | query | watch | status | install-hooks
+├── mcp/        stdio MCP server — 9 tools for all AI platforms
+└── dashboard/  React + Vite + Sigma.js — 5 views (Graph/Health/Domains/Architecture/Learn)
 ```
 
 ```mermaid
@@ -295,6 +302,12 @@ sprang scan /path/to/your/project --phase1-only
 # Full scan — Phase 1 now + Phase 2 enrichment triggered by Cascade
 sprang scan /path/to/your/project
 
+# Skip scan if graph is already current (compares git HEAD vs stats.gitCommitHash)
+sprang scan . --phase1-only --if-stale
+
+# Install a post-commit git hook that auto-refreshes the graph after each commit
+sprang install-hooks
+
 # Check graph age, phase, and node/edge count
 sprang status
 
@@ -303,6 +316,9 @@ sprang health
 
 # Fuzzy-search nodes by name or summary
 sprang query "authentication"
+
+# Semantic search — cosine similarity over TF-IDF embeddings
+sprang query "authentication" --semantic
 
 # Watch for file changes and incrementally update the graph
 sprang watch
@@ -469,6 +485,58 @@ Skills and workflows live in `.windsurf/skills/` and `.windsurf/workflows/`, sym
 
 ---
 
+## Setup with Claude Code
+
+Claude Code picks up Sprang automatically when the repo is opened — no installation needed.
+
+**What's pre-configured in this repo:**
+
+| File | Purpose |
+|---|---|
+| `CLAUDE.md` | Imports `AGENTS.md` — Claude Code reads it before every session |
+| `.mcp.json` | MCP server config — Claude Code auto-starts `packages/mcp/dist/server.js` |
+| `.claude/rules/sprang-context.md` | Always-on rule: use MCP tools before editing any file |
+| `.claude/rules/sprang-highrisk.md` | Glob rule: blast radius check when editing source files |
+| `.claude/commands/` | 11 slash commands (same as Cascade workflows) |
+| `.claude/settings.json` | Pre-approved permissions for sprang CLI and MCP tools |
+
+**First use:**
+
+```bash
+# Build the MCP server (once per clone)
+pnpm build
+
+# Then in Claude Code chat:
+/sprang          # Build or refresh the knowledge graph
+/sprang-onboard  # Guided tour adapted to your experience level
+```
+
+The MCP server starts automatically when Claude Code opens the workspace. All 9 MCP tools are available immediately.
+
+---
+
+## Setup with GitHub Copilot
+
+**What's pre-configured in this repo:**
+
+| File | Purpose |
+|---|---|
+| `.vscode/mcp.json` | MCP server in Copilot's `"servers"` format |
+| `.github/copilot-instructions.md` | Pre-edit checklist + tool reference — auto-loaded by Copilot |
+
+**Activation:**
+
+1. Build the MCP server: `pnpm build`
+2. Open VS Code with the GitHub Copilot extension
+3. Switch Copilot to **Agent mode** (the model selector dropdown in the chat panel)
+4. The `sprang` MCP server connects automatically
+
+In agent mode, Copilot can call all 9 MCP tools. The `.github/copilot-instructions.md` tells it to call `sprang_node` before editing any file and `sprang_diff_impact` after changes.
+
+> **Note:** MCP tools only work in Copilot **agent mode**, not the default ask/edit modes. The `@sprang` extension pattern is not yet available — this integration uses the standard MCP protocol.
+
+---
+
 ## Slash commands
 
 | Command | Description |
@@ -572,19 +640,22 @@ risk_score = clamp(
 
 <!-- MCP tools reference — generated with Gemini gemini-3.1-flash-image-preview -->
 <p align="center">
-  <img src="assets/mcp-tools.png" alt="Sprang MCP server — 8 tools for Cascade" width="100%" />
+  <img src="assets/mcp-tools.png" alt="Sprang MCP server — 9 tools for all AI platforms" width="100%" />
 </p>
 
 | Tool | Input | Output |
 |---|---|---|
 | `sprang_node` | `{ node_id }` | Full node + 1-hop neighbors + layer + in/out degree + annotation |
-| `sprang_query` | `{ query, node_types?, limit? }` | Fuzzy-ranked nodes with summaries |
+| `sprang_query` | `{ query, node_types?, limit?, mode? }` | Fuzzy or semantic-ranked nodes with summaries |
 | `sprang_diff_impact` | `{ files: string[] }` | BFS blast-radius, risk-ranked impact list |
 | `sprang_why` | `{ node_id }` | Decision context + git history + team annotation |
 | `sprang_health` | `{}` | Smell summary, top-10 risk, orphans, circular deps |
-| `sprang_tour` | `{ tour_id?, persona? }` | Ordered pedagogical tour, persona-filtered |
+| `sprang_tour` | `{ tour_id?, persona? }` | Ordered pedagogical tour with language lessons per step |
 | `sprang_domain` | `{ domain_name? }` | Business domain flows and entry points |
 | `sprang_annotate` | `{ node_id, content, tags? }` | Write `.sprang/annotations/<id>.md` |
+| `sprang_respond` | `{ response, question? }` | Write response to `.sprang/cascade-response.json` for dashboard display |
+
+`sprang_query` accepts `mode: "semantic"` to search by meaning via cosine similarity over TF-IDF embeddings instead of keyword matching.
 
 ### Enriched `sprang_node` response
 
@@ -641,7 +712,8 @@ SPRANG_ROOT=$(pwd) pnpm --filter @sprang/dashboard dev
 | **Graph** | `g` / `1` | Sigma.js force-directed canvas — risk heatmap, layer filter, diff overlay, BFS pathfinder |
 | **Health** | `h` / `2` | Smell breakdown, top-10 risky nodes, circular deps, orphan count |
 | **Domains** | `d` / `3` | Business domain explorer — list view + React Flow layout toggle |
-| **Learn** | `l` / `4` | Persona-adaptive guided tour with language lessons |
+| **Architecture** | `a` / `4` | React Flow + ELK layer map — one card per layer, weighted cross-layer edge count |
+| **Learn** | `l` / `5` | Persona-adaptive guided tour with language lessons per step |
 
 ### Toolbar components (25 total)
 
@@ -673,7 +745,8 @@ SPRANG_ROOT=$(pwd) pnpm --filter @sprang/dashboard dev
 | `g` `1` | Graph view |
 | `h` `2` | Health view |
 | `d` `3` | Domains view |
-| `l` `4` | Learn view |
+| `a` `4` | Architecture view |
+| `l` `5` | Learn view |
 | `r` | Toggle risk overlay |
 | `?` | Keyboard shortcuts help |
 
@@ -758,67 +831,91 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 277 unit tests across core/dashboard/mcp, zero failures
+pnpm test              # 496 unit tests across core/dashboard/mcp/cli, zero failures
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at localhost:5173
-pnpm --filter @sprang/dashboard test:e2e   # 15 Playwright e2e tests (15 parallel workers)
+pnpm --filter @sprang/dashboard test:e2e   # 32 Playwright e2e tests
 ```
 
 ### Test structure
 
 | Package | Runner | Count | What is tested |
 |---|---|---|---|
-| `@sprang/core` | Vitest | 228 | Schema validators, all 6 agents, pipeline integration, multi-language |
-| `@sprang/dashboard` | Vitest | 33 | Zustand store (26), BFS pathfinder (7) |
-| `@sprang/mcp` | Vitest | 49 | GraphLoader (3), sprang_node + sprang_annotate (11), all 8 MCP tools (35) |
-| **Total unit** | | **277** | |
-| `@sprang/dashboard` | Playwright | 15 | Full UI e2e — loading, nav, keyboard shortcuts, health, domains, search, onboarding |
+| `@sprang/core` | Vitest | 383 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree |
+| `@sprang/dashboard` | Vitest | 55 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6) |
+| `@sprang/mcp` | Vitest | 52 | GraphLoader (3), sprang_node + sprang_annotate (11), all 9 MCP tools (38) |
+| `@sprang/cli` | Vitest | 6 | `--if-stale` scan flag (3), `install-hooks` command (3) |
+| **Total unit** | | **496** | |
+| `@sprang/dashboard` | Playwright | 32 | Full UI e2e — loading, nav, keyboard shortcuts, architecture tab, cascade bridge, APIs |
 
 ```
 packages/core/tests/
 ├── schema/
-│   └── validators.test.ts        21 tests — Zod schema, round-trip serialization
+│   └── validators.test.ts             21 tests — Zod schema, round-trip serialization
 ├── agents/
-│   ├── project-scanner.test.ts      6 tests — file discovery, language detection
-│   ├── file-analyzer.test.ts        5 tests — AST parsing, edge extraction
-│   ├── smell-detector.test.ts      14 tests — circular-deps, god-node, clean baseline
-│   ├── risk-scorer.test.ts         15 tests — formula weights, factor tags
-│   ├── git-layer.test.ts            6 tests — commit association, PR refs
-│   ├── architecture-analyzer.test.ts  8 tests — layer clustering
-│   ├── multi-lang-imports.test.ts  50 tests — per-language import extraction + resolver
-│   └── multi-lang-symbols.test.ts  34 tests — per-language symbol parsing
-└── integration/
-    ├── pipeline.test.ts            13 tests — full Phase 1 against simple-ts/ fixture
-    ├── pipeline-python.test.ts      8 tests — full Phase 1 against simple-python/ fixture
-    └── pipeline-multilang.test.ts  16 tests — Go, Rust, Java, Ruby, C, Kotlin pipelines
+│   ├── project-scanner.test.ts           6 tests — file discovery, language detection
+│   ├── project-scanner-fingerprint.test.ts  6 tests — fingerprint stats, skip/structural detection
+│   ├── file-analyzer.test.ts             5 tests — AST parsing, edge extraction
+│   ├── smell-detector.test.ts           14 tests — circular-deps, god-node, clean baseline
+│   ├── risk-scorer.test.ts              15 tests — formula weights, factor tags
+│   ├── git-layer.test.ts                 6 tests — commit association, PR refs
+│   ├── architecture-analyzer.test.ts     8 tests — layer clustering
+│   ├── language-lessons.test.ts         52 tests — 12 pattern detectors, positive + negative
+│   ├── language-lessons-priority.test.ts 15 tests — priority ladder, multi-language
+│   ├── multi-lang-imports.test.ts       50 tests — per-language import extraction + resolver
+│   └── multi-lang-symbols.test.ts       34 tests — per-language symbol parsing
+├── graph/
+│   ├── normalize.test.ts               14 tests — all 6 normalization steps
+│   └── merge-subgraphs.test.ts          9 tests — pnpm workspace, prefix namespacing
+├── utils/
+│   ├── fingerprint.test.ts             20 tests — SHA-256, TS/Python/Go extraction, classifyChange
+│   └── embedding-search.test.ts        25 tests — cosine similarity, TF-IDF, vocabulary
+└── orchestrator/
+    ├── worktree.test.ts                  4 tests — worktree redirect, git-not-found
+    ├── pipeline.test.ts                 13 tests — full Phase 1 against simple-ts/ fixture
+    ├── pipeline-python.test.ts           8 tests — full Phase 1 against simple-python/ fixture
+    └── pipeline-multilang.test.ts       16 tests — Go, Rust, Java, Ruby, C, Kotlin pipelines
 
 packages/dashboard/src/
 ├── store.test.ts           26 tests — Zustand store state transitions
 └── pathfinder.test.ts       7 tests — BFS shortest path
 
+packages/dashboard/src/pages/
+└── ArchitectureView.test.ts  9 tests — empty-state detection, card count, edge aggregation
+
+packages/dashboard/src/utils/
+├── edge-aggregation.test.ts  7 tests — cross-layer counting, intra-layer exclusion
+└── elk-layout.test.ts        6 tests — ELK mock, coordinate pass-through, fallback
+
 packages/dashboard/e2e/
-└── app.spec.ts             15 tests — Playwright, 15 parallel workers
+└── app.spec.ts             32 tests — Playwright, full UI coverage
     ├── error state (no graph, retry button)
-    ├── loaded state (nav, tabs)
-    ├── navigation (graph → health → domains)
-    ├── keyboard shortcuts (Ctrl+K, h, g, d, ?)
+    ├── loaded state (all 5 nav tabs)
+    ├── navigation (graph → health → domains → architecture → learn)
+    ├── keyboard shortcuts (Ctrl+K, h, g, d, a, l, ?, 1-5)
     ├── health view (heading, god_node smell)
     ├── domains view (domain label rendered)
     ├── search dialog (open, type, filter, close)
     ├── onboarding overlay (dismiss)
-    ├── graph toolbar (project name)
-    └── nav bar (logo persistence)
+    ├── architecture view (empty state, layer count, card click, clear selection)
+    ├── cascade bridge (/cascade-ask POST validation + success, /cascade-response)
+    ├── graph APIs (/knowledge-graph.json, /diff-overlay.json, /file-content.json)
+    └── nav bar (logo + Architecture tab persistence)
 
 packages/mcp/tests/
 ├── graph-loader.test.ts     3 tests — load, null-on-missing, hot-reload
 ├── sprang-node.test.ts     11 tests — sprang_node enrichment, sprang_annotate
-└── mcp-tools.test.ts       35 tests — all 8 MCP tools:
+└── mcp-tools.test.ts       38 tests — all 9 MCP tools:
     ├── sprang_health  (7)  — counts, risk summary, smells, orphan detection
-    ├── sprang_tour    (7)  — default/id, junior/senior/pm persona, step enrichment
-    ├── sprang_query   (6)  — label/summary match, empty, type filter, limit
+    ├── sprang_tour    (7)  — default/id, junior/senior/pm persona, languageLesson
+    ├── sprang_query   (9)  — label/summary match, empty, type filter, limit, mode:semantic
     ├── sprang_diff    (5)  — changed nodes, BFS blast radius, unknown files
     ├── sprang_domain  (4)  — list all, detail by name, unknown error
     └── sprang_why     (6)  — label/summary, decision_context, graceful no-context
+
+packages/cli/tests/
+├── scan-if-stale.test.ts    3 tests — hash-match skip, hash-mismatch scan, missing graph
+└── install-hooks.test.ts    3 tests — fresh creation, append-to-existing, duplicate guard
 ```
 
 ### Test fixtures
@@ -839,6 +936,7 @@ packages/mcp/tests/
 | `god-node/` | 30+ imports, 300+ LOC |
 | `git-repo/` | 20 scripted commits, 3 authors, PR refs in messages |
 | `well-tested/` | Every source file has a `tested_by` edge |
+| `monorepo-root/` | pnpm workspace with 2 packages for subgraph merge testing |
 
 ---
 

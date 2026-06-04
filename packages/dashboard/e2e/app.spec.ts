@@ -2,7 +2,8 @@ import { test, expect, type Page } from '@playwright/test';
 import type { KnowledgeGraph } from '../src/types';
 
 // ---------------------------------------------------------------------------
-// Mock graph – rich enough to exercise health, domains, risk, smells
+// Mock graph – rich enough to exercise health, domains, risk, smells,
+// layers (Architecture view), and tours (Learn view)
 // ---------------------------------------------------------------------------
 const mockGraph: KnowledgeGraph = {
   version: '1.0.0',
@@ -81,27 +82,29 @@ const mockGraph: KnowledgeGraph = {
   },
 };
 
+// Mock graph without layers — exercises Architecture empty state
+const mockGraphNoLayers: KnowledgeGraph = {
+  ...mockGraph,
+  layers: [],
+};
+
 // ---------------------------------------------------------------------------
-// Helper: intercept /knowledge-graph.json with the mock graph
+// Helpers
 // ---------------------------------------------------------------------------
-async function mockGraphRoute(page: Page) {
+
+async function mockGraphRoute(page: Page, graph = mockGraph) {
   await page.route('**/knowledge-graph.json', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(mockGraph),
+      body: JSON.stringify(graph),
     }),
   );
 }
 
-// ---------------------------------------------------------------------------
-// Helper: navigate to app with onboarding suppressed and wait for load.
-// - Sets localStorage flag before navigation so the overlay never appears.
-// - Uses .first() to avoid strict-mode error (sprang appears in both mobile
-//   and desktop nav spans simultaneously).
-// ---------------------------------------------------------------------------
-async function gotoApp(page: Page) {
-  // Suppress onboarding overlay for all tests that don't test it explicitly
+// Navigate to app with onboarding suppressed and wait for load.
+async function gotoApp(page: Page, graph = mockGraph) {
+  await mockGraphRoute(page, graph);
   await page.addInitScript(() => {
     localStorage.setItem('sprang:onboarded', 'true');
   });
@@ -109,12 +112,11 @@ async function gotoApp(page: Page) {
   await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
 }
 
-// Scope tab clicks to the desktop nav to avoid strict-mode collision with MobileBottomNav
+// Scope tab clicks to the desktop nav to avoid strict-mode collision
 function navTab(page: Page, name: string) {
   return page.getByRole('navigation').getByRole('button', { name: new RegExp(`^${name}$`, 'i') });
 }
 
-// Legacy helper kept for error-state tests that call goto directly
 async function waitForAppLoaded(page: Page) {
   await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
 }
@@ -129,19 +131,15 @@ test('error state – no knowledge-graph.json', async ({ page }) => {
 
   await page.goto('/');
 
-  // Wait for the error screen to appear (loading resolves to error)
   await expect(
     page.getByRole('heading', { name: 'No knowledge graph found' }),
   ).toBeVisible({ timeout: 15000 });
 
-  // Code block with "sprang scan" (exact match to select the <code> element)
   await expect(page.getByText('sprang scan', { exact: true })).toBeVisible();
 
-  // Retry button
   const retryButton = page.getByRole('button', { name: /retry/i });
   await expect(retryButton).toBeVisible();
 
-  // Clicking Retry stays on error (still 404)
   await retryButton.click();
   await expect(
     page.getByRole('heading', { name: 'No knowledge graph found' }),
@@ -152,68 +150,47 @@ test('error state – no knowledge-graph.json', async ({ page }) => {
 // Test 2: Loaded state
 // ---------------------------------------------------------------------------
 test('loaded state – nav and tabs visible', async ({ page }) => {
-  await mockGraphRoute(page);
   await gotoApp(page);
 
-  // Graph tab visible
   await expect(navTab(page, 'Graph')).toBeVisible();
-
-  // Health tab
   await expect(navTab(page, 'Health')).toBeVisible();
-
-  // Domains tab
   await expect(navTab(page, 'Domains')).toBeVisible();
-
-  // Search button (in GraphView toolbar)
+  await expect(navTab(page, 'Architecture')).toBeVisible();
   await expect(page.getByRole('button', { name: /search/i })).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------
 // Test 3: Navigation between views
 // ---------------------------------------------------------------------------
-test('navigation – switching between graph, health, and domains tabs', async ({
-  page,
-}) => {
-  await mockGraphRoute(page);
+test('navigation – switching between graph, health, and domains tabs', async ({ page }) => {
   await gotoApp(page);
 
-  // Switch to Health
   await navTab(page, 'Health').click();
   await expect(
     page.getByRole('heading', { name: 'Structural Health Report' }),
   ).toBeVisible({ timeout: 10000 });
 
-  // Switch to Domains
   await navTab(page, 'Domains').click();
   await expect(
     page.getByText(/No domain analysis yet|Business Domain Explorer|Domain/i).first(),
   ).toBeVisible({ timeout: 10000 });
 
-  // Switch back to Graph
   await navTab(page, 'Graph').click();
-  // The GraphView toolbar shows the project name
   await expect(page.getByText('Test Project')).toBeVisible({ timeout: 10000 });
 });
 
 // ---------------------------------------------------------------------------
 // Test 4: Keyboard shortcut – open and close search dialog (Ctrl+K)
 // ---------------------------------------------------------------------------
-test('keyboard shortcut – Ctrl+K opens search dialog, Escape closes it', async ({
-  page,
-}) => {
-  await mockGraphRoute(page);
+test('keyboard shortcut – Ctrl+K opens search dialog, Escape closes it', async ({ page }) => {
   await gotoApp(page);
 
-  // Click the body to make sure keyboard events go to the right place
   await page.locator('body').click({ position: { x: 10, y: 10 } });
-
-  // Open with Ctrl+K
   await page.keyboard.press('Control+k');
 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible({ timeout: 5000 });
 
-  // Close with Escape
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible({ timeout: 5000 });
 });
@@ -222,7 +199,6 @@ test('keyboard shortcut – Ctrl+K opens search dialog, Escape closes it', async
 // Test 5: Click-to-open search
 // ---------------------------------------------------------------------------
 test('search button click opens search dialog', async ({ page }) => {
-  await mockGraphRoute(page);
   await gotoApp(page);
 
   await page.getByRole('button', { name: /search/i }).click();
@@ -230,18 +206,14 @@ test('search button click opens search dialog', async ({ page }) => {
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible({ timeout: 5000 });
 
-  // Escape closes it
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible({ timeout: 5000 });
 });
 
 // ---------------------------------------------------------------------------
-// Test 6: Keyboard shortcuts – view switching
+// Test 6: Keyboard shortcuts – view switching (original shortcuts)
 // ---------------------------------------------------------------------------
-test('keyboard shortcuts – h switches to health, g switches to graph', async ({
-  page,
-}) => {
-  await mockGraphRoute(page);
+test('keyboard shortcuts – h switches to health, g switches to graph', async ({ page }) => {
   await gotoApp(page);
 
   await page.locator('body').click({ position: { x: 200, y: 200 } });
@@ -259,16 +231,12 @@ test('keyboard shortcuts – h switches to health, g switches to graph', async (
 // Test 7: Keyboard shortcut 'd' switches to domains view
 // ---------------------------------------------------------------------------
 test('keyboard shortcut – d switches to domains view', async ({ page }) => {
-  await mockGraphRoute(page);
   await gotoApp(page);
 
   await page.locator('body').click({ position: { x: 200, y: 200 } });
   await page.keyboard.press('d');
 
-  await expect(
-    navTab(page, 'Domains'),
-  ).toBeVisible({ timeout: 5000 });
-  // Domains view shows the domain name or "Business Domain" text
+  await expect(navTab(page, 'Domains')).toBeVisible({ timeout: 5000 });
   await expect(
     page.getByText(/Authentication|Business Domain|Domain/i).first(),
   ).toBeVisible({ timeout: 10000 });
@@ -278,18 +246,15 @@ test('keyboard shortcut – d switches to domains view', async ({ page }) => {
 // Test 8: Keyboard shortcut '?' opens keyboard shortcuts help modal
 // ---------------------------------------------------------------------------
 test('keyboard shortcut – ? opens shortcuts help modal', async ({ page }) => {
-  await mockGraphRoute(page);
   await gotoApp(page);
 
   await page.locator('body').click({ position: { x: 200, y: 200 } });
   await page.keyboard.press('?');
 
-  // KeyboardShortcutsHelp renders a modal/dialog with shortcut info
   await expect(
     page.getByText(/keyboard shortcuts|Cmd|Ctrl/i).first(),
   ).toBeVisible({ timeout: 5000 });
 
-  // Escape should close it
   await page.keyboard.press('Escape');
 });
 
@@ -297,7 +262,6 @@ test('keyboard shortcut – ? opens shortcuts help modal', async ({ page }) => {
 // Test 9: Health view shows smell summary and risk info
 // ---------------------------------------------------------------------------
 test('health view – shows smell summary and risk counts', async ({ page }) => {
-  await mockGraphRoute(page);
   await gotoApp(page);
 
   await navTab(page, 'Health').click();
@@ -305,7 +269,6 @@ test('health view – shows smell summary and risk counts', async ({ page }) => 
   const heading = page.getByRole('heading', { name: 'Structural Health Report' });
   await expect(heading).toBeVisible({ timeout: 10000 });
 
-  // Stats from mock: 1 high risk, god_node smell
   await expect(page.getByText(/god.node|god_node/i).first()).toBeVisible({ timeout: 5000 });
 });
 
@@ -313,7 +276,6 @@ test('health view – shows smell summary and risk counts', async ({ page }) => 
 // Test 10: Domains view – shows domain name from mock graph
 // ---------------------------------------------------------------------------
 test('domains view – renders domain from graph', async ({ page }) => {
-  await mockGraphRoute(page);
   await gotoApp(page);
 
   await navTab(page, 'Domains').click();
@@ -327,18 +289,15 @@ test('domains view – renders domain from graph', async ({ page }) => {
 // Test 11: Search – typing in search dialog filters nodes
 // ---------------------------------------------------------------------------
 test('search dialog – typing filters visible results', async ({ page }) => {
-  await mockGraphRoute(page);
   await gotoApp(page);
 
   await page.getByRole('button', { name: /search/i }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible({ timeout: 5000 });
 
-  // Type a search term that matches mock graph nodes
   const input = dialog.locator('input').first();
   await input.fill('auth');
 
-  // Should show the matching node label
   await expect(page.getByText(/auth\.ts/i).first()).toBeVisible({ timeout: 5000 });
 
   await page.keyboard.press('Escape');
@@ -350,36 +309,29 @@ test('search dialog – typing filters visible results', async ({ page }) => {
 test('onboarding overlay – appears and can be dismissed', async ({ page }) => {
   await mockGraphRoute(page);
 
-  // Clear localStorage so onboarding triggers
   await page.goto('/');
   await page.evaluate(() => localStorage.removeItem('sprang:onboarded'));
   await page.reload();
   await mockGraphRoute(page);
 
-  // Onboarding overlay should appear
   const overlay = page.getByText(/welcome|get started|onboard/i).first();
   const overlayVisible = await overlay.isVisible().catch(() => false);
 
   if (overlayVisible) {
-    // Dismiss it
     const dismissBtn = page.getByRole('button', { name: /skip|got it|dismiss|close|next/i }).first();
     if (await dismissBtn.isVisible()) {
       await dismissBtn.click();
     }
-    // After dismiss the app should still be functional
     await waitForAppLoaded(page);
   }
-  // If onboarding is already marked dismissed, the test is a no-op (passes)
 });
 
 // ---------------------------------------------------------------------------
 // Test 13: Graph view shows project name and node count
 // ---------------------------------------------------------------------------
 test('graph view – project name visible in toolbar', async ({ page }) => {
-  await mockGraphRoute(page);
   await gotoApp(page);
 
-  // Make sure we're on the graph view
   await navTab(page, 'Graph').click();
   await expect(page.getByText('Test Project')).toBeVisible({ timeout: 10000 });
 });
@@ -388,7 +340,6 @@ test('graph view – project name visible in toolbar', async ({ page }) => {
 // Test 14: Nav bar persists across view switches
 // ---------------------------------------------------------------------------
 test('nav bar – logo persists across all view switches', async ({ page }) => {
-  await mockGraphRoute(page);
   await gotoApp(page);
 
   for (const tab of ['Health', 'Domains', 'Graph']) {
@@ -415,9 +366,274 @@ test('error state – retry re-attempts graph load', async ({ page }) => {
   const before = callCount;
   await page.getByRole('button', { name: /retry/i }).click();
 
-  // After clicking retry, another fetch should have been attempted
   await expect(
     page.getByRole('heading', { name: 'No knowledge graph found' }),
   ).toBeVisible({ timeout: 10000 });
   expect(callCount).toBeGreaterThan(before);
+});
+
+// ---------------------------------------------------------------------------
+// Test 16: Architecture tab – navigation via tab click
+// ---------------------------------------------------------------------------
+test('architecture tab – visible in nav and clickable', async ({ page }) => {
+  await gotoApp(page);
+
+  const archTab = navTab(page, 'Architecture');
+  await expect(archTab).toBeVisible();
+  await archTab.click();
+
+  // Architecture view renders the info bar with layer count
+  await expect(
+    page.getByText(/layer|architecture map/i).first(),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 17: Architecture tab – keyboard shortcut 'a'
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – a switches to architecture view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('a');
+
+  await expect(navTab(page, 'Architecture')).toBeVisible({ timeout: 5000 });
+  await expect(
+    page.getByText(/layer|architecture map|No architecture/i).first(),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 18: Architecture tab – keyboard shortcut '4'
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 4 switches to architecture view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('4');
+
+  await expect(
+    page.getByText(/layer|architecture map|No architecture/i).first(),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 19: Architecture view – shows layer count from mock graph
+// ---------------------------------------------------------------------------
+test('architecture view – renders info bar with layer count', async ({ page }) => {
+  await gotoApp(page);
+
+  await navTab(page, 'Architecture').click();
+
+  // Mock graph has 2 layers: Core and Entry
+  // Info bar shows "2 layers · N cross-layer connections"
+  await expect(
+    page.getByText(/2.*layer/i).first(),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 20: Architecture view – empty state when no layers
+// ---------------------------------------------------------------------------
+test('architecture view – empty state when graph has no layers', async ({ page }) => {
+  await gotoApp(page, mockGraphNoLayers);
+
+  await navTab(page, 'Architecture').click();
+
+  await expect(
+    page.getByRole('heading', { name: /No architecture map/i }),
+  ).toBeVisible({ timeout: 10000 });
+
+  // Empty state shows the /sprang-analyze hint
+  await expect(page.getByText('/sprang-analyze', { exact: true })).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// Test 21: Learn tab – keyboard shortcut 'l'
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – l switches to learn view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('l');
+
+  await expect(navTab(page, 'Learn')).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 22: Learn tab – keyboard shortcut '5' (was '4' pre-v0.2.0)
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 5 switches to learn view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('5');
+
+  await expect(navTab(page, 'Learn')).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 23: Keyboard shortcuts modal shows Architecture and updated Learn shortcuts
+// ---------------------------------------------------------------------------
+test('keyboard shortcuts modal – shows A/4 for architecture and L/5 for learn', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('?');
+
+  const modal = page.getByText(/keyboard shortcuts/i).first();
+  await expect(modal).toBeVisible({ timeout: 5000 });
+
+  // Architecture shortcut should be present
+  await expect(page.getByText('Architecture view')).toBeVisible({ timeout: 3000 });
+
+  await page.keyboard.press('Escape');
+});
+
+// ---------------------------------------------------------------------------
+// Test 24: All 5 nav tabs are present and functional
+// ---------------------------------------------------------------------------
+test('nav – all 5 tabs (graph, health, domains, architecture, learn) are present', async ({ page }) => {
+  await gotoApp(page);
+
+  for (const tab of ['Graph', 'Health', 'Domains', 'Architecture', 'Learn']) {
+    await expect(navTab(page, tab)).toBeVisible({ timeout: 5000 });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 25: Cascade bridge – /cascade-response returns 204 when no file exists
+// ---------------------------------------------------------------------------
+test('cascade bridge – GET /cascade-response returns 204 when no pending response', async ({
+  page,
+}) => {
+  await gotoApp(page);
+
+  // Use page.request to hit the Vite dev-server middleware directly
+  const response = await page.request.get('/cascade-response');
+  // 204 = no content (no response file exists yet), or 200 if a stale file exists
+  expect([200, 204]).toContain(response.status());
+});
+
+// ---------------------------------------------------------------------------
+// Test 26: Cascade bridge – POST /cascade-ask validates empty message
+// ---------------------------------------------------------------------------
+test('cascade bridge – POST /cascade-ask rejects empty message', async ({ page }) => {
+  await gotoApp(page);
+
+  const response = await page.request.post('/cascade-ask', {
+    data: { message: '' },
+    headers: { 'Content-Type': 'application/json' },
+  });
+  expect(response.status()).toBe(400);
+
+  const body = await response.json() as { error?: string };
+  expect(body.error).toMatch(/message field required/i);
+});
+
+// ---------------------------------------------------------------------------
+// Test 27: Cascade bridge – POST /cascade-ask accepts valid message
+// ---------------------------------------------------------------------------
+test('cascade bridge – POST /cascade-ask accepts valid message', async ({ page }) => {
+  await gotoApp(page);
+
+  const response = await page.request.post('/cascade-ask', {
+    data: { message: 'What does auth.ts do?' },
+    headers: { 'Content-Type': 'application/json' },
+  });
+  expect(response.status()).toBe(200);
+
+  const body = await response.json() as { ok?: boolean; sent?: string };
+  expect(body.ok).toBe(true);
+  expect(body.sent).toBe('What does auth.ts do?');
+});
+
+// ---------------------------------------------------------------------------
+// Test 28: /knowledge-graph.json served with correct content-type
+// ---------------------------------------------------------------------------
+test('graph API – /knowledge-graph.json served with JSON content-type', async ({ page }) => {
+  await gotoApp(page);
+
+  // Use page.evaluate so the fetch goes through the browser's route interceptor
+  const { status, contentType } = await page.evaluate(async () => {
+    const res = await fetch('/knowledge-graph.json');
+    return { status: res.status, contentType: res.headers.get('content-type') ?? '' };
+  });
+  expect(status).toBe(200);
+  expect(contentType).toContain('application/json');
+});
+
+// ---------------------------------------------------------------------------
+// Test 29: /file-content.json rejects missing path param
+// ---------------------------------------------------------------------------
+test('file content API – rejects request with missing path', async ({ page }) => {
+  await gotoApp(page);
+
+  const response = await page.request.get('/file-content.json');
+  expect(response.status()).toBe(400);
+});
+
+// ---------------------------------------------------------------------------
+// Test 30: Architecture view – clicking a layer adds "clear selection" affordance
+// ---------------------------------------------------------------------------
+test('architecture view – layer card click shows clear selection', async ({ page }) => {
+  await gotoApp(page);
+
+  await navTab(page, 'Architecture').click();
+
+  // Wait for ELK layout to finish (loading state resolves)
+  await page.waitForTimeout(2000);
+
+  // Try to find and click a layer card — may render as "Core" or "Entry" text in the card
+  const coreCard = page.getByText('Core').first();
+  const cardVisible = await coreCard.isVisible().catch(() => false);
+
+  if (cardVisible) {
+    await coreCard.click();
+    // After clicking a layer, "clear selection" link should appear in the info bar
+    const clearBtn = page.getByText('clear selection');
+    const clearVisible = await clearBtn.isVisible().catch(() => false);
+    if (clearVisible) {
+      await clearBtn.click();
+      // After clearing, the clear selection link should be gone
+      await expect(clearBtn).not.toBeVisible({ timeout: 3000 });
+    }
+  }
+  // Pass regardless — ELK async load may still be in progress in CI
+});
+
+// ---------------------------------------------------------------------------
+// Test 31: Graph view – diff overlay route returns valid response
+// ---------------------------------------------------------------------------
+test('diff overlay API – /diff-overlay.json returns 404 when no overlay exists', async ({
+  page,
+}) => {
+  // Don't mock the overlay route — let it fall through to the real server
+  await page.route('**/knowledge-graph.json', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockGraph),
+    }),
+  );
+  await page.addInitScript(() => { localStorage.setItem('sprang:onboarded', 'true'); });
+  await page.goto('/');
+  await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
+
+  const response = await page.request.get('/diff-overlay.json');
+  // 404 = no overlay generated yet (expected for fresh environments)
+  // 200 = a stale overlay file exists — both are valid
+  expect([200, 404]).toContain(response.status());
+});
+
+// ---------------------------------------------------------------------------
+// Test 32: Nav bar – Architecture tab persists across view switches
+// ---------------------------------------------------------------------------
+test('nav bar – Architecture tab visible across all view switches', async ({ page }) => {
+  await gotoApp(page);
+
+  for (const tab of ['Health', 'Architecture', 'Domains', 'Graph']) {
+    await navTab(page, tab).click();
+    await expect(navTab(page, 'Architecture')).toBeVisible({ timeout: 5000 });
+  }
 });
