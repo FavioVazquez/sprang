@@ -1,13 +1,14 @@
 import React from 'react';
-import { Network, Activity, Globe, BookOpen } from 'lucide-react';
+import { Network, Activity, Globe, BookOpen, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export type MobileView = 'graph' | 'health' | 'domain' | 'learn';
+export type MobileView = 'graph' | 'health' | 'domain' | 'architecture' | 'learn';
 
 const NAV_ITEMS: Array<{ id: MobileView; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'graph', label: 'Graph', icon: Network },
   { id: 'health', label: 'Health', icon: Activity },
   { id: 'domain', label: 'Domains', icon: Globe },
+  { id: 'architecture', label: 'Arch', icon: Layers },
   { id: 'learn', label: 'Learn', icon: BookOpen },
 ];
 
