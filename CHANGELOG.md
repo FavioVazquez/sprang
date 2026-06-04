@@ -30,6 +30,12 @@ Platform-aware **Ask Agent** bridge — native Claude Code and GitHub Copilot CL
 - **README** — updated "Dashboard chat" section to "Ask Agent" with bridge priority table, session file reference, and Claude Code / Copilot setup notes.
 - Test suite: **84 unit tests** (dashboard), **36 e2e tests** — all passing.
 
+### Fixed
+
+- **Bridge detection** (`detect.ts`) — old heuristic checked `.cascade-trigger-session` mtime < 60s, which always timed out since the file is only written on message send (not kept fresh by the extension). Replaced with `WINDSURF_CASCADE_TERMINAL_KIND` env var check (always present in Windsurf/Devin Desktop processes) with trigger-file-exists fallback. Fixes bridge falling through to Claude Code CLI when both are installed.
+- **Ask Agent panel** — error message now shows the actual server error text instead of a hardcoded generic string.
+- **`.devin/rules/cascade-messaging.md`** — rule now instructs Cascade to re-read `.cascade-conversation.md` immediately before answering **each** dashboard message (not just at session start). Fixes Cascade ignoring conversation history for follow-up questions sent within the same session.
+
 ---
 
 ## [0.2.2] — 2026-06-04
