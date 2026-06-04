@@ -25,6 +25,7 @@ export interface LayerCardNodeData {
   complexity: 'simple' | 'moderate' | 'complex';
   colorIndex: number;
   isSelected: boolean;
+  onSelect: (layerId: string) => void;
   [key: string]: unknown; // React Flow requires index signature on node data
 }
 
@@ -53,6 +54,10 @@ export default function LayerCardNode({ data }: NodeProps) {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={() => d.onSelect(d.layerId)}
+      onKeyDown={(e) => e.key === 'Enter' && d.onSelect(d.layerId)}
       style={{
         width: 280,
         minHeight: 160,

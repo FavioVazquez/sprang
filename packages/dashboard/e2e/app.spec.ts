@@ -574,32 +574,62 @@ test('file content API – rejects request with missing path', async ({ page }) 
 });
 
 // ---------------------------------------------------------------------------
-// Test 30: Architecture view – clicking a layer adds "clear selection" affordance
+// Test 30: Architecture view – clicking a layer card opens detail panel
 // ---------------------------------------------------------------------------
-test('architecture view – layer card click shows clear selection', async ({ page }) => {
+test('architecture view – layer card click opens detail panel with node list', async ({ page }) => {
   await gotoApp(page);
-
   await navTab(page, 'Architecture').click();
 
-  // Wait for ELK layout to finish (loading state resolves)
-  await page.waitForTimeout(2000);
+  // Wait for ELK layout to complete
+  await page.waitForFunction(
+    () => !document.querySelector('[data-testid="loading-layout"]'),
+    { timeout: 8000 },
+  ).catch(() => { /* tolerate — fallback grid renders immediately */ });
+  await page.waitForTimeout(2500);
 
-  // Try to find and click a layer card — may render as "Core" or "Entry" text in the card
-  const coreCard = page.getByText('Core').first();
-  const cardVisible = await coreCard.isVisible().catch(() => false);
+  // Click the Core layer card (contains "Core" heading text)
+  const coreCard = page.getByRole('button', { name: /core/i }).first();
+  await expect(coreCard).toBeVisible({ timeout: 5000 });
+  await coreCard.click();
 
-  if (cardVisible) {
-    await coreCard.click();
-    // After clicking a layer, "clear selection" link should appear in the info bar
-    const clearBtn = page.getByText('clear selection');
-    const clearVisible = await clearBtn.isVisible().catch(() => false);
-    if (clearVisible) {
-      await clearBtn.click();
-      // After clearing, the clear selection link should be gone
-      await expect(clearBtn).not.toBeVisible({ timeout: 3000 });
-    }
-  }
-  // Pass regardless — ELK async load may still be in progress in CI
+  // Detail panel should appear
+  const panel = page.getByTestId('layer-panel');
+  await expect(panel).toBeVisible({ timeout: 3000 });
+
+  // Panel header shows layer name
+  await expect(panel.getByRole('heading', { name: /core/i })).toBeVisible();
+
+  // File list shows at least one file from the Core layer (auth.ts or utils.ts)
+  await expect(panel.getByText(/auth\.ts|utils\.ts/).first()).toBeVisible();
+
+  // "clear selection" appears in the info bar
+  await expect(page.getByText('clear selection')).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// Test 30b: Architecture view – layer panel shows stats and close button works
+// ---------------------------------------------------------------------------
+test('architecture view – layer panel stats and close button', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Architecture').click();
+  await page.waitForTimeout(2500);
+
+  const coreCard = page.getByRole('button', { name: /core/i }).first();
+  await expect(coreCard).toBeVisible({ timeout: 5000 });
+  await coreCard.click();
+
+  const panel = page.getByTestId('layer-panel');
+  await expect(panel).toBeVisible({ timeout: 3000 });
+
+  // Stats row: files count visible (Core has 2 nodes)
+  await expect(panel.getByText('files')).toBeVisible();
+
+  // Close button dismisses panel
+  await panel.getByRole('button', { name: /close panel/i }).click();
+  await expect(panel).not.toBeVisible({ timeout: 2000 });
+
+  // "clear selection" gone after close
+  await expect(page.getByText('clear selection')).not.toBeVisible({ timeout: 2000 });
 });
 
 // ---------------------------------------------------------------------------

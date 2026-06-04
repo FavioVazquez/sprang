@@ -4,9 +4,9 @@ import {
   Background,
   Controls,
   MiniMap,
-  type Node,
   type Edge,
   type NodeTypes,
+  type Node,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Layers, Terminal, X, AlertTriangle, File } from 'lucide-react';
@@ -49,6 +49,7 @@ function buildFlowElements(
   graph: KnowledgeGraph,
   positions: Map<string, { x: number; y: number }>,
   selectedLayerId: string | null,
+  onSelect: (layerId: string) => void,
 ): { nodes: Node[]; edges: Edge[] } {
   const layerEdges = aggregateLayerEdges(graph);
 
@@ -62,6 +63,7 @@ function buildFlowElements(
       complexity: maxComplexity(layer.node_ids, graph.nodes),
       colorIndex: idx,
       isSelected: layer.id === selectedLayerId,
+      onSelect,
     };
     return {
       id: layer.id,
@@ -312,16 +314,9 @@ export function ArchitectureView() {
       });
   }, [graph, hasLayers]);
 
-  const { nodes, edges } = useMemo(() => {
-    if (!graph || !positions) return { nodes: [], edges: [] };
-    return buildFlowElements(graph, positions, selectedLayerId);
-  }, [graph, positions, selectedLayerId]);
-
-  const handleNodeClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      const layerId = node.id;
+  const handleSelect = useCallback(
+    (layerId: string) => {
       if (selectedLayerId === layerId) {
-        // Deselect
         setSelectedLayerId(null);
         setFilters({ layerIds: new Set<string>() });
       } else {
@@ -331,6 +326,12 @@ export function ArchitectureView() {
     },
     [selectedLayerId, setFilters],
   );
+
+  const { nodes, edges } = useMemo(() => {
+    if (!graph || !positions) return { nodes: [], edges: [] };
+    return buildFlowElements(graph, positions, selectedLayerId, handleSelect);
+  }, [graph, positions, selectedLayerId, handleSelect]);
+
 
   if (!graph || !hasLayers) {
     return <EmptyState />;
@@ -385,7 +386,6 @@ export function ArchitectureView() {
               nodes={nodes}
               edges={edges}
               nodeTypes={NODE_TYPES}
-              onNodeClick={handleNodeClick}
               fitView
               fitViewOptions={{ padding: 0.15 }}
               colorMode="dark"
