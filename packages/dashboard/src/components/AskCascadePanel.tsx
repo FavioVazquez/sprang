@@ -47,7 +47,7 @@ async function clearResponse(): Promise<void> {
   try { await fetch('/cascade-response', { method: 'DELETE' }); } catch { /* ignore */ }
 }
 
-export function AskCascadePanel() {
+export function AskAgentPanel() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [waiting, setWaiting] = useState(false);
@@ -173,7 +173,7 @@ export function AskCascadePanel() {
       {/* Nav button */}
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Ask Cascade"
+        title="Ask Agent"
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
           open
             ? 'bg-sprang-500/20 text-sprang-300'
@@ -181,7 +181,7 @@ export function AskCascadePanel() {
         }`}
       >
         <Sparkles className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">Ask Cascade</span>
+        <span className="hidden sm:inline">Ask Agent</span>
         {messages.length > 0 && (
           <span className="ml-0.5 px-1 rounded-full bg-sprang-500/30 text-sprang-300 text-[9px] font-bold">
             {messages.filter(m => m.role !== 'error').length}
@@ -217,7 +217,7 @@ export function AskCascadePanel() {
                   <div className="w-5 h-5 rounded bg-sprang-500/20 flex items-center justify-center">
                     <Sparkles className="w-3 h-3 text-sprang-400" />
                   </div>
-                  <span className="text-xs font-semibold text-surface-200">Ask Cascade</span>
+                  <span className="text-xs font-semibold text-surface-200">Ask Agent</span>
                 </div>
                 <div className="flex items-center gap-1">
                   {messages.length > 0 && (
@@ -243,7 +243,7 @@ export function AskCascadePanel() {
                 <div className="flex items-start gap-2 mx-3 mt-3 px-3 py-2 rounded-lg bg-amber-950/50 border border-amber-800/50 flex-shrink-0">
                   <AlertCircle className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
                   <p className="text-[10px] text-amber-300 leading-relaxed">
-                    cascade-bridge not responding. Ensure Windsurf has the extension active and is watching this workspace.
+                    Agent bridge not available. On Windsurf/Devin Desktop: ensure the cascade-messaging extension is installed and active. On Claude Code or Copilot: ask your agent directly in its chat — the dashboard bridge is Windsurf-only.
                   </p>
                 </div>
               )}
@@ -259,8 +259,8 @@ export function AskCascadePanel() {
                     <div>
                       <p className="text-xs font-medium text-surface-500">Ask about the codebase</p>
                       <p className="text-[10px] text-surface-700 mt-1">
-                        Questions go to Cascade via cascade-bridge.<br />
-                        Answers appear here automatically.
+                        Windsurf/Devin Desktop: answers arrive via the cascade-messaging extension.<br />
+                        Claude Code / Copilot: ask your agent directly in its chat.
                       </p>
                     </div>
                   </div>
@@ -315,7 +315,7 @@ export function AskCascadePanel() {
                     onKeyDown={handleKeyDown}
                     rows={2}
                     disabled={waiting}
-                    placeholder={waiting ? 'Waiting for Cascade…' : 'Ask about the codebase… (Enter to send)'}
+                    placeholder={waiting ? 'Waiting for agent…' : 'Ask about the codebase… (Enter to send)'}
                     className="flex-1 resize-none rounded-xl bg-surface-800 border border-surface-700 text-xs text-surface-200 placeholder-surface-600 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-sprang-500 disabled:opacity-50"
                   />
                   <button

@@ -23,7 +23,7 @@ import { WarningBanner } from './components/WarningBanner';
 import { ThemePicker, useTheme } from './components/ThemePicker';
 import { OnboardingOverlay, useOnboarding } from './components/OnboardingOverlay';
 import { MobileBottomNav, type MobileView } from './components/MobileLayout';
-import { AskCascadePanel } from './components/AskCascadePanel';
+import { AskAgentPanel } from './components/AskCascadePanel';
 import { loadGraph } from './api/graphApi';
 import { useDashboardStore } from './store';
 import type { KnowledgeGraph } from './types';
@@ -272,8 +272,8 @@ export default function App() {
             <span className="text-xs text-surface-600">v{graph.version}</span>
           </div>
 
-          {/* Ask Cascade */}
-          <AskCascadePanel />
+          {/* Ask Agent */}
+          <AskAgentPanel />
 
           {/* Theme picker */}
           <ThemePicker theme={theme} onChange={setTheme} />
