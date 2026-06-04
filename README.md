@@ -40,25 +40,20 @@ Your AI agent is the intelligence layer. Sprang is the data layer. Together they
 
 ### Claude Code
 
-**Via the plugin system (recommended)**
+**Via the plugin marketplace (recommended)**
 
-Run this inside a Claude Code session:
+Run these two commands inside a Claude Code session:
 
 ```
-/plugin install https://github.com/FavioVazquez/sprang.git
+/plugin marketplace add FavioVazquez/sprang
+/plugin install sprang
 ```
 
-Claude Code downloads the plugin and activates all skills, slash commands, and hooks from `.claude-plugin/`. Then build the MCP server to unlock all 9 tools:
+The first command registers the GitHub repo as a local marketplace source (reads `marketplace.json`). The second installs the plugin from it. Claude Code activates all slash commands, hooks, and rules from `.claude-plugin/`. Then build the MCP server to unlock all 9 tools:
 
 ```bash
 # In the installed plugin directory (typically ~/.claude/plugins/sprang/)
 pnpm install && pnpm build
-```
-
-**Once listed in the community marketplace**, users can install with a single command:
-
-```
-/plugin install sprang@claude-community
 ```
 
 **What the plugin activates:**
@@ -66,7 +61,7 @@ pnpm install && pnpm build
 | File | What it does |
 |---|---|
 | `.claude-plugin/plugin.json` | Plugin manifest — name, version, metadata |
-| `.claude-plugin/marketplace.json` | Community marketplace listing |
+| `.claude-plugin/marketplace.json` | Marketplace source — registers this repo as an installable plugin |
 | `.claude/commands/` | 11 slash commands (e.g. `/sprang`, `/sprang-onboard`) |
 | `.claude/hooks/session-start.sh` | Warns Claude on session open if graph is missing or stale |
 | `.claude/hooks/post-tool-use.sh` | Triggers incremental graph refresh after git commits |
