@@ -1,0 +1,33 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [
+              "-c",
+              "printf '%s' \"${TOOL_INPUT:-}\" | grep -qE 'git[[:space:]]+(commit|merge|cherry-pick|rebase)' && [ -f .sprang/knowledge-graph.json ] && (npx sprang scan --phase1-only --if-stale >\"${TMPDIR:-/tmp}/sprang-autoupdate.log\" 2>&1 &); true"
+            ]
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [
+              "-c",
+              "GRAPH='.sprang/knowledge-graph.json'; if [ ! -f \"$GRAPH\" ]; then echo '[sprang] No knowledge graph found — run /sprang to build one before making changes.'; exit 0; fi; GRAPH_HASH=$(node -e \"try{const g=JSON.parse(require('fs').readFileSync('$GRAPH','utf8'));process.stdout.write((g.stats&&g.stats.gitCommitHash)||'')}catch(e){}\" 2>/dev/null||echo ''); HEAD_HASH=$(git rev-parse HEAD 2>/dev/null||echo ''); [ -n \"$HEAD_HASH\" ] && [ -n \"$GRAPH_HASH\" ] && [ \"$GRAPH_HASH\" != \"$HEAD_HASH\" ] && echo \"[sprang] Knowledge graph is stale (indexed: ${GRAPH_HASH:0:7}, HEAD: ${HEAD_HASH:0:7}) — run /sprang to refresh before editing files.\"; true"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

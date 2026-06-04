@@ -202,6 +202,51 @@ npx sprang scan --if-stale
 
 ---
 
+## Claude Code Native Hooks
+
+Two event hooks run automatically inside Claude Code — no installation needed. They are configured in `.claude/settings.json` and implemented as shell scripts in `.claude/hooks/`.
+
+### `SessionStart` — stale graph warning
+
+**Script:** `.claude/hooks/session-start.sh`
+
+Runs every time a Claude Code session opens. Its stdout is injected directly into Claude's context window.
+
+- If no knowledge graph exists: warns Claude to run `/sprang` before making changes.
+- If the graph's recorded `gitCommitHash` differs from `HEAD`: tells Claude the graph is stale and shows both short hashes so it knows how far behind it is.
+- Silent if graph is fresh, if `gitCommitHash` is absent (pre-v0.2 graph), or if not in a git repo.
+
+Example output Claude sees:
+```
+[sprang] Knowledge graph is stale (indexed: abc1234, HEAD: def5678) — run /sprang to refresh before editing files.
+```
+
+### `PostToolUse` — incremental background refresh
+
+**Script:** `.claude/hooks/post-tool-use.sh`  
+**Matcher:** `Bash` tool only
+
+Fires after every Bash tool call. If the command was a `git commit`, `git merge`, `git cherry-pick`, or `git rebase`, it triggers an incremental Phase 1 graph refresh in the background via `--if-stale`. The scan is skipped instantly if the graph is already current.
+
+- Never blocks Claude Code — runs with `nohup ... &`
+- Produces no stdout (PostToolUse output is not injected into context)
+- Logs to `${TMPDIR:-/tmp}/sprang-autoupdate.log`
+- Three guards before acting: git mutating command detected, graph file exists, CLI is built
+
+### Disabling hooks
+
+To disable both hooks, remove the `"hooks"` key from `.claude/settings.json`. To disable a single hook, remove its entry from the `"PostToolUse"` or `"SessionStart"` arrays.
+
+### Hook tests
+
+Both scripts have full unit test coverage in `packages/cli/tests/hooks-scripts.test.ts` (12 tests). Run with:
+
+```bash
+pnpm --filter @sprang/cli test
+```
+
+---
+
 ## For New Team Members
 
 ```

@@ -8,5 +8,30 @@
       "Bash(git log*)",
       "Bash(git rev-parse*)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [".claude/hooks/post-tool-use.sh"]
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [".claude/hooks/session-start.sh"]
+          }
+        ]
+      }
+    ]
   }
 }
