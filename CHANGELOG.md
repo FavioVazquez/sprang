@@ -6,6 +6,40 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.0] — 2026-06-04
+
+Six new capabilities: architecture card view, structural fingerprinting, language pattern detection, graph normalization, semantic search, and auto-update hooks. Full Claude Code and GitHub Copilot integration added.
+
+### Added
+
+- **Architecture card view** (`packages/dashboard`) — 4th dashboard tab (`'a'` / `'4'`) with a React Flow + ELK force-directed layer map. `LayerCardNode.tsx` cards (280px wide, dark surface, colored left accent bar, complexity badge) show one card per architectural layer. `elk-layout.ts` runs ELK `"layered"` layout asynchronously with a loading spinner and fallback grid on error. `edge-aggregation.ts` collapses all cross-layer file-level edges to a single weighted edge with stroke width `min(1 + log2(count+1), 5)`. Clicking a layer card dispatches `setFilters({ layerIds })` to filter the main Graph view.
+
+- **Structural fingerprinting** (`packages/core/src/utils/fingerprint.ts`) — SHA-256 content hash + per-language structural signature extraction (functions, classes, imports, exports for TS/JS/Python/Go). `classifyChange` returns `SKIP` (identical hash), `COSMETIC` (hash differs but signatures equal), or `STRUCTURAL` (signatures changed). Fingerprints persisted at `.sprang/cache/fingerprints.json`. Project scanner logs skip/cosmetic/structural counts per run and attaches `changeType` to each `FileRecord`.
+
+- **Language lesson detection** (`packages/core/src/agents/language-lessons.ts`) — pure deterministic detection of 12 programming patterns: closures, async_await, promises, generators, decorators, generics, streams, observers, dependency_injection, middleware, finite_state_machine, immutability. One lesson per file (highest-priority match). Attached to `SprangNode.languageLesson` and `TourStep.languageLesson`. Surfaced in the `sprang_tour` MCP tool response.
+
+- **Graph normalization** (`packages/core/src/graph/normalize.ts`) — six-step pipeline: double-prefix stripping, last-write-wins node dedup, first-occurrence edge dedup, dangling edge removal, `tested_by` canonicalization (auto-flips edges where the target is a test file), and stats recalculation. Runs automatically after Phase 1 in the orchestrator.
+
+- **Monorepo subgraph merging** (`packages/core/src/graph/merge-subgraphs.ts`) — reads `pnpm-workspace.yaml` or `package.json#workspaces`, discovers packages, merges their `.sprang/knowledge-graph.json` files into the root graph with namespaced node IDs (`packagePath:originalId`).
+
+- **Semantic embedding search** (`packages/core/src/utils/embedding-search.ts`) — cosine similarity over TF-IDF vectors. `sprang_query` now accepts `mode: "semantic"` to search by semantic meaning rather than keyword match. Results include a `score` field (0–1 cosine similarity). CLI `query` command gains `--semantic` flag. Embeddings stored at `.sprang/cache/embeddings.json`.
+
+- **Auto-update git hooks** (`packages/cli/src/commands/install-hooks.ts`) — `sprang install-hooks` writes a `post-commit` hook that runs `sprang scan --phase1-only --if-stale` after every commit. The `--if-stale` flag on `sprang scan` compares `stats.gitCommitHash` against `git rev-parse HEAD` and skips the scan when the graph is already current. Git commit hash recorded in `graph.stats.gitCommitHash` after Phase 1.
+
+- **Git worktree detection** (`packages/core/src/orchestrator/runner.ts`) — `resolveSprangDir()` uses `git rev-parse --git-common-dir` to detect linked worktrees and redirect `.sprang/` to the main repo root, so all worktrees share one graph.
+
+- **`.sprang-hooks/session-start.md`** — session-start guide for AI agents: run `sprang scan --phase1-only --if-stale` at session start to auto-refresh stale graphs.
+
+- **Claude Code integration** — `CLAUDE.md` (imports `@AGENTS.md`), `.mcp.json` (MCP server config), `.claude/rules/` (3 always-on/glob rules), `.claude/commands/` (11 slash commands mirroring all Devin workflows), `.claude/settings.json` (pre-approved Bash permissions).
+
+- **GitHub Copilot integration** — `.vscode/mcp.json` (MCP server in `"servers"` format for Copilot), `.github/copilot-instructions.md` (pre-edit checklist, MCP tools reference, setup guide).
+
+### Changed
+
+- `.gitignore` — `.claude/` no longer wholly excluded; now excludes only `.claude/worktrees/` and `.claude/settings.local.json` so project rules/commands are committed.
+
+---
+
 ## [0.1.3] — 2026-06-04
 
 Persistent dashboard chat — send messages from the Sprang dashboard to Cascade and maintain conversation context across sessions.
