@@ -56,3 +56,8 @@ packages/cascade-messaging/
 .cascade-trigger-session
 .cascade-trigger
 .cascade-session
+
+# Agent bridge runtime files (session state, never committed)
+.sprang/cascade-response.json
+.sprang/claude-session.json
+.sprang/copilot-session.json

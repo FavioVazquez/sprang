@@ -6,6 +6,32 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.3] — 2026-06-05
+
+Platform-aware **Ask Agent** bridge — native Claude Code and GitHub Copilot CLI integration for the dashboard chat panel.
+
+### Added
+
+- **`packages/dashboard/src/bridge/detect.ts`** — runtime bridge detection with a four-way priority: Windsurf (`cascade-messaging` extension active) → Claude Code (`claude` CLI) → Copilot CLI (`copilot` CLI) → none. Exported: `detectBridge()`, `isWindsurfBridgeActive()`, `isClaudeCLIAvailable()`, `isCopilotCLIAvailable()`.
+- **`packages/dashboard/src/bridge/claude.ts`** — non-interactive Claude Code bridge. Spawns `claude -p "<question>" --output-format json --allowedTools <mcp_tools> --no-interactive`. Persists session ID to `.sprang/claude-session.json` and resumes via `--resume <session_id>`. Falls back to plain-text output when JSON parsing fails. Exported: `askClaude()`, `clearClaudeSession()`.
+- **`packages/dashboard/src/bridge/copilot.ts`** — non-interactive Copilot CLI bridge. Spawns `copilot -p "<question>"`. Uses `--continue` once a session exists (tracked in `.sprang/copilot-session.json`). Exported: `askCopilot()`, `clearCopilotSession()`.
+- **`packages/dashboard/src/bridge/windsurf.ts`** — extracted Windsurf bridge helpers. Writes trigger file atomically with the `[SPRANG DASHBOARD MESSAGE]` prefix and mandatory `sprang_respond` instruction. Exported: `writeWindsurfTrigger()`, `getWindsurfTriggerPath()`, `getWindsurfResponsePath()`.
+- **`packages/dashboard/src/bridge/index.ts`** — unified `askAgent(question, sprangRoot)` entry point: routes to the correct bridge, writes `cascade-response.json` for CLI bridges (same polling path as Windsurf), returns `{ mode: 'async' | 'sync', ok, error? }`. Also exports `clearAgentSession()` (clears all session files + response file).
+- **`GET /bridge-status`** vite dev/preview endpoint — returns current `BridgeStatus` JSON (`{ kind, detail }`). Used by the dashboard to show `via Claude Code` / `via Copilot CLI` / `via Windsurf` next to the panel header.
+- **`AskAgentPanel`** (renamed from `AskCascadePanel`): fetches `/bridge-status` on panel open, displays active bridge name in header, shows platform-aware empty state and error messages. `DELETE /cascade-response` now calls `clearAgentSession()` to clear all session state.
+- **Unit tests** (`packages/dashboard/src/bridge/__tests__/bridge.test.ts`) — 29 tests covering all four modules. Uses top-level `vi.mock('node:child_process')` with shared mock instances to work around ESM namespace non-configurability.
+- **e2e tests** (`packages/dashboard/e2e/app.spec.ts`) — 3 new tests: `GET /bridge-status` returns valid JSON, Ask Agent panel opens and shows bridge info (Playwright route-mocked), `POST /cascade-ask` returns 200 or 503 depending on environment.
+- **`.gitignore`** — added `.sprang/cascade-response.json`, `.sprang/claude-session.json`, `.sprang/copilot-session.json`.
+
+### Changed
+
+- **`POST /cascade-ask`** now routes through `askAgent()` and returns `503` with `{ error }` when no bridge is detected (previously always returned 200 even when no Windsurf extension was active). Response body includes `mode: 'async' | 'sync'` field.
+- **`DELETE /cascade-response`** clears all bridge session state via `clearAgentSession()`, not just the response file.
+- **README** — updated "Dashboard chat" section to "Ask Agent" with bridge priority table, session file reference, and Claude Code / Copilot setup notes.
+- Test suite: **84 unit tests** (dashboard), **36 e2e tests** — all passing.
+
+---
+
 ## [0.2.2] — 2026-06-04
 
 Claude Code native hooks, hook unit tests, and hooks documentation.

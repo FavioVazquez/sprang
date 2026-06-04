@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { detectBridge, askAgent, clearAgentSession } from './src/bridge/index.js';
 
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024; // 1 MB cap for source files
 
@@ -66,23 +67,10 @@ const EXT_TO_LANG: Record<string, string> = {
 type ConnectServer = { middlewares: import('vite').Connect.Server };
 
 // ---------------------------------------------------------------------------
-// Cascade Bridge helpers
+// Response file path (shared by all bridge kinds)
 // ---------------------------------------------------------------------------
-function getTriggerFilePath(): string {
-  // Use .cascade-trigger-session (cascade-messaging extension) for session continuity.
-  // cascade-bridge still watches .cascade-trigger — both can coexist.
-  return path.join(getSprangRoot(), '.cascade-trigger-session');
-}
-
 function getResponseFilePath(): string {
   return path.join(getSprangRoot(), '.sprang', 'cascade-response.json');
-}
-
-/** Write a message to .cascade-trigger so the cascade-bridge extension picks it up */
-function writeCascadeTrigger(message: string): void {
-  const tmp = getTriggerFilePath() + '.tmp';
-  fs.writeFileSync(tmp, message, 'utf-8');
-  fs.renameSync(tmp, getTriggerFilePath());
 }
 
 function attachSprangMiddlewares(server: ConnectServer) {
@@ -172,14 +160,22 @@ function attachSprangMiddlewares(server: ConnectServer) {
     res.end(JSON.stringify({ path: normalized, language, content }));
   });
 
+  // GET /bridge-status — returns which agent bridge is currently active.
+  server.middlewares.use('/bridge-status', (_req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+    res.setHeader('Content-Type', 'application/json');
+    const status = detectBridge(getSprangRoot());
+    res.statusCode = 200;
+    res.end(JSON.stringify(status));
+  });
+
   // POST /cascade-ask  { "message": "..." }
-  // Writes the message to .cascade-trigger so cascade-bridge picks it up.
+  // Routes to the appropriate agent bridge (windsurf / claude / copilot).
   server.middlewares.use('/cascade-ask', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
     if (req.method !== 'POST') { res.statusCode = 405; res.end(JSON.stringify({ error: 'POST only' })); return; }
 
-    const MAX_BODY_BYTES = 64 * 1024; // 64 KB hard cap — protects against memory exhaustion
+    const MAX_BODY_BYTES = 64 * 1024;
     let body = '';
     let bodyBytes = 0;
     let aborted = false;
@@ -203,20 +199,15 @@ function attachSprangMiddlewares(server: ConnectServer) {
           res.end(JSON.stringify({ error: 'message field required' }));
           return;
         }
-        const userMessage = message.trim().slice(0, 4096); // cap at 4096 chars for trigger file
-        // Clear previous response before asking
-        const responsePath = getResponseFilePath();
-        if (fs.existsSync(responsePath)) fs.unlinkSync(responsePath);
-
-        // Wrap with mandatory instruction so Cascade always calls sprang_respond
-        const triggerMessage = `[SPRANG DASHBOARD MESSAGE — you MUST call the sprang_respond MCP tool with your answer when done, so it appears in the dashboard]
-
-Question: ${userMessage}
-
-After answering, call sprang_respond with: { "response": "<your answer>", "question": "${userMessage.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" }`;
-        writeCascadeTrigger(triggerMessage);
+        const userMessage = message.trim().slice(0, 4096);
+        const result = askAgent(userMessage, getSprangRoot());
+        if (!result.ok) {
+          res.statusCode = 503;
+          res.end(JSON.stringify({ error: result.error ?? 'Agent bridge unavailable' }));
+          return;
+        }
         res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, sent: userMessage }));
+        res.end(JSON.stringify({ ok: true, sent: userMessage, mode: result.mode }));
       } catch {
         res.statusCode = 400;
         res.end(JSON.stringify({ error: 'Invalid JSON body' }));
@@ -229,8 +220,7 @@ After answering, call sprang_respond with: { "response": "<your answer>", "quest
   server.middlewares.use('/cascade-response', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'DELETE') {
-      const responsePath = getResponseFilePath();
-      if (fs.existsSync(responsePath)) fs.unlinkSync(responsePath);
+      clearAgentSession(getSprangRoot());
       res.statusCode = 200;
       res.end(JSON.stringify({ ok: true }));
       return;

@@ -541,11 +541,17 @@ test('cascade bridge – POST /cascade-ask accepts valid message', async ({ page
     data: { message: 'What does auth.ts do?' },
     headers: { 'Content-Type': 'application/json' },
   });
-  expect(response.status()).toBe(200);
+  // 200 = a bridge was found and message dispatched
+  // 503 = no bridge available in this environment (expected in CI without claude/copilot)
+  expect([200, 503]).toContain(response.status());
 
-  const body = await response.json() as { ok?: boolean; sent?: string };
-  expect(body.ok).toBe(true);
-  expect(body.sent).toBe('What does auth.ts do?');
+  const body = await response.json() as { ok?: boolean; sent?: string; error?: string };
+  if (response.status() === 200) {
+    expect(body.ok).toBe(true);
+    expect(body.sent).toBe('What does auth.ts do?');
+  } else {
+    expect(typeof body.error).toBe('string');
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -657,7 +663,84 @@ test('diff overlay API – /diff-overlay.json returns 404 when no overlay exists
 });
 
 // ---------------------------------------------------------------------------
-// Test 32: Nav bar – Architecture tab persists across view switches
+// Test 33: Bridge status – /bridge-status endpoint returns valid JSON
+// ---------------------------------------------------------------------------
+test('bridge status API – /bridge-status returns valid BridgeStatus JSON', async ({ page }) => {
+  await page.addInitScript(() => { localStorage.setItem('sprang:onboarded', 'true'); });
+  await page.route('**/knowledge-graph.json', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockGraph) }),
+  );
+  await page.goto('/');
+  await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
+
+  const resp = await page.request.get('/bridge-status');
+  expect(resp.status()).toBe(200);
+  const body = await resp.json() as { kind: string; detail: string };
+  // kind must be one of the four valid values
+  expect(['windsurf', 'claude', 'copilot', 'none']).toContain(body.kind);
+  expect(typeof body.detail).toBe('string');
+});
+
+// ---------------------------------------------------------------------------
+// Test 34: Ask Agent panel – opens, shows bridge status, shows "Ask Agent"
+// ---------------------------------------------------------------------------
+test('Ask Agent panel – opens and displays bridge info', async ({ page }) => {
+  await page.addInitScript(() => { localStorage.setItem('sprang:onboarded', 'true'); });
+  await page.route('**/knowledge-graph.json', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockGraph) }),
+  );
+  // Mock bridge-status to return a known value
+  await page.route('**/bridge-status', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ kind: 'none', detail: 'No agent bridge found.' }),
+    }),
+  );
+  await page.goto('/');
+  await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
+
+  // Open Ask Agent panel
+  const askBtn = page.getByRole('button', { name: /ask agent/i });
+  await expect(askBtn).toBeVisible({ timeout: 5000 });
+  await askBtn.click();
+
+  // Panel header visible
+  await expect(page.getByText('Ask Agent').first()).toBeVisible({ timeout: 3000 });
+
+  // Empty state shows bridge detection message
+  await expect(page.getByText(/no bridge detected|detecting agent bridge/i)).toBeVisible({ timeout: 3000 });
+
+  // Close by pressing Escape
+  await page.keyboard.press('Escape');
+});
+
+// ---------------------------------------------------------------------------
+// Test 35: Ask Agent panel – /cascade-ask returns 503 when no bridge
+// ---------------------------------------------------------------------------
+test('Ask Agent panel – /cascade-ask 503 when no agent bridge available', async ({ page }) => {
+  await page.addInitScript(() => { localStorage.setItem('sprang:onboarded', 'true'); });
+  await page.route('**/knowledge-graph.json', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockGraph) }),
+  );
+  await page.goto('/');
+  await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
+
+  // In test environment, no claude/copilot CLIs and no trigger file → bridge=none
+  // /cascade-ask should return 503
+  const resp = await page.request.post('/cascade-ask', {
+    data: { message: 'what does auth.ts do?' },
+  });
+  // 503 = no bridge, 200 = a bridge was found (e.g. claude CLI installed on CI)
+  expect([200, 503]).toContain(resp.status());
+  if (resp.status() === 503) {
+    const body = await resp.json() as { error: string };
+    expect(typeof body.error).toBe('string');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 36: Nav bar – Architecture tab persists across view switches
 // ---------------------------------------------------------------------------
 test('nav bar – Architecture tab visible across all view switches', async ({ page }) => {
   await gotoApp(page);
