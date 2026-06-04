@@ -239,12 +239,20 @@ export interface FileRecord {
   sizeLines: number;
   fileCategory: string;
   mtime: number;
+  changeType?: import('../utils/fingerprint.js').ChangeType;
 }
 
 export interface ImportEdge {
   from: string;
   to: string;
   resolved: boolean;
+}
+
+export interface FingerprintStats {
+  skip: number;
+  cosmetic: number;
+  structural: number;
+  total: number;
 }
 
 export interface ScanResult {
@@ -257,6 +265,7 @@ export interface ScanResult {
   filteredByIgnore: number;
   estimatedComplexity: string;
   importMap: Record<string, string[]>;
+  fingerprintStats?: FingerprintStats;
 }
 
 export interface FunctionRecord {
