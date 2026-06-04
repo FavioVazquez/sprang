@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2024-01-01T00:00:00.000Z",
+  "project_root": "/monorepo/packages/utils",
+  "project_name": "utils",
+  "phase": "skeleton",
+  "nodes": [
+    {
+      "id": "file:src/index.ts",
+      "type": "file",
+      "label": "src/index.ts",
+      "filePath": "src/index.ts"
+    }
+  ],
+  "edges": [],
+  "layers": [],
+  "tours": [],
+  "domains": [],
+  "stats": {
+    "node_count": 1,
+    "edge_count": 0,
+    "risk_summary": { "high": 0, "medium": 0, "low": 0 },
+    "smell_summary": {},
+    "generated_at": "2024-01-01T00:00:00.000Z"
+  }
+}
