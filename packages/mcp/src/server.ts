@@ -26,7 +26,7 @@ const loader = new GraphLoader(sprangRoot);
 const server = new Server(
   {
     name: 'sprang',
-    version: '0.1.0',
+    version: '0.2.0',
   },
   {
     capabilities: {

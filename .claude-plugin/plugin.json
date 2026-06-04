@@ -1,4 +1,5 @@
 {
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "sprang",
   "description": "Knowledge graph platform for instant codebase comprehension — git history, structural health, risk scoring, and architectural tours for any project",
   "version": "0.2.0",
@@ -16,5 +17,8 @@
     "risk-scoring",
     "onboarding",
     "dashboard"
+  ],
+  "skills": [
+    "./skills"
   ]
 }
