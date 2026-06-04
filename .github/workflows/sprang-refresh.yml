@@ -35,7 +35,7 @@ jobs:
         run: pnpm build
 
       - name: Run Sprang scan
-        run: node packages/cli/dist/index.js scan . --skip-llm
+        run: node packages/cli/dist/index.js scan . --phase1-only
 
       - name: Commit updated graph files
         run: |
