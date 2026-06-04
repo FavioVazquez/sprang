@@ -1,0 +1,17 @@
+Understand why a file or function exists — git history, decision context, team annotations.
+
+Arguments: `<file path or function name>`
+
+1. Call `sprang_query` with the argument to find the matching graph node ID.
+2. Call `sprang_why` with the resolved `node_id` to retrieve: commit history, primary authors, rationale snippets, PR references, and any team annotation.
+3. Call `sprang_node` with the same `node_id` to get:
+   - `layer` (name + id) and `layer_mate_count` — where it fits in the architecture
+   - `in_degree` / `out_degree` — how coupled it is
+   - `has_annotation` / `annotation_path` — whether team knowledge exists
+   - Full 1-hop neighbor list
+4. If `has_annotation` is true, display the full annotation content prominently.
+5. If `decision_context.change_frequency >= 10` (commits in 90 days), flag as 🔴 **frequently-churning** — extra care required.
+6. Cross-reference PR references from decision context with related notes.
+7. Summarize: purpose, origin, ownership, layer, risk level, and specific guidance before modifying (especially if `risk_score > 0.7`).
+
+$ARGUMENTS

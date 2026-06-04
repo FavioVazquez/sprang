@@ -40,7 +40,8 @@ packages/dashboard/test-results/
 packages/dashboard/playwright-report/
 
 # Development tool artifacts (never commit)
-.claude/
+.claude/worktrees/
+.claude/settings.local.json
 .impeccable/
 .agents/skills/impeccable/
 

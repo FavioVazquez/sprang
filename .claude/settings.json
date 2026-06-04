@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx sprang*)",
+      "Bash(node packages/mcp/dist/server.js*)",
+      "Bash(pnpm --filter @sprang/dashboard dev*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git rev-parse*)"
+    ]
+  }
+}
