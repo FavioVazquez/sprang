@@ -5,6 +5,7 @@ import { makeHealthCommand } from './commands/health.js';
 import { makeQueryCommand } from './commands/query.js';
 import { makeWatchCommand } from './commands/watch.js';
 import { makeStatusCommand } from './commands/status.js';
+import { makeInstallHooksCommand } from './commands/install-hooks.js';
 
 const program = new Command();
 
@@ -18,5 +19,6 @@ program.addCommand(makeHealthCommand());
 program.addCommand(makeQueryCommand());
 program.addCommand(makeWatchCommand());
 program.addCommand(makeStatusCommand());
+program.addCommand(makeInstallHooksCommand());
 
 program.parse(process.argv);

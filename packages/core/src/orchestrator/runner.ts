@@ -1,28 +1,71 @@
 import { join } from 'node:path';
+import * as path from 'node:path';
 import { fork } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { NullLLMClient } from '../llm/client.js';
 import { runPhase1 } from './phase1.js';
+import { saveGraph } from '../graph/store.js';
 import type { KnowledgeGraph } from '../schema/types.js';
 import type { SprangOptions } from '../agents/base.js';
 import { SPRANG_DIR } from '../schema/constants.js';
+
+function getCurrentGitHash(projectRoot: string): string | undefined {
+  try {
+    return execSync('git rev-parse HEAD', { cwd: projectRoot, encoding: 'utf-8' }).trim();
+  } catch { return undefined; }
+}
+
+export async function resolveSprangDir(projectRoot: string, sprangDir: string): Promise<string> {
+  try {
+    // git rev-parse --git-common-dir returns .git for main worktree,
+    // or a relative path like ../../.git for a worktree
+    const gitCommonDir = execSync('git rev-parse --git-common-dir', {
+      cwd: projectRoot, encoding: 'utf-8'
+    }).trim();
+    const absGitCommonDir = path.isAbsolute(gitCommonDir)
+      ? gitCommonDir
+      : path.resolve(projectRoot, gitCommonDir);
+    const mainRepoRoot = path.dirname(absGitCommonDir);
+    if (mainRepoRoot !== projectRoot) {
+      // We're in a worktree — redirect to main repo
+      const redirectedDir = path.join(mainRepoRoot, SPRANG_DIR);
+      const log = (msg: string) => process.stdout.write(msg + '\n');
+      log(`[sprang] Worktree detected — using main repo's .sprang at ${redirectedDir}`);
+      return redirectedDir;
+    }
+  } catch { /* not a git repo or git not available */ }
+  return sprangDir;
+}
 
 export async function runSprangAnalysis(
   projectRoot: string,
   options: SprangOptions & { background?: boolean }
 ): Promise<void> {
-  const sprangDir = join(projectRoot, SPRANG_DIR);
+  const baseSprangDir = join(projectRoot, SPRANG_DIR);
+  const sprangDir = await resolveSprangDir(projectRoot, baseSprangDir);
   const llm = new NullLLMClient();
 
   const log = (msg: string) => process.stdout.write(msg + '\n');
 
   log('[sprang] Starting Phase 1 analysis...');
-  const skeletonGraph = await runPhase1(
+  let skeletonGraph = await runPhase1(
     projectRoot,
     sprangDir,
     options,
     llm,
     log
   );
+
+  // Record the current git commit hash in the graph stats
+  const gitHash = getCurrentGitHash(projectRoot);
+  if (gitHash) {
+    skeletonGraph = {
+      ...skeletonGraph,
+      stats: { ...skeletonGraph.stats, gitCommitHash: gitHash },
+    };
+    await saveGraph(sprangDir, skeletonGraph);
+  }
+
   log(
     `[sprang] Phase 1 complete. Nodes: ${skeletonGraph.nodes.length}, Edges: ${skeletonGraph.edges.length}`
   );
@@ -71,9 +114,22 @@ export async function runPhase1Only(
   projectRoot: string,
   options?: SprangOptions
 ): Promise<KnowledgeGraph> {
-  const sprangDir = join(projectRoot, SPRANG_DIR);
+  const baseSprangDir = join(projectRoot, SPRANG_DIR);
+  const sprangDir = await resolveSprangDir(projectRoot, baseSprangDir);
   const llm = new NullLLMClient();
   const log = (msg: string) => process.stdout.write(msg + '\n');
 
-  return runPhase1(projectRoot, sprangDir, options ?? {}, llm, log);
+  let graph = await runPhase1(projectRoot, sprangDir, options ?? {}, llm, log);
+
+  // Record the current git commit hash in the graph stats
+  const gitHash = getCurrentGitHash(projectRoot);
+  if (gitHash) {
+    graph = {
+      ...graph,
+      stats: { ...graph.stats, gitCommitHash: gitHash },
+    };
+    await saveGraph(sprangDir, graph);
+  }
+
+  return graph;
 }
