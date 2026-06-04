@@ -8,10 +8,12 @@ Messages sent from the Sprang dashboard arrive via the trigger file `.cascade-tr
 
 ## Conversation History
 
-The file `.cascade-conversation.md` in the workspace root contains the full history of prior exchanges between the user and Cascade. **Read it at the start of each session** to restore context before answering.
+The file `.cascade-conversation.md` in the workspace root is an **append-only log** of every prior exchange. The hook that writes it fires *after* each response, so new entries accumulate while the session is running.
+
+**You MUST read `.cascade-conversation.md` immediately before answering EACH dashboard message** — not just at session start — because earlier messages in the same session will have been appended since you last read it.
 
 ## When you receive a dashboard message:
-1. Read `.cascade-conversation.md` to recall prior context
-2. Answer the message fully, taking prior exchanges into account
+1. **Immediately read `.cascade-conversation.md`** (use the read_file tool) — this gives you the full conversation history including any exchanges that happened earlier in this same session
+2. Answer the message fully, taking ALL prior exchanges into account
 3. Always call the `sprang_respond` MCP tool with your answer so it appears in the dashboard UI
-4. This is a continuous conversation — treat each message as part of an ongoing session even if it arrives in a new Cascade tab
+4. This is a continuous conversation — every question builds on the full history in that file
