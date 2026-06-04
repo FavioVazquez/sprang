@@ -78,24 +78,27 @@ beforeEach(() => {
 
 describe('isWindsurfBridgeActive', () => {
   let tmpDir: string;
-  beforeEach(() => { tmpDir = makeTmp(); });
-  afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
-
-  it('returns false when trigger file does not exist', () => {
-    expect(isWindsurfBridgeActive(tmpDir)).toBe(false);
+  const origEnv = process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
+  beforeEach(() => { tmpDir = makeTmp(); delete process.env['WINDSURF_CASCADE_TERMINAL_KIND']; });
+  afterEach(() => {
+    cleanTmp(tmpDir);
+    vi.restoreAllMocks();
+    if (origEnv !== undefined) process.env['WINDSURF_CASCADE_TERMINAL_KIND'] = origEnv;
+    else delete process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
   });
 
-  it('returns true when trigger file was modified within last 60s', () => {
-    fs.writeFileSync(path.join(tmpDir, '.cascade-trigger-session'), 'hello');
+  it('returns true when WINDSURF_CASCADE_TERMINAL_KIND env var is set', () => {
+    process.env['WINDSURF_CASCADE_TERMINAL_KIND'] = 'inherit';
     expect(isWindsurfBridgeActive(tmpDir)).toBe(true);
   });
 
-  it('returns false when trigger file is older than 60s', () => {
-    const p = path.join(tmpDir, '.cascade-trigger-session');
-    fs.writeFileSync(p, 'old');
-    const old = new Date(Date.now() - 120_000);
-    fs.utimesSync(p, old, old);
+  it('returns false when env var unset and trigger file does not exist', () => {
     expect(isWindsurfBridgeActive(tmpDir)).toBe(false);
+  });
+
+  it('returns true when env var unset but trigger file exists (fallback)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.cascade-trigger-session'), 'hello');
+    expect(isWindsurfBridgeActive(tmpDir)).toBe(true);
   });
 });
 
@@ -129,8 +132,13 @@ describe('isCopilotCLIAvailable', () => {
 
 describe('detectBridge priority', () => {
   let tmpDir: string;
-  beforeEach(() => { tmpDir = makeTmp(); });
-  afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
+  const origEnv = process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
+  beforeEach(() => { tmpDir = makeTmp(); delete process.env['WINDSURF_CASCADE_TERMINAL_KIND']; });
+  afterEach(() => {
+    cleanTmp(tmpDir); vi.restoreAllMocks();
+    if (origEnv !== undefined) process.env['WINDSURF_CASCADE_TERMINAL_KIND'] = origEnv;
+    else delete process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
+  });
 
   it('returns windsurf when trigger file is fresh (highest priority)', () => {
     // Even with CLIs available, windsurf wins if trigger is fresh
@@ -306,8 +314,13 @@ describe('askCopilot', () => {
 
 describe('askAgent', () => {
   let tmpDir: string;
-  beforeEach(() => { tmpDir = makeTmp(); });
-  afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
+  const origEnv = process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
+  beforeEach(() => { tmpDir = makeTmp(); delete process.env['WINDSURF_CASCADE_TERMINAL_KIND']; });
+  afterEach(() => {
+    cleanTmp(tmpDir); vi.restoreAllMocks();
+    if (origEnv !== undefined) process.env['WINDSURF_CASCADE_TERMINAL_KIND'] = origEnv;
+    else delete process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
+  });
 
   it('returns mode=async for windsurf bridge and writes trigger file', () => {
     // Fresh trigger file → windsurf detected

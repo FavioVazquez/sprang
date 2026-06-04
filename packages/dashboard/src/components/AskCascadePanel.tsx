@@ -177,7 +177,7 @@ export function AskAgentPanel() {
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
         role: 'error',
-        text: 'Could not reach the dashboard server. Is it running with SPRANG_ROOT set?',
+        text: askResult.error ?? 'Could not reach the dashboard server. Is it running with SPRANG_ROOT set?',
         ts: new Date().toISOString(),
       }]);
       return;

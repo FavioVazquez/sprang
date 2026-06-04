@@ -19,20 +19,15 @@ export interface BridgeStatus {
   detail: string;
 }
 
-/** Returns true if the cascade-messaging Windsurf extension is active.
- *  Heuristic: check whether .cascade-trigger-session exists OR has been
- *  written in the last 60 s (extension is alive and watching). */
+/** Returns true if running inside Windsurf / Devin Desktop.
+ *  Primary signal: WINDSURF_CASCADE_TERMINAL_KIND env var (always set by Windsurf/Devin Desktop).
+ *  Fallback: .cascade-trigger-session exists (extension has been active this session). */
 export function isWindsurfBridgeActive(sprangRoot: string): boolean {
+  // Env var is the most reliable signal — present in all Windsurf/Devin Desktop terminals
+  if (process.env['WINDSURF_CASCADE_TERMINAL_KIND'] !== undefined) return true;
+  // Fallback: trigger file exists (extension wrote it at some point)
   const triggerPath = path.join(sprangRoot, '.cascade-trigger-session');
-  if (!fs.existsSync(triggerPath)) return false;
-  try {
-    const stat = fs.statSync(triggerPath);
-    const ageMs = Date.now() - stat.mtimeMs;
-    // File present and touched within last 60 s — extension is watching
-    return ageMs < 60_000;
-  } catch {
-    return false;
-  }
+  return fs.existsSync(triggerPath);
 }
 
 /** Returns true if the `claude` CLI is available on PATH and responds. */
