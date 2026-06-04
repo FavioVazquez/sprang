@@ -1,11 +1,19 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join, basename, extname, relative } from 'node:path';
 import fg from 'fast-glob';
-import type { KnowledgeGraph, ScanResult, FileRecord, SprangNode } from '../schema/types.js';
+import type { KnowledgeGraph, ScanResult, FileRecord, SprangNode, FingerprintStats } from '../schema/types.js';
 import { EXTENSION_TO_LANGUAGE, DEFAULT_EXCLUDES, FRAMEWORK_MARKERS } from '../schema/constants.js';
 import { BaseAgent } from './base.js';
 import type { AgentContext, AgentResult } from './base.js';
 import { fileExists } from '../utils/fs.js';
+import {
+  computeFileFingerprint,
+  classifyChange,
+  loadFingerprintStore,
+  saveFingerprintStore,
+  buildFingerprintStore,
+} from '../utils/fingerprint.js';
+import type { FingerprintStore } from '../utils/fingerprint.js';
 
 // ─── TS/JS import extraction ─────────────────────────────────────────────────
 
@@ -473,6 +481,24 @@ export class ProjectScannerAgent extends BaseAgent {
 
       const newNodes: SprangNode[] = [];
 
+      // Load existing fingerprint store for incremental change detection
+      const prevStore = await loadFingerprintStore(ctx.sprangDir);
+
+      // Accumulate file data for building the new fingerprint store
+      const fingerprintInputs: Array<{
+        path: string;
+        absPath: string;
+        language: string;
+        content: string;
+      }> = [];
+
+      const fingerprintStats: FingerprintStats = {
+        skip: 0,
+        cosmetic: 0,
+        structural: 0,
+        total: 0,
+      };
+
       for (const absPath of absolutePaths) {
         const relPath = relative(projectRoot, absPath);
         const ext = extname(absPath).toLowerCase();
@@ -481,11 +507,12 @@ export class ProjectScannerAgent extends BaseAgent {
         const FILE_SIZE_LIMIT = 10 * 1024 * 1024; // 10MB
         let sizeLines = 0;
         let mtime = 0;
+        let content = '';
         try {
           const fileStat = await stat(absPath);
           mtime = fileStat.mtimeMs;
           if (fileStat.size > FILE_SIZE_LIMIT) continue;
-          const content = await readFile(absPath, 'utf-8');
+          content = await readFile(absPath, 'utf-8');
           sizeLines = content.split('\n').length;
 
           // Extract imports for all supported languages
@@ -499,6 +526,18 @@ export class ProjectScannerAgent extends BaseAgent {
           // Skip unreadable files
           continue;
         }
+
+        // Compute fingerprint and classify change
+        const currFingerprint = computeFileFingerprint(absPath, content, language);
+        const prevFingerprint = prevStore?.files[relPath];
+        const changeType = classifyChange(prevFingerprint, currFingerprint);
+
+        fingerprintInputs.push({ path: relPath, absPath, language, content });
+
+        fingerprintStats.total += 1;
+        if (changeType === 'SKIP') fingerprintStats.skip += 1;
+        else if (changeType === 'COSMETIC') fingerprintStats.cosmetic += 1;
+        else fingerprintStats.structural += 1;
 
         const fileCategory =
           SOURCE_LANGUAGES.has(language)
@@ -516,6 +555,7 @@ export class ProjectScannerAgent extends BaseAgent {
           sizeLines,
           fileCategory,
           mtime,
+          changeType,
         });
 
         if (language !== 'unknown') {
@@ -536,9 +576,22 @@ export class ProjectScannerAgent extends BaseAgent {
             sizeLines,
             mtime,
             fileCategory,
+            changeType,
           },
         });
       }
+
+      // Save updated fingerprint store
+      const newStore: FingerprintStore = buildFingerprintStore(fingerprintInputs);
+      await saveFingerprintStore(ctx.sprangDir, newStore);
+
+      // Log fingerprint summary
+      console.log(
+        `[sprang] Fingerprint: ${fingerprintStats.skip} unchanged, ` +
+        `${fingerprintStats.cosmetic} cosmetic, ` +
+        `${fingerprintStats.structural} structural ` +
+        `(${fingerprintStats.total} total)`
+      );
 
       const scanResult: ScanResult = {
         name: projectName,
@@ -554,6 +607,7 @@ export class ProjectScannerAgent extends BaseAgent {
             ? 'medium'
             : 'large',
         importMap,
+        fingerprintStats,
       };
 
       await this.writeIntermediate(ctx, 'scan-result.json', scanResult);
