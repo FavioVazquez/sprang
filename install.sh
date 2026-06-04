@@ -99,7 +99,16 @@ clone_or_update() {
   (cd "$REPO_DIR" && pnpm install --frozen-lockfile && pnpm build)
 }
 
-skills_root() { printf '%s\n' "$REPO_DIR/.agents/skills"; }
+skills_root() {
+  # Skills live in .windsurf/skills/ (Windsurf/Devin format); also check .agents/skills/ fallback
+  if [[ -d "$REPO_DIR/.windsurf/skills" ]]; then
+    printf '%s\n' "$REPO_DIR/.windsurf/skills"
+  elif [[ -d "$REPO_DIR/.agents/skills" ]]; then
+    printf '%s\n' "$REPO_DIR/.agents/skills"
+  else
+    printf '%s\n' "$REPO_DIR/.windsurf/skills"
+  fi
+}
 
 list_skills() {
   local root

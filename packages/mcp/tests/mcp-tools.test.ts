@@ -33,7 +33,7 @@ function makeGraph(overrides: Record<string, unknown> = {}) {
         summary: 'JWT authentication logic',
         tags: ['auth'],
         risk_score: 0.85,
-        risk_factors: [{ factor: 'blast_radius', score: 0.9, weight: 0.35 }],
+        risk_factors: ['large_blast_radius', 'has_structural_warnings'],
         structural_warnings: [
           {
             category: 'god_node',
@@ -45,13 +45,14 @@ function makeGraph(overrides: Record<string, unknown> = {}) {
         ],
         decision_context: {
           commits: [
-            { hash: 'abc123', author: 'alice@test.com', date: '2024-01-01', message: 'add JWT validation (#42)' },
+            { sha: 'abc123', author: 'alice@test.com', date: '2024-01-01', message: 'add JWT validation (#42)' },
           ],
           primary_authors: ['alice@test.com'],
           last_changed: '2024-01-01',
           change_frequency: 8,
           rationale_snippets: ['add JWT validation'],
           pr_references: ['#42'],
+          changelog_entries: [],
         },
       },
       {

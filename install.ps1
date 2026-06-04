@@ -78,7 +78,14 @@ function Prompt-Platform {
     return $ids[$n - 1]
 }
 
-function Get-SkillsRoot { Join-Path $RepoDir '.agents\skills' }
+function Get-SkillsRoot {
+    # Skills live in .windsurf\skills\; fall back to .agents\skills\ if present
+    $windsurf = Join-Path $RepoDir '.windsurf\skills'
+    $agents   = Join-Path $RepoDir '.agents\skills'
+    if (Test-Path $windsurf) { return $windsurf }
+    if (Test-Path $agents)   { return $agents }
+    return $windsurf
+}
 
 function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
