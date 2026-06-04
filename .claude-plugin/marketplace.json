@@ -1,0 +1,15 @@
+{
+  "name": "sprang",
+  "metadata": {
+    "description": "Knowledge graph platform for instant codebase comprehension — git history, structural health, risk scoring, and architectural tours for any project"
+  },
+  "owner": {
+    "name": "FavioVazquez"
+  },
+  "plugins": [
+    {
+      "name": "sprang",
+      "source": "./"
+    }
+  ]
+}
