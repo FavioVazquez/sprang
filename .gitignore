@@ -46,3 +46,12 @@ packages/dashboard/playwright-report/
 
 # Brand image generation script (local dev tool — uses .env API key)
 generate_images.py
+
+# cascade-messaging VS Code extension — source not shipped, only the .vsix
+packages/cascade-messaging/
+
+# Cascade runtime files (generated, never committed)
+.cascade-conversation.md
+.cascade-trigger-session
+.cascade-trigger
+.cascade-session

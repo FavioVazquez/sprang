@@ -21,6 +21,7 @@ import { WarningBanner } from './components/WarningBanner';
 import { ThemePicker, useTheme } from './components/ThemePicker';
 import { OnboardingOverlay, useOnboarding } from './components/OnboardingOverlay';
 import { MobileBottomNav } from './components/MobileLayout';
+import { AskCascadePanel } from './components/AskCascadePanel';
 import { loadGraph } from './api/graphApi';
 import { useDashboardStore } from './store';
 import type { KnowledgeGraph } from './types';
@@ -212,7 +213,7 @@ export default function App() {
       <div className="h-full flex flex-col bg-surface-950 overflow-hidden font-sans">
         <WarningBanner errors={schemaWarnings} />
         {/* Global nav */}
-        <nav className="flex items-center gap-1 px-3 py-2 bg-surface-900 border-b border-surface-800 flex-shrink-0 z-10">
+        <nav className="relative flex items-center gap-1 px-3 py-2 bg-surface-900 border-b border-surface-800 flex-shrink-0 z-10">
           {/* Logo */}
           <div className="flex items-center gap-2 pr-3 mr-1 border-r border-surface-800">
             <div className="w-6 h-6 rounded-lg bg-sprang-500/20 flex items-center justify-center flex-shrink-0">
@@ -265,6 +266,9 @@ export default function App() {
             )}
             <span className="text-xs text-surface-600">v{graph.version}</span>
           </div>
+
+          {/* Ask Cascade */}
+          <AskCascadePanel />
 
           {/* Theme picker */}
           <ThemePicker theme={theme} onChange={setTheme} />

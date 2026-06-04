@@ -131,3 +131,19 @@ All 11 slash commands work. Skill definitions are in `.windsurf/skills/*/SKILL.m
 If no graph exists yet: run `/sprang` to build one.
 
 *New to this codebase? Run `/sprang-onboard` first.*
+
+---
+
+## Dashboard Chat (cascade-messaging)
+
+The Sprang dashboard has an **Ask Cascade** panel that sends messages via `.cascade-trigger-session`. The `cascade-messaging` VS Code extension forwards these to Cascade and maintains conversation history in `.cascade-conversation.md`.
+
+The rule `.devin/rules/cascade-messaging.md` (always_on) governs this — it tells Cascade to:
+1. Read `.cascade-conversation.md` at session start to restore prior context
+2. Answer the message fully
+3. Call `sprang_respond` MCP tool so the reply appears in the dashboard UI
+
+**If you receive a message prefixed with `[SPRANG DASHBOARD MESSAGE]`:**
+- Read `.cascade-conversation.md` first
+- Answer in context of the full conversation history
+- Always end by calling `sprang_respond` with your answer

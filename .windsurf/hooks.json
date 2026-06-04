@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "post_cascade_response_with_transcript": [
+      {
+        "command": "python3 .windsurf/hooks/save-conversation.py",
+        "working_directory": ".",
+        "show_output": false
+      }
+    ]
+  }
+}

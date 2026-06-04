@@ -17,6 +17,8 @@ import { sprangHealth } from './tools/sprang_health.js';
 import { sprangWhy } from './tools/sprang_why.js';
 import { sprangAnnotate } from './tools/sprang_annotate.js';
 import type { SprangAnnotateInput } from './tools/sprang_annotate.js';
+import { sprangRespond } from './tools/sprang_respond.js';
+import type { SprangRespondInput } from './tools/sprang_respond.js';
 
 const sprangRoot = process.env['SPRANG_ROOT'] ?? process.cwd();
 const loader = new GraphLoader(sprangRoot);
@@ -176,6 +178,25 @@ const TOOLS = [
       required: ['node_id', 'content'],
     },
   },
+  {
+    name: 'sprang_respond',
+    description:
+      'Write a response to .sprang/cascade-response.json so the Sprang dashboard can display it. Use this after answering a question triggered via the dashboard Ask Cascade feature.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        response: {
+          type: 'string',
+          description: 'The response text to send back to the dashboard.',
+        },
+        question: {
+          type: 'string',
+          description: 'Optional: the original question being answered.',
+        },
+      },
+      required: ['response'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -244,6 +265,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'sprang_why': {
         result = await sprangWhy(loader, { node_id: input['node_id'] as string }, sprangRoot);
+        break;
+      }
+
+      case 'sprang_respond': {
+        const respondInput: SprangRespondInput = {
+          response: input['response'] as string,
+        };
+        if (input['question'] !== undefined) {
+          respondInput.question = input['question'] as string;
+        }
+        result = await sprangRespond(respondInput, sprangRoot);
         break;
       }
 
