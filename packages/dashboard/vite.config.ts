@@ -56,7 +56,9 @@ type ConnectServer = { middlewares: import('vite').Connect.Server };
 // Cascade Bridge helpers
 // ---------------------------------------------------------------------------
 function getTriggerFilePath(): string {
-  return path.join(getSprangRoot(), '.cascade-trigger');
+  // Use .cascade-trigger-session (cascade-messaging extension) for session continuity.
+  // cascade-bridge still watches .cascade-trigger — both can coexist.
+  return path.join(getSprangRoot(), '.cascade-trigger-session');
 }
 
 function getResponseFilePath(): string {
@@ -179,9 +181,16 @@ function attachSprangMiddlewares(server: ConnectServer) {
         const responsePath = getResponseFilePath();
         if (fs.existsSync(responsePath)) fs.unlinkSync(responsePath);
 
-        writeCascadeTrigger(message.trim());
+        const userMessage = message.trim();
+        // Wrap with mandatory instruction so Cascade always calls sprang_respond
+        const triggerMessage = `[SPRANG DASHBOARD MESSAGE — you MUST call the sprang_respond MCP tool with your answer when done, so it appears in the dashboard]
+
+Question: ${userMessage}
+
+After answering, call sprang_respond with: { "response": "<your answer>", "question": "${userMessage.replace(/"/g, '\\"')}" }`;
+        writeCascadeTrigger(triggerMessage);
         res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, sent: message.trim() }));
+        res.end(JSON.stringify({ ok: true, sent: userMessage }));
       } catch {
         res.statusCode = 400;
         res.end(JSON.stringify({ error: 'Invalid JSON body' }));
