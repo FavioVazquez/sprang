@@ -17,7 +17,7 @@
   <a href="#manual-installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-8_tools-7C3AED?style=flat-square" alt="8 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-277_passing-10B981?style=flat-square" alt="277 unit tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-261_passing-10B981?style=flat-square" alt="261 unit tests passing"/>
   <img src="https://img.shields.io/badge/e2e_tests-15_passing-10B981?style=flat-square" alt="15 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
@@ -109,9 +109,22 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
    The dashboard will be available at http://localhost:7777
    It reads PROJECT_DIR/.sprang/knowledge-graph.json automatically.
 
-8. Report a summary of what was installed and where. Then tell me:
+8. Install the cascade-messaging VS Code extension (enables persistent dashboard chat).
+   Check if already installed first, then install only if missing:
+   if ! code --list-extensions 2>/dev/null | grep -q cascade-messaging && \
+      ! windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging; then
+     # Try windsurf CLI first, then fall back to code CLI
+     windsurf --install-extension ~/tools/sprang/cascade-messaging-0.1.0.vsix 2>/dev/null || \
+     code --install-extension ~/tools/sprang/cascade-messaging-0.1.0.vsix 2>/dev/null || \
+     echo "Could not auto-install — open Windsurf → Extensions → Install from VSIX → ~/tools/sprang/cascade-messaging-0.1.0.vsix"
+   else
+     echo "cascade-messaging already installed — skipping"
+   fi
+
+9. Report a summary of what was installed and where. Then tell me:
    "Please reload Windsurf now (Cmd/Ctrl+Shift+P → Reload Window) so the
-   MCP server activates. Dashboard is live at http://localhost:7777.
+   MCP server and cascade-messaging extension activate.
+   Dashboard is live at http://localhost:7777.
    Once reloaded, type /sprang-onboard to begin."
 ```
 
@@ -128,6 +141,7 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 - [Manual installation](#manual-installation)
 - [CLI usage](#cli-usage)
 - [Setup with Windsurf / Cascade](#setup-with-windsurf--cascade)
+- [Dashboard chat (cascade-messaging)](#dashboard-chat-cascade-messaging)
 - [Setup with Devin Desktop](#setup-with-devin-desktop)
 - [Slash commands](#slash-commands)
 - [Two-phase pipeline](#two-phase-pipeline)
@@ -359,9 +373,21 @@ SPRANG_ROOT="$(pwd)" pnpm --filter @sprang/dashboard preview
 
 Open **http://localhost:7777**. It reads `.sprang/knowledge-graph.json` directly from your project.
 
-### Step 5 — Reload Windsurf and run onboarding
+### Step 5 — Install the cascade-messaging extension
 
-Reload the window (`Cmd/Ctrl+Shift+P` → *Reload Window*) to activate the MCP server, then:
+This enables persistent chat from the Sprang dashboard — messages keep their context across Cascade sessions.
+
+```bash
+# Check if already installed
+windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging && echo "already installed" || \
+  windsurf --install-extension /path/to/sprang/cascade-messaging-0.1.0.vsix
+```
+
+Or manually: **Extensions** → **Install from VSIX** → select `cascade-messaging-0.1.0.vsix` from the Sprang root.
+
+### Step 6 — Reload Windsurf and run onboarding
+
+Reload the window (`Cmd/Ctrl+Shift+P` → *Reload Window*) to activate the MCP server and extension, then:
 
 ```
 /sprang-onboard
@@ -376,6 +402,48 @@ Once the MCP server is active and `.devin/rules/` files are present, Cascade wil
 - **After changes** — call `sprang_diff_impact` to assess blast radius
 
 Driven by `.devin/rules/sprang-context.md` (always-on) and `.devin/rules/sprang-highrisk.md` (glob trigger on `*.ts`, `*.tsx`, `packages/*/src`).
+
+---
+
+## Dashboard chat (cascade-messaging)
+
+The **cascade-messaging** extension bridges the Sprang dashboard's **Ask Cascade** panel to Windsurf, maintaining conversation context across sessions even though each message technically opens a new Cascade tab.
+
+### How it works
+
+1. You type a message in the dashboard's Ask Cascade panel and press Send
+2. The dashboard writes the message to `.cascade-trigger-session` in the workspace root
+3. The extension detects the file change and forwards the message to Cascade via `devin.sendChatActionMessage`
+4. Cascade loads `.devin/rules/cascade-messaging.md` (`always_on`) — which tells it to:
+   - Read `.cascade-conversation.md` to restore prior conversation history
+   - Answer the message in context
+   - Call `sprang_respond` so the reply appears in the dashboard UI
+5. The extension polls `~/.windsurf/transcripts/` for the new session transcript, extracts the exchange, and appends it to `.cascade-conversation.md`
+6. Next message: Cascade reads the updated history — full continuity restored
+
+### Installation
+
+```bash
+# From the Sprang root directory
+windsurf --install-extension cascade-messaging-0.1.0.vsix
+# Or: Extensions → Install from VSIX → cascade-messaging-0.1.0.vsix
+```
+
+The extension activates automatically on startup. A status bar item `$(broadcast) Cascade Messaging: watching` confirms it is running.
+
+### Configuration
+
+| Setting | Default | Description |
+|---|---|---|
+| `cascade-messaging.triggerFile` | `.cascade-trigger-session` | Trigger file path relative to workspace root |
+| `cascade-messaging.autoStart` | `true` | Start watcher automatically on activation |
+
+### Runtime files (all gitignored)
+
+| File | Purpose |
+|---|---|
+| `.cascade-trigger-session` | Written by dashboard, read by extension |
+| `.cascade-conversation.md` | Append-only conversation log — gives every new session its memory |
 
 ---
 
