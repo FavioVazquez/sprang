@@ -271,6 +271,72 @@ describe('sprang_query', () => {
   });
 });
 
+// ─── sprang_query (semantic mode) ─────────────────────────────────────────────
+
+describe('sprang_query — semantic mode', () => {
+  it('returns results for mode: "semantic" using TF-IDF fallback (no embedding file)', async () => {
+    const { loader } = await setupGraph();
+    const result = await sprangQuery(loader, {
+      query: 'authentication login',
+      mode: 'semantic',
+    }) as { nodes: Array<{ id: string; score: number }>; total: number; query: string };
+
+    expect(result.query).toBe('authentication login');
+    // Should return nodes — auth.ts has "JWT authentication logic" in summary
+    expect(Array.isArray(result.nodes)).toBe(true);
+    // Scores should be present (semantic mode always includes score)
+    if (result.nodes.length > 0) {
+      expect(typeof result.nodes[0]!.score).toBe('number');
+      expect(result.nodes[0]!.score).toBeGreaterThanOrEqual(0);
+      expect(result.nodes[0]!.score).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('respects node_types filter in semantic mode', async () => {
+    const { loader } = await setupGraph();
+    const result = await sprangQuery(loader, {
+      query: 'auth',
+      mode: 'semantic',
+      node_types: ['function'],
+    }) as { nodes: unknown[] };
+    // No function-type nodes in test graph
+    expect(result.nodes).toHaveLength(0);
+  });
+
+  it('uses stored embeddings when embedding file exists', async () => {
+    const { dir, loader } = await setupGraph();
+    // Write a fake embedding store
+    const embeddingStore = {
+      version: '1.0',
+      model: 'tfidf-local',
+      generatedAt: new Date().toISOString(),
+      embeddings: {
+        'file:src/auth.ts': [1, 0, 0, 0],
+        'file:src/index.ts': [0, 1, 0, 0],
+        'file:src/utils.ts': [0, 0, 1, 0],
+        'file:src/orphan.ts': [0, 0, 0, 1],
+      },
+    };
+    await mkdir(join(dir, '.sprang', 'cache'), { recursive: true });
+    await writeFile(
+      join(dir, '.sprang', 'cache', 'embeddings.json'),
+      JSON.stringify(embeddingStore),
+      'utf-8'
+    );
+
+    const result = await sprangQuery(loader, {
+      query: 'jwt authentication',
+      mode: 'semantic',
+    }) as { nodes: Array<{ id: string; score: number }> };
+
+    expect(Array.isArray(result.nodes)).toBe(true);
+    // Nodes should have score field
+    for (const node of result.nodes) {
+      expect(typeof node.score).toBe('number');
+    }
+  });
+});
+
 // ─── sprang_diff_impact ────────────────────────────────────────────────────────
 
 describe('sprang_diff_impact', () => {

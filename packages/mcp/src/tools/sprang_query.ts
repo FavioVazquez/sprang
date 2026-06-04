@@ -1,9 +1,18 @@
+import { join } from 'node:path';
+import { readJsonFileOrNull, semanticSearch } from '@sprang/core';
 import type { GraphLoader } from '../graph-loader.js';
+import type { EmbeddingStore } from '@sprang/core';
 
 export interface SprangQueryInput {
   query: string;
   node_types?: string[];
   limit?: number;
+  /**
+   * mode?: "text" | "semantic"
+   *   text (default) for keyword matching,
+   *   semantic for concept similarity (uses embeddings if available, TF-IDF fallback otherwise)
+   */
+  mode?: 'text' | 'semantic';
 }
 
 export interface SprangQueryResult {
@@ -13,6 +22,7 @@ export interface SprangQueryResult {
     label: string;
     summary?: string;
     risk_score?: number;
+    score?: number; // cosine similarity score (semantic mode only)
   }>;
   total: number;
   query: string;
@@ -29,7 +39,44 @@ export async function sprangQuery(
 
   const rawLimit = typeof input.limit === 'number' ? input.limit : 10;
   const limit = Math.max(1, Math.min(rawLimit, 500));
-  const { query, node_types } = input;
+  const { query, node_types, mode } = input;
+
+  if (mode === 'semantic') {
+    // ── Semantic mode ────────────────────────────────────────────────────────
+    const sprangRoot = loader.getRoot();
+    const embeddingStorePath = join(sprangRoot, '.sprang', 'cache', 'embeddings.json');
+    const embeddingStore = await readJsonFileOrNull<EmbeddingStore>(embeddingStorePath);
+
+    const candidates = node_types && node_types.length > 0
+      ? graph.nodes.filter((n) => node_types.includes(n.type))
+      : graph.nodes;
+
+    const searchResults = semanticSearch(
+      query,
+      candidates,
+      embeddingStore?.embeddings ?? null,
+      { limit, threshold: 0.25 }
+    );
+
+    // Build a lookup map for node data
+    const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
+
+    const nodes = searchResults.map((r) => {
+      const node = nodeMap.get(r.nodeId);
+      return {
+        id: r.nodeId,
+        type: node?.type ?? 'unknown',
+        label: node?.label ?? r.nodeId,
+        summary: node?.summary,
+        risk_score: node?.risk_score,
+        score: r.score,
+      };
+    });
+
+    return { nodes, total: searchResults.length, query };
+  }
+
+  // ── Text mode (default) ───────────────────────────────────────────────────
   const lowerQuery = query.toLowerCase();
 
   type ScoredNode = {

@@ -7,3 +7,5 @@ export * from './llm/client.js';
 export * from './agents/base.js';
 export * from './orchestrator/runner.js';
 export * from './watcher/watcher.js';
+export * from './utils/fs.js';
+export * from './utils/embedding-search.js';
