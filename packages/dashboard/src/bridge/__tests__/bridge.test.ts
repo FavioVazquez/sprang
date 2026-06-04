@@ -284,22 +284,23 @@ describe('askCopilot', () => {
     if (result.ok) expect(result.response).toBe('auth.ts manages tokens');
   });
 
-  it('uses --continue when prior session exists', () => {
+  it('uses --resume=<id> when prior session exists', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.sprang', 'copilot-session.json'),
-      JSON.stringify({ has_session: true, created_at: new Date().toISOString() }),
+      JSON.stringify({ session_id: 'prev-copilot-sess', created_at: new Date().toISOString() }),
     );
     stubSpawnSync({ status: 0, stdout: 'response' });
     askCopilot('question', tmpDir);
     const args = (mockSpawnSync.mock.calls[0] as unknown as [string, string[]])[1];
-    expect(args).toContain('--continue');
+    expect(args.some((a: string) => a.startsWith('--resume='))).toBe(true);
+    expect(args.some((a: string) => a.includes('prev-copilot-sess'))).toBe(true);
   });
 
-  it('does not use --continue on first session', () => {
+  it('does not use --resume on first session', () => {
     stubSpawnSync({ status: 0, stdout: 'response' });
     askCopilot('question', tmpDir);
     const args = (mockSpawnSync.mock.calls[0] as unknown as [string, string[]])[1];
-    expect(args).not.toContain('--continue');
+    expect(args.some((a: string) => a.startsWith('--resume='))).toBe(false);
   });
 
   it('clearCopilotSession removes session file', () => {

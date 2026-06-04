@@ -81,7 +81,6 @@ Question: ${question}`;
     '-p', prompt,
     '--output-format', 'json',
     '--allowedTools', ALLOWED_MCP_TOOLS,
-    '--no-interactive',
   ];
 
   if (sessionId) {
