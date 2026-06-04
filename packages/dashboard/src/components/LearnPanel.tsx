@@ -66,7 +66,8 @@ export function LearnPanel() {
             <BookOpen className="w-8 h-8 mx-auto text-surface-700" />
             <p className="text-sm font-medium text-surface-400">No tour available</p>
             <p className="text-xs text-surface-600 leading-relaxed">
-              Run <code className="text-sprang-400 bg-surface-800 px-1 rounded">/sprang</code> in Cascade to generate a guided tour for this codebase.
+              Run <code className="text-sprang-400 bg-surface-800 px-1 rounded">/sprang-analyze</code> in Cascade to build the guided tour.
+              If a graph already exists, use <code className="text-sprang-400 bg-surface-800 px-1 rounded">/sprang-analyze --full</code> to force a full rebuild including tour generation.
             </p>
           </div>
         </div>
