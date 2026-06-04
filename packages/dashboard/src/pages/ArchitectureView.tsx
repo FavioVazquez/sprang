@@ -9,7 +9,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Layers, Terminal } from 'lucide-react';
+import { Layers, Terminal, X, AlertTriangle, File } from 'lucide-react';
 import { useDashboardStore } from '../store';
 import LayerCardNode, { LAYER_COLORS, type LayerCardNodeData } from '../components/LayerCardNode';
 import { aggregateLayerEdges } from '../utils/edge-aggregation';
@@ -145,10 +145,132 @@ function LoadingLayout() {
   );
 }
 
+// ─── Layer detail panel ──────────────────────────────────────────────────────
+
+function getRiskColor(score: number): string {
+  if (score >= 0.7) return 'text-rose-400';
+  if (score >= 0.4) return 'text-amber-400';
+  return 'text-emerald-400';
+}
+
+interface LayerPanelProps {
+  graph: KnowledgeGraph;
+  layerId: string;
+  colorIndex: number;
+  onClose: () => void;
+}
+
+function LayerPanel({ graph, layerId, colorIndex, onClose }: LayerPanelProps) {
+  const layer = graph.layers.find((l) => l.id === layerId);
+  if (!layer) return null;
+
+  const color = LAYER_COLORS[colorIndex % LAYER_COLORS.length];
+  const layerNodes = graph.nodes
+    .filter((n) => layer.node_ids.includes(n.id))
+    .sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0));
+
+  return (
+    <div
+      className="flex flex-col w-72 shrink-0 border-l border-surface-800 bg-surface-900 overflow-hidden"
+      data-testid="layer-panel"
+    >
+      {/* Panel header */}
+      <div
+        className="flex items-center justify-between px-4 py-3 border-b border-surface-800"
+        style={{ borderLeftColor: color, borderLeftWidth: 3 }}
+      >
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color }}>
+            Layer
+          </p>
+          <h3 className="text-sm font-semibold text-surface-100 truncate">{layer.name}</h3>
+          {layer.description && (
+            <p className="text-[11px] text-surface-500 mt-0.5 leading-snug line-clamp-2">
+              {layer.description}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="ml-2 shrink-0 p-1 rounded hover:bg-surface-800 text-surface-500 hover:text-surface-300 transition-colors"
+          aria-label="Close panel"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Stats row */}
+      <div className="flex gap-4 px-4 py-2 border-b border-surface-800 bg-surface-950/40">
+        <div className="text-center">
+          <p className="text-[18px] font-bold text-surface-100">{layerNodes.length}</p>
+          <p className="text-[10px] text-surface-500 uppercase tracking-wide">files</p>
+        </div>
+        <div className="text-center">
+          <p className="text-[18px] font-bold text-rose-400">
+            {layerNodes.filter((n) => (n.risk_score ?? 0) >= 0.7).length}
+          </p>
+          <p className="text-[10px] text-surface-500 uppercase tracking-wide">high risk</p>
+        </div>
+        <div className="text-center">
+          <p className="text-[18px] font-bold text-surface-100">
+            {layerNodes.filter((n) => n.structural_warnings && n.structural_warnings.length > 0).length}
+          </p>
+          <p className="text-[10px] text-surface-500 uppercase tracking-wide">smells</p>
+        </div>
+      </div>
+
+      {/* Node list */}
+      <div className="flex-1 overflow-y-auto">
+        {layerNodes.length === 0 ? (
+          <p className="px-4 py-6 text-xs text-surface-600 text-center">No files in this layer</p>
+        ) : (
+          <ul className="divide-y divide-surface-800/60">
+            {layerNodes.map((node) => {
+              const risk = node.risk_score ?? 0;
+              const hasSmells = node.structural_warnings && node.structural_warnings.length > 0;
+              const label = node.label ?? node.id;
+              const shortLabel = label.includes('/') ? label.split('/').pop()! : label;
+              return (
+                <li
+                  key={node.id}
+                  className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-surface-800/40 transition-colors"
+                >
+                  <File className="w-3.5 h-3.5 mt-0.5 shrink-0 text-surface-600" />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-[12px] font-medium text-surface-200 truncate"
+                      title={label}
+                    >
+                      {shortLabel}
+                    </p>
+                    {node.summary && (
+                      <p className="text-[11px] text-surface-500 line-clamp-1 leading-snug">
+                        {node.summary}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {hasSmells && (
+                      <AlertTriangle className="w-3 h-3 text-amber-500" />
+                    )}
+                    <span className={`text-[11px] font-semibold tabular-nums ${getRiskColor(risk)}`}>
+                      {risk.toFixed(2)}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function ArchitectureView() {
-  const { graph, filters, setFilters } = useDashboardStore();
+  const { graph, setFilters } = useDashboardStore();
   const [positions, setPositions] = useState<Map<string, { x: number; y: number }> | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
 
@@ -216,6 +338,9 @@ export function ArchitectureView() {
 
   const crossLayerCount = aggregateLayerEdges(graph).length;
 
+  const selectedLayer = graph.layers.find((l) => l.id === selectedLayerId);
+  const selectedColorIndex = selectedLayer ? graph.layers.indexOf(selectedLayer) : 0;
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-surface-950">
       {/* Info bar */}
@@ -249,38 +374,54 @@ export function ArchitectureView() {
         )}
       </div>
 
-      {/* Canvas or loading */}
-      {positions === null ? (
-        <LoadingLayout />
-      ) : (
-        <div className="flex-1 min-h-0">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={NODE_TYPES}
-            onNodeClick={handleNodeClick}
-            fitView
-            fitViewOptions={{ padding: 0.15 }}
-            colorMode="dark"
-            proOptions={{ hideAttribution: true }}
-            style={{ background: '#09090b' }}
-          >
-            <Background color="#27272a" gap={24} size={1} />
-            <Controls
-              style={{
-                background: '#18181b',
-                border: '1px solid #3f3f46',
-                color: '#a1a1aa',
-              }}
-            />
-            <MiniMap
-              style={{ background: '#18181b', border: '1px solid #3f3f46' }}
-              nodeColor="#3f3f46"
-              maskColor="rgba(0,0,0,0.7)"
-            />
-          </ReactFlow>
-        </div>
-      )}
+      {/* Canvas + optional detail panel */}
+      <div className="flex-1 flex min-h-0">
+        {/* Canvas or loading */}
+        {positions === null ? (
+          <LoadingLayout />
+        ) : (
+          <div className="flex-1 min-h-0">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={NODE_TYPES}
+              onNodeClick={handleNodeClick}
+              fitView
+              fitViewOptions={{ padding: 0.15 }}
+              colorMode="dark"
+              proOptions={{ hideAttribution: true }}
+              style={{ background: '#09090b' }}
+            >
+              <Background color="#27272a" gap={24} size={1} />
+              <Controls
+                style={{
+                  background: '#18181b',
+                  border: '1px solid #3f3f46',
+                  color: '#a1a1aa',
+                }}
+              />
+              <MiniMap
+                style={{ background: '#18181b', border: '1px solid #3f3f46' }}
+                nodeColor="#3f3f46"
+                maskColor="rgba(0,0,0,0.7)"
+              />
+            </ReactFlow>
+          </div>
+        )}
+
+        {/* Layer detail panel */}
+        {selectedLayerId && (
+          <LayerPanel
+            graph={graph}
+            layerId={selectedLayerId}
+            colorIndex={selectedColorIndex}
+            onClose={() => {
+              setSelectedLayerId(null);
+              setFilters({ layerIds: new Set<string>() });
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }
