@@ -3,7 +3,6 @@
   <img src="assets/banner.png" alt="Sprang — The qualitative leap in codebase comprehension" width="100%" />
 </p>
 
-<!-- Logo + tagline -->
 <p align="center">
   <img src="assets/logo.png" alt="Sprang logo" height="80" />
 </p>
@@ -14,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="#installer-script"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
+  <a href="#installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
   <img src="https://img.shields.io/badge/unit_tests-508_passing-10B981?style=flat-square" alt="508 unit tests passing"/>
@@ -25,9 +24,9 @@
 
 ---
 
-Sprang is a knowledge graph platform for [Windsurf](https://windsurf.com) (Cascade), [Devin Desktop](https://devin.ai), [Claude Code](https://claude.ai/code), and [GitHub Copilot](https://github.com/features/copilot) that creates **total codebase comprehension** — not just symbol search, but *why* code exists, *who* changed it, *what* it risks, and *how* it all fits together.
+Sprang is a knowledge graph platform for [Windsurf](https://windsurf.com) (Cascade / Devin Desktop), [Claude Code](https://claude.ai/code), and [GitHub Copilot](https://github.com/features/copilot) that creates **total codebase comprehension** — not just symbol search, but *why* code exists, *who* changed it, *what* it risks, and *how* it all fits together.
 
-Cascade is the intelligence layer. Sprang is the data layer. Together they answer **"what will break if I change this file?"** in a single tool call.
+Your AI agent is the intelligence layer. Sprang is the data layer. Together they answer **"what will break if I change this file?"** in a single tool call.
 
 > *"The System knows everything about being, but nothing about existence."*  
 > Kierkegaard's critique of Hegel applies equally to symbol indexers and grep tools.  
@@ -35,82 +34,72 @@ Cascade is the intelligence layer. Sprang is the data layer. Together they answe
 
 ---
 
-## Quick start
+## Installation
 
-> **Note:** Devin Desktop and Windsurf are the same product — Windsurf AI was rebranded as Devin Desktop. Both names appear throughout this README; all instructions, skills, and workflows are identical for both.
+> **Note:** Windsurf AI and Devin Desktop are the same product — Windsurf was rebranded as Devin Desktop. All instructions, skills, and workflows are identical for both. Both names appear in this README.
 
-### Plugin install — Claude Code and GitHub Copilot
+### Claude Code
 
-Sprang ships with plugin manifests for direct discovery and installation:
-
-**Claude Code**
+This repo ships fully configured for Claude Code. Clone it and build once:
 
 ```bash
-# Install from GitHub via the Claude Code plugin system
-claude plugin install github:FavioVazquez/sprang
-
-# Or: open this repo in Claude Code — it auto-discovers .claude-plugin/plugin.json
-# and .mcp.json, activating the MCP server and all 11 slash commands immediately.
+git clone https://github.com/FavioVazquez/sprang.git
+cd sprang
+pnpm install && pnpm build
 ```
 
-The `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` files enable Claude Code marketplace listing. Once the MCP server is built (`pnpm build`), all 9 tools and 11 slash commands are live with zero additional configuration.
+Claude Code auto-discovers everything on project open:
 
-**GitHub Copilot**
-
-```bash
-# Build the MCP server, then switch Copilot to Agent mode — it auto-discovers .vscode/mcp.json
-pnpm build
-
-# The .copilot-plugin/plugin.json registers Sprang's skills and agents paths
-# for plugin ecosystem discovery when Sprang is listed in the VS Code marketplace
-```
-
-### All platforms
-
-| Platform | Fastest path |
+| File | What activates |
 |---|---|
-| **Claude Code** | Plugin install above, or open repo — [zero setup](#setup-with-claude-code) |
-| **GitHub Copilot** | `pnpm build` + Agent mode — [auto-connects via .vscode/mcp.json](#setup-with-github-copilot) |
-| **Windsurf / Devin Desktop** | [Paste one agentic prompt](#agentic-install--windsurf--devin-desktop) — handles everything |
+| `.mcp.json` | MCP server starts automatically — all 9 tools available immediately |
+| `.claude-plugin/plugin.json` | Plugin discovery metadata for the Claude Code marketplace |
+| `.claude-plugin/marketplace.json` | Marketplace listing — enables one-click install once published |
+| `.claude/commands/` | 11 slash commands wired in |
+| `.claude/hooks/` | Session-start warning + post-commit auto-refresh |
 
-### Installer script
+After opening the project in Claude Code:
 
-The fastest manual path for all platforms:
-
-```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.sh | bash -s windsurf
-# Platform options:  windsurf  |  copilot  |  claude
+```
+/sprang           # build the knowledge graph (first time)
+/sprang-onboard   # guided architecture tour
 ```
 
-```powershell
-# Windows (PowerShell)
-irm https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.ps1 | iex
-# Platform options:  .\install.ps1 windsurf  |  .\install.ps1 copilot  |  .\install.ps1 claude
-```
-
-```bash
-# If you already have the repo cloned:
-./install.sh windsurf     # Devin Desktop / Windsurf — symlinks 11 skills into ~/.windsurf/skills/
-./install.sh copilot      # GitHub Copilot — symlinks 11 skills into ~/.copilot/skills/
-./install.sh claude       # Claude Code — prints per-project setup guide
-./install.sh --update     # pull latest + rebuild
-./install.sh --uninstall windsurf
-```
-
-| Platform | Skills target | Description |
-|---|---|---|
-| `windsurf` | `~/.windsurf/skills/` | Devin Desktop and Windsurf AI |
-| `copilot` | `~/.copilot/skills/` | GitHub Copilot VS Code extension |
-| `claude` | project-local | Claude Code (per-project via `.mcp.json` + plugin manifest) |
+Once Sprang is listed in the Claude Code marketplace, users will be able to install it directly from the **Extensions** panel without cloning manually.
 
 ---
 
-## Agentic install — Windsurf / Devin Desktop
+### GitHub Copilot
 
-> Windsurf AI and Devin Desktop are the same product. The prompt below works in both — paste it into Cascade (Windsurf) or Devin's chat interface.
+Clone and build:
 
-Paste this prompt into your agent. It clones, builds, wires up the MCP server, copies slash commands and rules, runs the first scan, and starts the dashboard. Reload the window once when it finishes and you're live.
+```bash
+git clone https://github.com/FavioVazquez/sprang.git
+cd sprang
+pnpm install && pnpm build
+```
+
+Then in VS Code:
+
+1. Open the project with the GitHub Copilot extension active
+2. Switch Copilot to **Agent mode** (the model selector in the chat panel)
+3. The `sprang` MCP server connects automatically via `.vscode/mcp.json`
+
+| File | What activates |
+|---|---|
+| `.vscode/mcp.json` | MCP server in Copilot's servers format — auto-connects in Agent mode |
+| `.github/copilot-instructions.md` | Pre-edit checklist auto-loaded by Copilot |
+| `.copilot-plugin/plugin.json` | Plugin discovery metadata with `skills`/`agents` paths |
+
+The `.copilot-plugin/plugin.json` registers Sprang for the VS Code marketplace. Once listed, one-click install will be available without cloning.
+
+> MCP tools only work in Copilot **Agent mode** — not the default ask/edit modes.
+
+---
+
+### Windsurf / Devin Desktop — agentic install
+
+Paste this prompt into Cascade or Devin. It handles everything: clones, builds, wires up the MCP server, copies slash commands, skills, and rules, runs the first scan, and starts the dashboard.
 
 ```
 Please install the Sprang knowledge graph platform for this project.
@@ -155,7 +144,7 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 
 5. Copy rules, workflows, and skills into the current project:
 
-   Rules — tell Cascade to use Sprang automatically before/after every edit:
+   Rules — tell Cascade/Devin to use Sprang automatically before/after every edit:
      mkdir -p .devin/rules
      cp ~/tools/sprang/.devin/rules/sprang-context.md .devin/rules/
      cp ~/tools/sprang/.devin/rules/sprang-highrisk.md .devin/rules/
@@ -168,7 +157,7 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
      mkdir -p .windsurf/skills
      cp -r ~/tools/sprang/.windsurf/skills/sprang* .windsurf/skills/
 
-   Symlinks so Devin Desktop also finds them under .devin/:
+   Symlinks so both Windsurf and Devin find them:
      ln -sf ../.windsurf/workflows .devin/workflows
      ln -sf ../.windsurf/skills .devin/skills
 
@@ -176,48 +165,71 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
    sprang scan . --phase1-only
    (If `sprang` is not yet in PATH, use: node ~/tools/sprang/packages/cli/dist/index.js scan . --phase1-only)
 
-7. Start the dashboard (run in ~/tools/sprang, non-blocking).
-   Set SPRANG_ROOT so the dashboard finds the right knowledge-graph.json:
+7. Start the dashboard:
    SPRANG_ROOT="PROJECT_DIR" pnpm --filter @sprang/dashboard preview
-   The dashboard will be available at http://localhost:7777
-   It reads PROJECT_DIR/.sprang/knowledge-graph.json automatically.
+   Dashboard will be at http://localhost:7777
 
-8. Install the cascade-messaging VS Code extension (enables persistent dashboard chat).
-   Check if already installed first, then install only if missing:
-   if ! code --list-extensions 2>/dev/null | grep -q cascade-messaging && \
-      ! windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging; then
+8. Install the cascade-messaging VS Code extension (enables persistent dashboard chat):
+   if ! windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging; then
      windsurf --install-extension ~/tools/sprang/cascade-messaging-0.1.0.vsix 2>/dev/null || \
      code --install-extension ~/tools/sprang/cascade-messaging-0.1.0.vsix 2>/dev/null || \
-     echo "Could not auto-install — open Windsurf → Extensions → Install from VSIX → ~/tools/sprang/cascade-messaging-0.1.0.vsix"
-   else
-     echo "cascade-messaging already installed — skipping"
+     echo "Manual install: Extensions → Install from VSIX → ~/tools/sprang/cascade-messaging-0.1.0.vsix"
    fi
 
-9. Report a summary of what was installed and where. Then tell me:
-   "Please reload Windsurf now (Cmd/Ctrl+Shift+P → Reload Window) so the
-   MCP server and cascade-messaging extension activate.
+9. Report what was installed and where. Then tell me:
+   "Please reload the window now (Cmd/Ctrl+Shift+P → Reload Window) so the MCP server
+   and cascade-messaging extension activate.
    Dashboard is live at http://localhost:7777.
    Once reloaded, type /sprang-onboard to begin."
 ```
 
-> After Cascade / Devin finishes, **reload the window** (`Cmd/Ctrl+Shift+P` → *Reload Window*), then type `/sprang-onboard`. The dashboard is at **http://localhost:7777**.
+> After the agent finishes, **reload the window** (`Cmd/Ctrl+Shift+P` → *Reload Window*), then type `/sprang-onboard`. Dashboard is at **http://localhost:7777**.
+
+---
+
+### Installer script
+
+For scripted or manual setup on any platform:
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.sh | bash -s windsurf
+# Options:  windsurf  |  copilot  |  claude
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.ps1 | iex
+# Options:  .\install.ps1 windsurf  |  .\install.ps1 copilot  |  .\install.ps1 claude
+```
+
+```bash
+# If you already have the repo cloned:
+./install.sh windsurf     # symlinks 11 skills into ~/.windsurf/skills/
+./install.sh copilot      # symlinks 11 skills into ~/.copilot/skills/
+./install.sh claude       # prints per-project setup guide
+./install.sh --update     # pull latest + rebuild
+./install.sh --uninstall windsurf
+```
+
+| Flag | Skills target | Platform |
+|---|---|---|
+| `windsurf` | `~/.windsurf/skills/` | Windsurf AI / Devin Desktop |
+| `copilot` | `~/.copilot/skills/` | GitHub Copilot |
+| `claude` | project-local | Claude Code (via `.mcp.json` + plugin manifest) |
 
 ---
 
 ## Contents
 
-- [Quick start](#quick-start)
-- [Agentic install — Windsurf / Devin Desktop](#agentic-install--windsurf--devin-desktop)
+- [Installation](#installation)
 - [What Sprang does](#what-sprang-does)
 - [Platform architecture](#platform-architecture)
 - [Prerequisites](#prerequisites)
-- [Manual installation](#manual-installation)
+- [Manual build](#manual-build)
 - [CLI usage](#cli-usage)
-- [Setup with Windsurf / Cascade](#setup-with-windsurf--cascade)
+- [Windsurf / Devin Desktop — detailed setup](#windsurf--devin-desktop--detailed-setup)
 - [Dashboard chat (cascade-messaging)](#dashboard-chat-cascade-messaging)
-- [Setup with Devin Desktop](#setup-with-devin-desktop)
-- [Setup with Claude Code](#setup-with-claude-code)
-- [Setup with GitHub Copilot](#setup-with-github-copilot)
 - [Slash commands](#slash-commands)
 - [Two-phase pipeline](#two-phase-pipeline)
 - [The three differentiating agents](#the-three-differentiating-agents)
@@ -239,7 +251,7 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
   <em>Force-directed knowledge graph, risk heatmap, node detail panel with decision context, and guided tour player.</em>
 </p>
 
-Sprang gives Cascade a persistent memory of your codebase — not just file names and symbols, but the full context of *why* things exist, *who* changed them, *what* they risk, and *how* they connect.
+Sprang gives your AI agent a persistent memory of the codebase — not just file names and symbols, but the full context of *why* things exist, *who* changed them, *what* they risk, and *how* they connect.
 
 ### One-call answers
 
@@ -262,7 +274,7 @@ sprang_health {}
 → 8-step guided tour, persona-adaptive (junior / senior / PM)
 ```
 
-### What it brings to your AI agent
+### Capabilities
 
 | Capability | How |
 |---|---|
@@ -274,7 +286,7 @@ sprang_health {}
 | **Blast-radius diff** | `sprang_diff_impact` — BFS over the graph before any edit, risk-ranked |
 | **Team annotations** | `sprang_annotate` — write `.sprang/annotations/<id>.md`, committed to the repo |
 | **Knowledge graphs** | `/sprang-knowledge` — Obsidian / Logseq / Dendron / Foam / Zettelkasten / plain markdown |
-| **11 slash commands** | Full workflow coverage for Windsurf/Cascade, Devin Desktop, and Claude Code |
+| **11 slash commands** | Full workflow coverage for Windsurf/Devin Desktop and Claude Code |
 | **9 MCP tools** | Direct graph access — all agents read and write the graph via MCP |
 | **< 60s skeleton** | Phase 1 is fully static — runs anywhere, no network, no waiting |
 | **Architecture card view** | React Flow + ELK layer map — one card per layer, weighted cross-layer edges |
@@ -310,16 +322,13 @@ graph LR
     CORE --> FS
     MCP --> FS
 
-    CASCADE["Windsurf / Cascade"] -->|"MCP tools"| MCP
-    CASCADE -->|"slash commands"| CLI
+    CASCADE["Windsurf / Devin Desktop\n(mcp_config.json or .devin/config.json)"] -->|"MCP tools"| MCP
+    CASCADE -->|"slash commands / skills"| CLI
 
-    DEVIN["Devin Desktop"] -->|"MCP tools"| MCP
-    DEVIN -->|"slash commands / skills"| CLI
-
-    CLAUDE["Claude Code"] -->|"MCP tools (.mcp.json)"| MCP
+    CLAUDE["Claude Code\n(.mcp.json)"] -->|"MCP tools"| MCP
     CLAUDE -->|"slash commands (.claude/commands/)"| CLI
 
-    COPILOT["GitHub Copilot"] -->|"MCP tools (.vscode/mcp.json)"| MCP
+    COPILOT["GitHub Copilot\n(.vscode/mcp.json)"] -->|"MCP tools"| MCP
 ```
 
 ---
@@ -332,43 +341,30 @@ graph LR
 
 ---
 
-## Manual installation
+## Manual build
+
+If you've cloned the repo and want to build without using the installer:
 
 ```bash
-# 1. Clone (or pull latest if already cloned)
-if [ -d ~/tools/sprang ]; then
-  git -C ~/tools/sprang pull --ff-only
-else
-  git clone https://github.com/FavioVazquez/sprang.git ~/tools/sprang
-fi
-cd ~/tools/sprang
+cd ~/tools/sprang   # or wherever you cloned to
 
-# 2. Install all dependencies
-pnpm install
+pnpm install        # install all dependencies
+pnpm build          # build all packages
 
-# 3. Build all packages
-pnpm build
-
-# 4. Link CLI globally (so `sprang` works from anywhere)
-#    pnpm setup adds PNPM_HOME to your shell profile automatically
+# Link the CLI globally
 cd packages/cli
 pnpm setup
 export PNPM_HOME="$HOME/.local/share/pnpm"
 export PATH="$PNPM_HOME:$PATH"
 pnpm link --global
 cd ../..
-```
 
-```bash
-# Verify
-which sprang        # should print $PNPM_HOME/sprang
+which sprang        # verify: should print $PNPM_HOME/sprang
 sprang --version    # 0.2.0
-sprang --help
 ```
 
 ```bash
-# 5. Start the dashboard (serves the pre-built dist/ — instant, no compilation)
-#    Set SPRANG_ROOT to tell the dashboard which project's graph to load
+# Start the dashboard (serves pre-built dist/, instant startup)
 SPRANG_ROOT="/path/to/your/project" pnpm --filter @sprang/dashboard preview
 # Open http://localhost:7777
 ```
@@ -381,7 +377,7 @@ SPRANG_ROOT="/path/to/your/project" pnpm --filter @sprang/dashboard preview
 # Phase 1 — static analysis, < 60s, builds the skeleton graph
 sprang scan /path/to/your/project --phase1-only
 
-# Full scan — Phase 1 now + Phase 2 enrichment triggered by Cascade
+# Full scan — Phase 1 now + Phase 2 enrichment via your AI agent
 sprang scan /path/to/your/project
 
 # Skip scan if graph is already current (compares git HEAD vs stats.gitCommitHash)
@@ -396,11 +392,9 @@ sprang status
 # Print health report: smells, risk table, orphans, circular deps
 sprang health
 
-# Fuzzy-search nodes by name or summary
+# Search nodes by name or summary
 sprang query "authentication"
-
-# Semantic search — cosine similarity over TF-IDF embeddings
-sprang query "authentication" --semantic
+sprang query "authentication" --semantic   # cosine similarity over TF-IDF embeddings
 
 # Watch for file changes and incrementally update the graph
 sprang watch
@@ -420,21 +414,20 @@ your-project/
 
 ---
 
-## Setup with Windsurf / Cascade
+## Windsurf / Devin Desktop — detailed setup
 
-The fastest path is the [agentic install prompt](#agentic-install--windsurf--devin-desktop) at the top — paste it into Cascade and it handles everything. For manual setup:
+The fastest path is the [agentic install prompt](#installation) above. For manual step-by-step control:
 
-### Step 1 — Scan your project
+### 1 — Build and scan
 
 ```bash
-sprang scan . --phase1-only
+cd ~/tools/sprang && pnpm install && pnpm build
+sprang scan /path/to/your/project --phase1-only
 ```
 
-Produces `.sprang/knowledge-graph.json` in under 60 seconds — fully static, no network calls.
+### 2 — Add the MCP server
 
-### Step 2 — Add the MCP server
-
-Add to `~/.codeium/windsurf/mcp_config.json` (merge if the file already exists):
+For **Windsurf** — add to `~/.codeium/windsurf/mcp_config.json` (merge if the file exists):
 
 ```json
 {
@@ -448,108 +441,9 @@ Add to `~/.codeium/windsurf/mcp_config.json` (merge if the file already exists):
 }
 ```
 
-> Use full absolute paths. `${workspaceFolder}` is **not** resolved in `mcp_config.json`.
+> `${workspaceFolder}` is **not** resolved in this file — use full absolute paths.
 
-### Step 3 — Copy workflows, skills, and rules
-
-```bash
-mkdir -p .windsurf/workflows .windsurf/skills .devin/rules
-cp /path/to/sprang/.windsurf/workflows/*.md .windsurf/workflows/
-cp -r /path/to/sprang/.windsurf/skills/sprang* .windsurf/skills/
-cp /path/to/sprang/.devin/rules/*.md .devin/rules/
-ln -sf ../.windsurf/workflows .devin/workflows
-ln -sf ../.windsurf/skills .devin/skills
-```
-
-### Step 4 — Start the dashboard
-
-The dashboard serves the pre-built `dist/` — no compilation, instant startup:
-
-```bash
-SPRANG_ROOT="$(pwd)" pnpm --filter @sprang/dashboard preview
-```
-
-Open **http://localhost:7777**. It reads `.sprang/knowledge-graph.json` directly from your project.
-
-### Step 5 — Install the cascade-messaging extension
-
-This enables persistent chat from the Sprang dashboard — messages keep their context across Cascade sessions.
-
-```bash
-# Check if already installed
-windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging && echo "already installed" || \
-  windsurf --install-extension /path/to/sprang/cascade-messaging-0.1.0.vsix
-```
-
-Or manually: **Extensions** → **Install from VSIX** → select `cascade-messaging-0.1.0.vsix` from the Sprang root.
-
-### Step 6 — Reload Windsurf and run onboarding
-
-Reload the window (`Cmd/Ctrl+Shift+P` → *Reload Window*) to activate the MCP server and extension, then:
-
-```
-/sprang-onboard
-```
-
-### What Cascade does automatically
-
-Once the MCP server is active and `.devin/rules/` files are present, Cascade will automatically:
-
-- **Before editing any file** — call `sprang_node` to check `risk_score` and `structural_warnings`
-- **On high-risk files (risk > 0.7)** — call `sprang_why` to read decision context before changing anything
-- **After changes** — call `sprang_diff_impact` to assess blast radius
-
-Driven by `.devin/rules/sprang-context.md` (always-on) and `.devin/rules/sprang-highrisk.md` (glob trigger on `*.ts`, `*.tsx`, `packages/*/src`).
-
----
-
-## Dashboard chat (cascade-messaging)
-
-The **cascade-messaging** extension bridges the Sprang dashboard's **Ask Cascade** panel to Windsurf, maintaining conversation context across sessions even though each message technically opens a new Cascade tab.
-
-### How it works
-
-1. You type a message in the dashboard's Ask Cascade panel and press Send
-2. The dashboard writes the message to `.cascade-trigger-session` in the workspace root
-3. The extension detects the file change and forwards the message to Cascade via `devin.sendChatActionMessage`
-4. Cascade loads `.devin/rules/cascade-messaging.md` (`always_on`) — which tells it to:
-   - Read `.cascade-conversation.md` to restore prior conversation history
-   - Answer the message in context
-   - Call `sprang_respond` so the reply appears in the dashboard UI
-5. The extension polls `~/.windsurf/transcripts/` for the new session transcript, extracts the exchange, and appends it to `.cascade-conversation.md`
-6. Next message: Cascade reads the updated history — full continuity restored
-
-### Installation
-
-```bash
-# From the Sprang root directory
-windsurf --install-extension cascade-messaging-0.1.0.vsix
-# Or: Extensions → Install from VSIX → cascade-messaging-0.1.0.vsix
-```
-
-The extension activates automatically on startup. A status bar item `$(broadcast) Cascade Messaging: watching` confirms it is running.
-
-### Configuration
-
-| Setting | Default | Description |
-|---|---|---|
-| `cascade-messaging.triggerFile` | `.cascade-trigger-session` | Trigger file path relative to workspace root |
-| `cascade-messaging.autoStart` | `true` | Start watcher automatically on activation |
-
-### Runtime files (all gitignored)
-
-| File | Purpose |
-|---|---|
-| `.cascade-trigger-session` | Written by dashboard, read by extension |
-| `.cascade-conversation.md` | Append-only conversation log — gives every new session its memory |
-
----
-
-## Setup with Devin Desktop
-
-> Devin Desktop is the same product as Windsurf AI — they were the same company and have been merged. Both names refer to the same agent and the same MCP config format.
-
-The fastest path is the [agentic install prompt](#agentic-install--windsurf--devin-desktop) at the top. For manual setup, add to `.devin/config.json` in your project root (Devin Desktop resolves `${workspaceFolder}` automatically, unlike the global `mcp_config.json`):
+For **Devin Desktop** — add to `.devin/config.json` in your project root instead:
 
 ```json
 {
@@ -563,100 +457,100 @@ The fastest path is the [agentic install prompt](#agentic-install--windsurf--dev
 }
 ```
 
-> In `.devin/config.json`, `${workspaceFolder}` **is** resolved to the project root automatically.
+> In `.devin/config.json`, `${workspaceFolder}` **is** resolved automatically.
 
-Skills and workflows live in `.windsurf/skills/` and `.windsurf/workflows/`, symlinked to `.devin/skills/` and `.devin/workflows/` so both Cascade and Devin agents discover them automatically.
-
-Then scan and start the dashboard:
+### 3 — Copy workflows, skills, and rules
 
 ```bash
-sprang scan . --phase1-only
+mkdir -p .windsurf/workflows .windsurf/skills .devin/rules
+cp /path/to/sprang/.windsurf/workflows/*.md .windsurf/workflows/
+cp -r /path/to/sprang/.windsurf/skills/sprang* .windsurf/skills/
+cp /path/to/sprang/.devin/rules/*.md .devin/rules/
+ln -sf ../.windsurf/workflows .devin/workflows
+ln -sf ../.windsurf/skills .devin/skills
+```
+
+### 4 — Start the dashboard
+
+```bash
 SPRANG_ROOT="$(pwd)" pnpm --filter @sprang/dashboard preview
-# Open http://localhost:7777
+# Opens at http://localhost:7777
 ```
 
----
+### 5 — Install the cascade-messaging extension
 
-## Setup with Claude Code
-
-Claude Code picks up Sprang automatically when this repo is opened — no installation step needed.
-
-**What's pre-configured in this repo:**
-
-| File | Purpose |
-|---|---|
-| `CLAUDE.md` | Comprehensive Claude Code integration guide — MCP tools, rules, commands, workflows |
-| `AGENTS.md` | Platform-agnostic command reference — imported by `CLAUDE.md` |
-| `.mcp.json` | MCP server config — Claude Code auto-starts `packages/mcp/dist/server.js` |
-| `.claude/rules/sprang-context.md` | Always-on rule: use MCP tools before editing any file |
-| `.claude/rules/sprang-highrisk.md` | Glob rule: blast radius check when editing source files |
-| `.claude/commands/` | 11 slash commands (same as Cascade workflows) |
-| `.claude/settings.json` | Pre-approved permissions + native event hooks |
-| `.claude/hooks/session-start.sh` | Injects stale/missing graph warning into Claude's context on every session open |
-| `.claude/hooks/post-tool-use.sh` | Detects `git commit/merge/rebase` → triggers incremental graph refresh in background |
-| `.claude-plugin/plugin.json` | Claude Code plugin discovery metadata |
-| `.claude-plugin/marketplace.json` | Plugin marketplace listing |
-
-**First use:**
+Enables persistent chat from the Sprang dashboard with context across Cascade sessions.
 
 ```bash
-# Build the MCP server (once per clone)
-pnpm build
-
-# Then in Claude Code chat:
-/sprang          # Build or refresh the knowledge graph
-/sprang-onboard  # Guided tour adapted to your experience level
+windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging && echo "already installed" || \
+  windsurf --install-extension /path/to/sprang/cascade-messaging-0.1.0.vsix
 ```
 
-**Native hooks (no installation needed):**
+Or: **Extensions** → **Install from VSIX** → `cascade-messaging-0.1.0.vsix`.
 
-The two hooks in `.claude/hooks/` run automatically inside Claude Code via `.claude/settings.json`:
+### 6 — Reload and run onboarding
 
-- **`session-start.sh`** — runs on every session open. If the graph is missing, Claude sees `[sprang] No knowledge graph found — run /sprang to build one`. If the graph is stale vs `HEAD`, Claude sees the indexed hash and current hash so it knows how far behind it is.
-- **`post-tool-use.sh`** — fires after every Bash tool call. Detects `git commit`, `git merge`, `git cherry-pick`, or `git rebase` and silently refreshes the graph in the background via `--if-stale`. Never blocks Claude Code.
+Reload (`Cmd/Ctrl+Shift+P` → *Reload Window*) to activate the MCP server, then:
 
-To disable either hook, remove its entry from `"hooks"` in `.claude/settings.json`.
+```
+/sprang-onboard
+```
 
-The MCP server starts automatically when Claude Code opens the workspace. All 9 MCP tools are available immediately.
+### What the agent does automatically
+
+With `.devin/rules/` files present, your agent will:
+
+- **Before editing any file** — call `sprang_node` to check `risk_score` and `structural_warnings`
+- **On high-risk files (risk > 0.7)** — call `sprang_why` to read decision context first
+- **After changes** — call `sprang_diff_impact` to assess blast radius
+
+Driven by `sprang-context.md` (always-on) and `sprang-highrisk.md` (glob: `*.ts`, `*.tsx`, `packages/*/src`).
 
 ---
 
-## Setup with GitHub Copilot
+## Dashboard chat (cascade-messaging)
 
-**What's pre-configured in this repo:**
+The **cascade-messaging** extension bridges the Sprang dashboard's **Ask Cascade** panel to Windsurf / Devin Desktop, maintaining conversation context across sessions.
+
+### How it works
+
+1. You type a message in the dashboard Ask Cascade panel
+2. The dashboard writes it to `.cascade-trigger-session` in the workspace root
+3. The extension forwards it to Cascade via `devin.sendChatActionMessage`
+4. Cascade reads `.cascade-conversation.md` to restore prior context, answers, then calls `sprang_respond` to display the reply in the dashboard UI
+5. The extension appends the exchange to `.cascade-conversation.md` — full continuity for the next message
+
+### Configuration
+
+| Setting | Default | Description |
+|---|---|---|
+| `cascade-messaging.triggerFile` | `.cascade-trigger-session` | Trigger file path relative to workspace root |
+| `cascade-messaging.autoStart` | `true` | Start watcher automatically on activation |
+
+### Runtime files (gitignored)
 
 | File | Purpose |
 |---|---|
-| `.vscode/mcp.json` | MCP server in Copilot's `"servers"` format |
-| `.github/copilot-instructions.md` | Pre-edit checklist + tool reference — auto-loaded by Copilot |
-| `.copilot-plugin/plugin.json` | Copilot plugin discovery metadata with `skills`/`agents` paths |
-
-**Activation:**
-
-1. Build the MCP server: `pnpm build`
-2. Open VS Code with the GitHub Copilot extension
-3. Switch Copilot to **Agent mode** (the model selector dropdown in the chat panel)
-4. The `sprang` MCP server connects automatically
-
-In agent mode, Copilot can call all 9 MCP tools. The `.github/copilot-instructions.md` tells it to call `sprang_node` before editing any file and `sprang_diff_impact` after changes.
-
-> **Note:** MCP tools only work in Copilot **agent mode**, not the default ask/edit modes.
+| `.cascade-trigger-session` | Written by dashboard, read by extension |
+| `.cascade-conversation.md` | Append-only log — gives every session its prior context |
 
 ---
 
 ## Slash commands
 
+Available in Windsurf / Cascade, Devin Desktop, and Claude Code:
+
 | Command | Description |
 |---|---|
 | `/sprang` | Build or refresh the knowledge graph — auto-detects codebase vs knowledge base |
-| `/sprang-analyze [path] [--full] [--language <lang>] [--chunk N]` | Full Cascade-driven codebase analysis — summaries, layers, tour, risk |
+| `/sprang-analyze [path] [--full] [--language <lang>] [--chunk N]` | Full AI-driven analysis — summaries, layers, tour, risk |
 | `/sprang-knowledge [path] [--format obsidian\|logseq\|...] [--full]` | Build knowledge graph from markdown notes |
-| `/sprang-chat <question>` | Ask any question about the codebase using the knowledge graph |
+| `/sprang-chat <question>` | Ask any question about the codebase |
 | `/sprang-explain <file>` | Deep-dive: what, why, who, risk, history for a file or function |
 | `/sprang-onboard` | Guided architecture tour — adapts to persona (junior / senior / PM) |
-| `/sprang-diff [files...]` | Blast radius analysis — writes diff overlay for dashboard amber highlight |
+| `/sprang-diff [files...]` | Blast radius analysis — writes diff overlay for dashboard |
 | `/sprang-domain [name]` | Explore business domain architecture and flows |
-| `/sprang-why <file>` | Why does this file exist? Git history + rationale + team annotations |
+| `/sprang-why <file>` | Git history + rationale + team annotations for a file |
 | `/sprang-health` | Full health report: risk, smells, orphans, circular deps |
 | `/sprang-team [node]` | Browse/write team annotations with staleness detection |
 
@@ -666,8 +560,8 @@ In agent mode, Copilot can call all 9 MCP tools. The `.github/copilot-instructio
 
 <!-- Pipeline diagram — generated with Gemini gemini-3.1-flash-image-preview -->
 <p align="center">
-  <img src="assets/pipeline.png" alt="Sprang two-phase pipeline: Phase 1 static skeleton, Phase 2 Cascade-driven enrichment" width="100%" />
-  <em>Phase 1 is fully static — runs in under 60 seconds, no network calls. Phase 2 is driven by Cascade as the intelligence layer.</em>
+  <img src="assets/pipeline.png" alt="Sprang two-phase pipeline: Phase 1 static skeleton, Phase 2 AI-driven enrichment" width="100%" />
+  <em>Phase 1 is fully static — runs in under 60 seconds, no network calls. Phase 2 is driven by your AI agent.</em>
 </p>
 
 ```mermaid
@@ -679,7 +573,7 @@ flowchart TB
         SD --> SG[skeleton graph written]
         RS --> SG
     end
-    subgraph Phase2 ["Phase 2 — Background enrichment (via /sprang-analyze)"]
+    subgraph Phase2 ["Phase 2 — Enrichment (via /sprang-analyze)"]
         G1[architecture-analyzer] --> TB[tour-builder]
         G2[domain-analyzer] --> TB
         G3[git-layer] --> RS2[risk-scorer update]
@@ -690,7 +584,7 @@ flowchart TB
     SG -->|"forks Phase 2"| Phase2
 ```
 
-**Cascade is the intelligence layer.** There is no external API. Phase 2 enrichment is performed by Cascade using its own context window — it reads the graph, writes summaries, and calls `sprang_annotate` to record what it learns.
+**Your AI agent is the intelligence layer.** Phase 2 enrichment is performed by the agent using its own context window — it reads the graph, writes summaries, and calls `sprang_annotate` to record what it learns. No external API.
 
 ---
 
@@ -755,7 +649,7 @@ risk_score = clamp(
 
 | Tool | Input | Output |
 |---|---|---|
-| `sprang_node` | `{ node_id }` | Full node + 1-hop neighbors + layer + in/out degree + annotation |
+| `sprang_node` | `{ node_id }` | Full node + 1-hop neighbors + layer + in/out degree + annotation status |
 | `sprang_query` | `{ query, node_types?, limit?, mode? }` | Fuzzy or semantic-ranked nodes with summaries |
 | `sprang_diff_impact` | `{ files: string[] }` | BFS blast-radius, risk-ranked impact list |
 | `sprang_why` | `{ node_id }` | Decision context + git history + team annotation |
@@ -765,7 +659,7 @@ risk_score = clamp(
 | `sprang_annotate` | `{ node_id, content, tags? }` | Write `.sprang/annotations/<id>.md` |
 | `sprang_respond` | `{ response, question? }` | Write response to `.sprang/cascade-response.json` for dashboard display |
 
-`sprang_query` accepts `mode: "semantic"` to search by meaning via cosine similarity over TF-IDF embeddings instead of keyword matching.
+`sprang_query` accepts `mode: "semantic"` for cosine similarity search over TF-IDF embeddings.
 
 ### Enriched `sprang_node` response
 
@@ -812,9 +706,6 @@ SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard dev
 
 # Production preview — pre-built dist/, instant startup at http://localhost:7777
 SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard preview
-
-# Point at this repo itself
-SPRANG_ROOT=$(pwd) pnpm --filter @sprang/dashboard dev
 ```
 
 ### Views
@@ -872,7 +763,6 @@ SPRANG_ROOT=$(pwd) pnpm --filter @sprang/dashboard dev
 `/sprang-knowledge [path]` builds a `kind: "knowledge"` graph from markdown notes — Obsidian vaults, Logseq databases, Dendron workspaces, Foam wikis, Zettelkasten archives, or plain markdown.
 
 ```bash
-# In Cascade / Devin / Claude Code chat
 /sprang-knowledge /path/to/your/notes
 ```
 
@@ -951,7 +841,7 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 508 unit tests across core/dashboard/mcp/cli, zero failures
+pnpm test              # 508 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
 pnpm --filter @sprang/dashboard test:e2e   # 32 Playwright e2e tests
@@ -1077,9 +967,7 @@ packages/cli/tests/
 ## Configuration
 
 <details>
-<summary>.sprang/config.json — all thresholds and options</summary>
-
-`.sprang/config.json` in your project root:
+<summary>.sprang/config.json — thresholds and options</summary>
 
 ```json
 {
@@ -1111,4 +999,4 @@ MIT
 
 ---
 
-*The name Sprang comes from Kierkegaard's concept of the* qualitative spring *— the leap that cannot be reached by gradual accumulation alone, but only by a discontinuous jump in understanding. The git-layer, smell-detector, risk-scorer agents and the Devin Desktop integration are original work. Sprang was inspired by the open-source codebase comprehension space, particularly the work in [Understand-Anything](https://github.com/Lum1104/Understand-Anything).*
+*The name Sprang comes from Kierkegaard's concept of the* qualitative spring *— the leap that cannot be reached by gradual accumulation alone, but only by a discontinuous jump in understanding. The git-layer, smell-detector, risk-scorer agents and the Windsurf / Devin Desktop integration are original work. Sprang was inspired by the open-source codebase comprehension space, particularly the work in [Understand-Anything](https://github.com/Lum1104/Understand-Anything).*
