@@ -40,58 +40,78 @@ Your AI agent is the intelligence layer. Sprang is the data layer. Together they
 
 ### Claude Code
 
-This repo ships fully configured for Claude Code. Clone it and build once:
+**Via the plugin system (recommended)**
+
+Run this inside a Claude Code session:
+
+```
+/plugin install https://github.com/FavioVazquez/sprang.git
+```
+
+Claude Code downloads the plugin and activates all skills, slash commands, and hooks from `.claude-plugin/`. Then build the MCP server to unlock all 9 tools:
 
 ```bash
-git clone https://github.com/FavioVazquez/sprang.git
-cd sprang
+# In the installed plugin directory (typically ~/.claude/plugins/sprang/)
 pnpm install && pnpm build
 ```
 
-Claude Code auto-discovers everything on project open:
-
-| File | What activates |
-|---|---|
-| `.mcp.json` | MCP server starts automatically — all 9 tools available immediately |
-| `.claude-plugin/plugin.json` | Plugin discovery metadata for the Claude Code marketplace |
-| `.claude-plugin/marketplace.json` | Marketplace listing — enables one-click install once published |
-| `.claude/commands/` | 11 slash commands wired in |
-| `.claude/hooks/` | Session-start warning + post-commit auto-refresh |
-
-After opening the project in Claude Code:
+**Once listed in the community marketplace**, users can install with a single command:
 
 ```
-/sprang           # build the knowledge graph (first time)
+/plugin install sprang@claude-community
+```
+
+**What the plugin activates:**
+
+| File | What it does |
+|---|---|
+| `.claude-plugin/plugin.json` | Plugin manifest — name, version, metadata |
+| `.claude-plugin/marketplace.json` | Community marketplace listing |
+| `.claude/commands/` | 11 slash commands (e.g. `/sprang`, `/sprang-onboard`) |
+| `.claude/hooks/session-start.sh` | Warns Claude on session open if graph is missing or stale |
+| `.claude/hooks/post-tool-use.sh` | Triggers incremental graph refresh after git commits |
+| `.mcp.json` | MCP server config — 9 tools once binary is built |
+
+To build the knowledge graph after install:
+
+```
+/sprang           # build the knowledge graph
 /sprang-onboard   # guided architecture tour
 ```
-
-Once Sprang is listed in the Claude Code marketplace, users will be able to install it directly from the **Extensions** panel without cloning manually.
 
 ---
 
 ### GitHub Copilot
 
-Clone and build:
+**Via the plugin system (recommended)**
 
 ```bash
-git clone https://github.com/FavioVazquez/sprang.git
-cd sprang
+copilot plugin install FavioVazquez/sprang
+```
+
+This installs the skills and registers `.copilot-plugin/plugin.json` for Copilot's plugin discovery. Then build the MCP server:
+
+```bash
+# In the installed plugin directory
 pnpm install && pnpm build
 ```
 
-Then in VS Code:
+**Or clone manually:**
 
-1. Open the project with the GitHub Copilot extension active
-2. Switch Copilot to **Agent mode** (the model selector in the chat panel)
-3. The `sprang` MCP server connects automatically via `.vscode/mcp.json`
+```bash
+git clone https://github.com/FavioVazquez/sprang.git
+cd sprang && pnpm install && pnpm build
+```
 
-| File | What activates |
+Open VS Code with Copilot, switch to **Agent mode** (the model selector in the chat panel), and `.vscode/mcp.json` auto-connects the MCP server.
+
+**What activates:**
+
+| File | What it does |
 |---|---|
-| `.vscode/mcp.json` | MCP server in Copilot's servers format — auto-connects in Agent mode |
+| `.copilot-plugin/plugin.json` | Plugin discovery metadata with `skills` paths |
+| `.vscode/mcp.json` | MCP server — auto-connects in Agent mode |
 | `.github/copilot-instructions.md` | Pre-edit checklist auto-loaded by Copilot |
-| `.copilot-plugin/plugin.json` | Plugin discovery metadata with `skills`/`agents` paths |
-
-The `.copilot-plugin/plugin.json` registers Sprang for the VS Code marketplace. Once listed, one-click install will be available without cloning.
 
 > MCP tools only work in Copilot **Agent mode** — not the default ask/edit modes.
 

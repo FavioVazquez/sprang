@@ -17,6 +17,5 @@
     "onboarding",
     "dashboard"
   ],
-  "skills": "./.windsurf/skills/",
-  "agents": "./.windsurf/skills/"
+  "skills": "./.windsurf/skills/"
 }
