@@ -16,6 +16,7 @@ The `sprang` MCP server provides 9 tools — use them in Copilot agent mode:
 | `sprang_health` | Full risk + smell + orphan report |
 | `sprang_why` | Git history + decision context for a file |
 | `sprang_annotate` | Write team knowledge to `.sprang/annotations/` |
+| `sprang_respond` | Send answer to dashboard Ask Agent panel |
 
 ## Pre-edit checklist
 
@@ -37,3 +38,7 @@ Build the MCP server first: `pnpm build`
 The MCP server is configured in `.vscode/mcp.json`. Copilot picks it up in agent mode automatically.
 
 To build or refresh the graph: run `npx sprang scan .` then ask Copilot to analyze the codebase.
+
+## Dashboard Ask Agent
+
+The Sprang dashboard has an **Ask Agent** panel. When the Copilot CLI bridge is active, the dashboard spawns `copilot --prompt` non-interactively and uses `--resume=<session_id>` for conversation continuity. Conversation history is maintained in `.sprang/agent-conversation.md` (gitignored — read with `cat`, not the Read tool).

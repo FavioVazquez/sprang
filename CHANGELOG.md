@@ -6,35 +6,45 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.2.3] — 2026-06-05
+## [0.2.0] — 2026-06-05
 
-Platform-aware **Ask Agent** bridge — native Claude Code and GitHub Copilot CLI integration for the dashboard chat panel.
+Platform-aware **Ask Agent** bridge — native Claude Code and GitHub Copilot CLI integration, reliable Windsurf detection, and persistent cross-session conversation history.
 
 ### Added
 
-- **`packages/dashboard/src/bridge/detect.ts`** — runtime bridge detection with a four-way priority: Windsurf (`cascade-messaging` extension active) → Claude Code (`claude` CLI) → Copilot CLI (`copilot` CLI) → none. Exported: `detectBridge()`, `isWindsurfBridgeActive()`, `isClaudeCLIAvailable()`, `isCopilotCLIAvailable()`.
-- **`packages/dashboard/src/bridge/claude.ts`** — non-interactive Claude Code bridge. Spawns `claude -p "<question>" --output-format json --allowedTools <mcp_tools> --no-interactive`. Persists session ID to `.sprang/claude-session.json` and resumes via `--resume <session_id>`. Falls back to plain-text output when JSON parsing fails. Exported: `askClaude()`, `clearClaudeSession()`.
-- **`packages/dashboard/src/bridge/copilot.ts`** — non-interactive Copilot CLI bridge. Spawns `copilot -p "<question>"`. Uses `--continue` once a session exists (tracked in `.sprang/copilot-session.json`). Exported: `askCopilot()`, `clearCopilotSession()`.
-- **`packages/dashboard/src/bridge/windsurf.ts`** — extracted Windsurf bridge helpers. Writes trigger file atomically with the `[SPRANG DASHBOARD MESSAGE]` prefix and mandatory `sprang_respond` instruction. Exported: `writeWindsurfTrigger()`, `getWindsurfTriggerPath()`, `getWindsurfResponsePath()`.
-- **`packages/dashboard/src/bridge/index.ts`** — unified `askAgent(question, sprangRoot)` entry point: routes to the correct bridge, writes `cascade-response.json` for CLI bridges (same polling path as Windsurf), returns `{ mode: 'async' | 'sync', ok, error? }`. Also exports `clearAgentSession()` (clears all session files + response file).
-- **`GET /bridge-status`** vite dev/preview endpoint — returns current `BridgeStatus` JSON (`{ kind, detail }`). Used by the dashboard to show `via Claude Code` / `via Copilot CLI` / `via Windsurf` next to the panel header.
-- **`AskAgentPanel`** (renamed from `AskCascadePanel`): fetches `/bridge-status` on panel open, displays active bridge name in header, shows platform-aware empty state and error messages. `DELETE /cascade-response` now calls `clearAgentSession()` to clear all session state.
-- **Unit tests** (`packages/dashboard/src/bridge/__tests__/bridge.test.ts`) — 29 tests covering all four modules. Uses top-level `vi.mock('node:child_process')` with shared mock instances to work around ESM namespace non-configurability.
-- **e2e tests** (`packages/dashboard/e2e/app.spec.ts`) — 3 new tests: `GET /bridge-status` returns valid JSON, Ask Agent panel opens and shows bridge info (Playwright route-mocked), `POST /cascade-ask` returns 200 or 503 depending on environment.
-- **`.gitignore`** — added `.sprang/cascade-response.json`, `.sprang/claude-session.json`, `.sprang/copilot-session.json`.
+- **`packages/dashboard/src/bridge/detect.ts`** — runtime bridge detection (four-way priority): Windsurf (`WINDSURF_CASCADE_TERMINAL_KIND` env var OR `.sprang/.cascade-bridge-active` marker OR `.cascade-trigger-session` exists) → Claude Code (`claude` CLI) → Copilot CLI (`copilot` CLI) → none.
+- **`packages/dashboard/src/bridge/claude.ts`** — non-interactive Claude Code bridge. Spawns `claude -p "<question>" --output-format json --allowedTools <mcp_tools>`. Persists `session_id` to `.sprang/claude-session.json` and resumes via `--resume <session_id>`. Falls back to plain-text when JSON parsing fails.
+- **`packages/dashboard/src/bridge/copilot.ts`** — non-interactive Copilot CLI bridge. Spawns `copilot --prompt "<question>" --output-format json`. Parses JSONL output for `session_id`. Resumes via `--resume=<session_id>` for conversation continuity. Persists ID to `.sprang/copilot-session.json`.
+- **`packages/dashboard/src/bridge/windsurf.ts`** — Windsurf bridge helpers: writes trigger file atomically with `[SPRANG DASHBOARD MESSAGE]` prefix and `sprang_respond` instruction.
+- **`packages/dashboard/src/bridge/index.ts`** — unified `askAgent(question, sprangRoot)` entry point. Routes to correct bridge; writes `cascade-response.json` for CLI bridges.
+- **`GET /bridge-status`** endpoint — returns current `BridgeStatus` JSON `{ kind, detail }`.
+- **`AskAgentPanel`** — renamed from `AskCascadePanel`. Shows active bridge name, platform-aware empty states and errors.
+- **`cascade-messaging` VS Code extension** — on `activate()` writes `.sprang/.cascade-bridge-active` presence marker (deleted on `deactivate()`). Enables reliable Windsurf detection even when Vite is started outside the IDE terminal.
+- **`cascade-messaging` extension** — conversation history now written to `.sprang/agent-conversation.md` (platform-neutral, under `.sprang/`) instead of `.cascade-conversation.md` at workspace root. Creates `.sprang/` dir if missing.
+- **`.claude/rules/cascade-messaging.md`** — always-on rule for Claude Code instructing it to `cat .sprang/agent-conversation.md` before each dashboard message (file is gitignored; `Read` tool blocked).
+- **`.claude/settings.json`** — added `Bash(cat .sprang/agent-conversation.md*)` to allowed commands.
+- **Unit tests** (`bridge/__tests__/bridge.test.ts`) — 85 tests covering all bridge modules + presence marker detection.
+- **e2e tests** (`e2e/app.spec.ts`) — 36 tests including bridge-status, Ask Agent panel, and cascade-ask endpoint.
+- **`.gitignore`** — added `.sprang/agent-conversation.md`, `.sprang/cascade-response.json`, `.sprang/claude-session.json`, `.sprang/copilot-session.json`, `.sprang/.cascade-bridge-active`.
 
 ### Changed
 
-- **`POST /cascade-ask`** now routes through `askAgent()` and returns `503` with `{ error }` when no bridge is detected (previously always returned 200 even when no Windsurf extension was active). Response body includes `mode: 'async' | 'sync'` field.
-- **`DELETE /cascade-response`** clears all bridge session state via `clearAgentSession()`, not just the response file.
-- **README** — updated "Dashboard chat" section to "Ask Agent" with bridge priority table, session file reference, and Claude Code / Copilot setup notes.
-- Test suite: **84 unit tests** (dashboard), **36 e2e tests** — all passing.
+- **`POST /cascade-ask`** returns `503` when no bridge detected. Response includes `mode: 'async' | 'sync'`.
+- **`.devin/rules/cascade-messaging.md`** — updated to reference `.sprang/agent-conversation.md`, instructs use of `cat` shell command (not `read_file`) since the file is gitignored.
+- **`AGENTS.md`** — Dashboard Chat section rewritten: "Ask Agent", all 3 bridges documented, correct file path and `cat` instruction.
+- **`CLAUDE.md`** — added `cascade-messaging.md` rule to Always-On Rules section; updated bridge description; added `Bash(cat ...)` allowed command.
+- **`packages/mcp/src/server.ts`** — `sprang_respond` description: "Ask Cascade" → "Ask Agent".
+- **`README.md`** — documents bridge detection signals and server launch note.
+- **Assets** (`assets/`): `architecture`, `pipeline`, `risk-formula`, `graph-modes`, `mcp-tools` regenerated with dark cinematic aesthetic (matching banner/logo/dashboard). All "Cascade/Devin" references replaced with "AI Agent". `mcp-tools` now shows 9 tools including `sprang_respond`.
+- Test suite: **538 total tests** — 85 dashboard + 383 core + 52 mcp + 18 cli — all passing. 36 e2e all passing.
 
 ### Fixed
 
-- **Bridge detection** (`detect.ts`) — old heuristic checked `.cascade-trigger-session` mtime < 60s, which always timed out since the file is only written on message send (not kept fresh by the extension). Replaced with `WINDSURF_CASCADE_TERMINAL_KIND` env var check (always present in Windsurf/Devin Desktop processes) with trigger-file-exists fallback. Fixes bridge falling through to Claude Code CLI when both are installed.
-- **Ask Agent panel** — error message now shows the actual server error text instead of a hardcoded generic string.
-- **`.devin/rules/cascade-messaging.md`** — rule now instructs Cascade to re-read `.cascade-conversation.md` immediately before answering **each** dashboard message (not just at session start). Fixes Cascade ignoring conversation history for follow-up questions sent within the same session.
+- **Bridge detection** — replaced stale mtime heuristic with `WINDSURF_CASCADE_TERMINAL_KIND` env var + `.sprang/.cascade-bridge-active` presence marker. Fixes bridge falling through to Claude Code when both are installed and Vite was started outside the IDE terminal.
+- **Claude Code bridge** — removed non-existent `--no-interactive` flag from CLI invocation.
+- **Copilot CLI bridge** — fixed incorrect `--continue` flag (doesn't exist). Now uses `--output-format json` + `--resume=<session_id>` for correct session continuity.
+- **Conversation history** — `cascade-messaging` extension was hardcoding `.cascade-conversation.md` at workspace root. Fixed to `.sprang/agent-conversation.md`, consistent with all other runtime files.
+- **Agent rules** — both `.devin` and `.claude` rules now use `cat` shell command to read gitignored conversation history (blocked by `read_file`/`Read` tool).
 
 ---
 
@@ -82,41 +92,6 @@ Security hardening, cross-platform installer, and plugin marketplace manifests.
 - All package versions bumped from `0.1.0` to `0.2.0` to match CHANGELOG and README badges.
 
 ---
-
-## [0.2.0] — 2026-06-04
-
-Six new capabilities: architecture card view, structural fingerprinting, language pattern detection, graph normalization, semantic search, and auto-update hooks. Full Claude Code and GitHub Copilot integration added.
-
-### Added
-
-- **Architecture card view** (`packages/dashboard`) — 4th dashboard tab (`'a'` / `'4'`) with a React Flow + ELK force-directed layer map. `LayerCardNode.tsx` cards (280px wide, dark surface, colored left accent bar, complexity badge) show one card per architectural layer. `elk-layout.ts` runs ELK `"layered"` layout asynchronously with a loading spinner and fallback grid on error. `edge-aggregation.ts` collapses all cross-layer file-level edges to a single weighted edge with stroke width `min(1 + log2(count+1), 5)`. Clicking a layer card dispatches `setFilters({ layerIds })` to filter the main Graph view.
-
-- **Structural fingerprinting** (`packages/core/src/utils/fingerprint.ts`) — SHA-256 content hash + per-language structural signature extraction (functions, classes, imports, exports for TS/JS/Python/Go). `classifyChange` returns `SKIP` (identical hash), `COSMETIC` (hash differs but signatures equal), or `STRUCTURAL` (signatures changed). Fingerprints persisted at `.sprang/cache/fingerprints.json`. Project scanner logs skip/cosmetic/structural counts per run and attaches `changeType` to each `FileRecord`.
-
-- **Language lesson detection** (`packages/core/src/agents/language-lessons.ts`) — pure deterministic detection of 12 programming patterns: closures, async_await, promises, generators, decorators, generics, streams, observers, dependency_injection, middleware, finite_state_machine, immutability. One lesson per file (highest-priority match). Attached to `SprangNode.languageLesson` and `TourStep.languageLesson`. Surfaced in the `sprang_tour` MCP tool response.
-
-- **Graph normalization** (`packages/core/src/graph/normalize.ts`) — six-step pipeline: double-prefix stripping, last-write-wins node dedup, first-occurrence edge dedup, dangling edge removal, `tested_by` canonicalization (auto-flips edges where the target is a test file), and stats recalculation. Runs automatically after Phase 1 in the orchestrator.
-
-- **Monorepo subgraph merging** (`packages/core/src/graph/merge-subgraphs.ts`) — reads `pnpm-workspace.yaml` or `package.json#workspaces`, discovers packages, merges their `.sprang/knowledge-graph.json` files into the root graph with namespaced node IDs (`packagePath:originalId`).
-
-- **Semantic embedding search** (`packages/core/src/utils/embedding-search.ts`) — cosine similarity over TF-IDF vectors. `sprang_query` now accepts `mode: "semantic"` to search by semantic meaning rather than keyword match. Results include a `score` field (0–1 cosine similarity). CLI `query` command gains `--semantic` flag. Embeddings stored at `.sprang/cache/embeddings.json`.
-
-- **Auto-update git hooks** (`packages/cli/src/commands/install-hooks.ts`) — `sprang install-hooks` writes a `post-commit` hook that runs `sprang scan --phase1-only --if-stale` after every commit. The `--if-stale` flag on `sprang scan` compares `stats.gitCommitHash` against `git rev-parse HEAD` and skips the scan when the graph is already current. Git commit hash recorded in `graph.stats.gitCommitHash` after Phase 1.
-
-- **Git worktree detection** (`packages/core/src/orchestrator/runner.ts`) — `resolveSprangDir()` uses `git rev-parse --git-common-dir` to detect linked worktrees and redirect `.sprang/` to the main repo root, so all worktrees share one graph.
-
-- **`.sprang-hooks/session-start.md`** — session-start guide for AI agents: run `sprang scan --phase1-only --if-stale` at session start to auto-refresh stale graphs.
-
-- **Claude Code integration** — `CLAUDE.md` (imports `@AGENTS.md`), `.mcp.json` (MCP server config), `.claude/rules/` (3 always-on/glob rules), `.claude/commands/` (11 slash commands mirroring all Devin workflows), `.claude/settings.json` (pre-approved Bash permissions).
-
-- **GitHub Copilot integration** — `.vscode/mcp.json` (MCP server in `"servers"` format for Copilot), `.github/copilot-instructions.md` (pre-edit checklist, MCP tools reference, setup guide).
-
-### Changed
-
-- `.gitignore` — `.claude/` no longer wholly excluded; now excludes only `.claude/worktrees/` and `.claude/settings.local.json` so project rules/commands are committed.
-
----
-
 ## [0.1.3] — 2026-06-04
 
 Persistent dashboard chat — send messages from the Sprang dashboard to Cascade and maintain conversation context across sessions.
