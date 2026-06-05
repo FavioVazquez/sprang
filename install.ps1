@@ -87,6 +87,24 @@ function Get-SkillsRoot {
     return $windsurf
 }
 
+function Install-CliBin {
+    $cliBin = Join-Path $RepoDir 'packages\cli\dist\index.js'
+    if (-not (Test-Path $cliBin)) {
+        Write-Host "  ⚠ CLI binary not found at $cliBin — skipping PATH link"
+        return
+    }
+    # Write a .cmd wrapper to %LOCALAPPDATA%\Microsoft\WindowsApps (on PATH by default on Windows 10+)
+    $binDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
+    if (-not (Test-Path $binDir)) {
+        $binDir = Join-Path $env:USERPROFILE '.local\bin'
+        if (-not (Test-Path $binDir)) { New-Item -ItemType Directory -Path $binDir | Out-Null }
+        Write-Host "  ℹ Add $binDir to your PATH if not already present"
+    }
+    $wrapper = "@echo off`r`nnode `"$cliBin`" %*`r`n"
+    [System.IO.File]::WriteAllText((Join-Path $binDir 'sprang.cmd'), $wrapper)
+    Write-Host "  ✓ sprang CLI linked → $binDir\sprang.cmd"
+}
+
 function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
         Write-Host "→ Updating existing checkout at $RepoDir"
@@ -105,6 +123,7 @@ function Clone-Or-Update {
     } finally {
         Pop-Location
     }
+    Install-CliBin
 }
 
 function Get-SkillNames {

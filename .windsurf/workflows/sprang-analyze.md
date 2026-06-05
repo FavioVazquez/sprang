@@ -419,9 +419,24 @@ cp "$SPRANG_ROOT/intermediate/layers.json" "$SPRANG_ROOT/intermediate/final-laye
 cp "$SPRANG_ROOT/intermediate/tour.json" "$SPRANG_ROOT/intermediate/final-tours.json" 2>/dev/null || true
 ```
 
-**Step 3 — Run `sprang merge`:**
+**Step 3 — Run `sprang merge`** using this portable resolver:
 ```bash
-node ~/tools/sprang/packages/cli/dist/index.js merge "$PROJECT_ROOT" --intermediate "$SPRANG_ROOT/intermediate"
+# Find sprang CLI — works regardless of install method
+SPRANG_CLI=""
+if command -v sprang &>/dev/null; then
+  # Installed via install.sh → ~/.local/bin/sprang (most users)
+  SPRANG_CLI="sprang"
+elif [[ -f "$HOME/.sprang/repo/packages/cli/dist/index.js" ]]; then
+  # Standard install.sh clone location
+  SPRANG_CLI="node $HOME/.sprang/repo/packages/cli/dist/index.js"
+elif [[ -f "$HOME/tools/sprang/packages/cli/dist/index.js" ]]; then
+  # Dev/EC2 fallback
+  SPRANG_CLI="node $HOME/tools/sprang/packages/cli/dist/index.js"
+else
+  echo "ERROR: sprang CLI not found. Run install.sh first." && exit 1
+fi
+
+$SPRANG_CLI merge "$PROJECT_ROOT" --intermediate "$PROJECT_ROOT/.sprang/intermediate"
 ```
 
 The command reads all chunk files, builds the complete valid graph, and writes `$PROJECT_ROOT/.sprang/knowledge-graph.json`.

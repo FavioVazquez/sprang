@@ -86,6 +86,29 @@ prompt_platform() {
   printf '%s\n' "${ids[$((choice-1))]}"
 }
 
+install_cli_bin() {
+  local cli_bin="$REPO_DIR/packages/cli/dist/index.js"
+  if [[ ! -f "$cli_bin" ]]; then
+    printf '  ⚠ CLI binary not found at %s — skipping PATH link\n' "$cli_bin"
+    return
+  fi
+  # Try ~/.local/bin first (XDG standard, no sudo needed)
+  local bin_dir="${HOME}/.local/bin"
+  mkdir -p "$bin_dir"
+  # Write a wrapper script so it works without 'node' prefix
+  cat > "$bin_dir/sprang" <<WRAPPER
+#!/usr/bin/env sh
+exec node "$cli_bin" "\$@"
+WRAPPER
+  chmod +x "$bin_dir/sprang"
+  printf '  ✓ sprang CLI linked → %s/sprang\n' "$bin_dir"
+  # Remind user to add ~/.local/bin to PATH if not already there
+  if ! echo "$PATH" | grep -q "$bin_dir"; then
+    printf '  ℹ Add %s to your PATH if not already present:\n' "$bin_dir"
+    printf '      echo '\''export PATH="$HOME/.local/bin:$PATH"'\'' >> ~/.zshrc  # or ~/.bashrc\n'
+  fi
+}
+
 clone_or_update() {
   if [[ -d "$REPO_DIR/.git" ]]; then
     printf -- '→ Updating existing checkout at %s\n' "$REPO_DIR"
@@ -97,6 +120,7 @@ clone_or_update() {
   fi
   printf -- '→ Installing dependencies and building...\n'
   (cd "$REPO_DIR" && pnpm install --frozen-lockfile && pnpm build)
+  install_cli_bin
 }
 
 skills_root() {
