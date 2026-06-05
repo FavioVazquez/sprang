@@ -157,12 +157,20 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
    }
    Use the real resolved paths, not placeholders.
 
-5. Copy rules, workflows, and skills into the current project:
+5. Copy rules, workflows, skills, and hooks into the current project:
 
-   Rules — tell Cascade/Devin to use Sprang automatically before/after every edit:
+   Rules — tell Cascade/Devin to use Sprang automatically:
      mkdir -p .devin/rules
      cp ~/tools/sprang/.devin/rules/sprang-context.md .devin/rules/
      cp ~/tools/sprang/.devin/rules/sprang-highrisk.md .devin/rules/
+     cp ~/tools/sprang/.devin/rules/cascade-messaging.md .devin/rules/
+
+   Hooks — enable persistent dashboard chat (conversation history):
+     cp ~/tools/sprang/.devin/hooks.json .devin/hooks.json
+     cp ~/tools/sprang/.devin/config.json .devin/config.json
+     mkdir -p .windsurf/hooks
+     cp ~/tools/sprang/.windsurf/hooks.json .windsurf/hooks.json
+     cp ~/tools/sprang/.windsurf/hooks/save-conversation.py .windsurf/hooks/save-conversation.py
 
    Workflows — all /sprang-* slash commands for Windsurf / Cascade:
      mkdir -p .windsurf/workflows
