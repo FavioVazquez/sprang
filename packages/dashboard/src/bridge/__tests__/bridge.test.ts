@@ -100,6 +100,12 @@ describe('isWindsurfBridgeActive', () => {
     fs.writeFileSync(path.join(tmpDir, '.cascade-trigger-session'), 'hello');
     expect(isWindsurfBridgeActive(tmpDir)).toBe(true);
   });
+
+  it('returns true when .sprang/.cascade-bridge-active marker exists', () => {
+    fs.mkdirSync(path.join(tmpDir, '.sprang'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.sprang', '.cascade-bridge-active'), new Date().toISOString());
+    expect(isWindsurfBridgeActive(tmpDir)).toBe(true);
+  });
 });
 
 describe('isClaudeCLIAvailable', () => {

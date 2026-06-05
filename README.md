@@ -492,6 +492,14 @@ SPRANG_ROOT="$(pwd)" pnpm --filter @sprang/dashboard preview
 # Opens at http://localhost:7777
 ```
 
+> **Important — start the server from a Windsurf / Devin Desktop terminal.**
+> Bridge detection uses three signals (any one is sufficient):
+> 1. `WINDSURF_CASCADE_TERMINAL_KIND` env var — automatically present in all IDE terminals
+> 2. `.sprang/.cascade-bridge-active` — written by the cascade-messaging extension on activation (works even if the server was started outside the IDE)
+> 3. `.cascade-trigger-session` exists — legacy fallback
+>
+> If the server is started outside the IDE (e.g. via SSH without the env) and the extension hasn't written the marker yet, the bridge falls through to Claude Code or Copilot CLI if those are installed.
+
 ### 5 — Install the cascade-messaging extension
 
 Enables persistent chat from the Sprang dashboard with context across Cascade sessions.

@@ -20,14 +20,18 @@ export interface BridgeStatus {
 }
 
 /** Returns true if running inside Windsurf / Devin Desktop.
- *  Primary signal: WINDSURF_CASCADE_TERMINAL_KIND env var (always set by Windsurf/Devin Desktop).
- *  Fallback: .cascade-trigger-session exists (extension has been active this session). */
+ *
+ *  Detection signals (any one is sufficient):
+ *  1. WINDSURF_CASCADE_TERMINAL_KIND env var — present when Vite is launched from a
+ *     Windsurf/Devin Desktop terminal (the most reliable signal when available).
+ *  2. .sprang/.cascade-bridge-active marker — written by the cascade-messaging extension
+ *     on activation, deleted on deactivation. Works even when the server was started
+ *     outside the IDE terminal (e.g. via a script or system service).
+ *  3. .cascade-trigger-session exists — legacy fallback (extension wrote it previously). */
 export function isWindsurfBridgeActive(sprangRoot: string): boolean {
-  // Env var is the most reliable signal — present in all Windsurf/Devin Desktop terminals
   if (process.env['WINDSURF_CASCADE_TERMINAL_KIND'] !== undefined) return true;
-  // Fallback: trigger file exists (extension wrote it at some point)
-  const triggerPath = path.join(sprangRoot, '.cascade-trigger-session');
-  return fs.existsSync(triggerPath);
+  if (fs.existsSync(path.join(sprangRoot, '.sprang', '.cascade-bridge-active'))) return true;
+  return fs.existsSync(path.join(sprangRoot, '.cascade-trigger-session'));
 }
 
 /** Returns true if the `claude` CLI is available on PATH and responds. */
