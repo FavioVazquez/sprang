@@ -7,6 +7,9 @@ argument-hint: ["[path] [--full] [--language <lang>] [--chunk <N>]"]
 Analyze the codebase and produce `.sprang/knowledge-graph.json` with full semantic enrichment.
 You (Cascade) are the analysis engine — read every file, write rich summaries, detect architecture, score risk.
 
+> **CRITICAL:** Complete ALL 6 phases in one run. Do not stop after Phase 2 — the Architecture and Learn tabs need Phases 3–6.
+> **RESUME:** If graph already exists at `phase: enriched`, skip Phases 0–2 and start at Phase 3.
+
 Follow the detailed instructions in `.windsurf/workflows/sprang-analyze.md`.
 
 Key options:

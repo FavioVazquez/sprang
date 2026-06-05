@@ -7,6 +7,10 @@ description: Analyze a codebase to produce a rich semantic knowledge graph — f
 Produce a `.sprang/knowledge-graph.json` for the project with full semantic enrichment.
 Cascade IS the analysis engine — you read every file and write rich understanding into the graph.
 
+> **CRITICAL — DO NOT STOP EARLY:** This workflow has 6 phases. You MUST complete ALL phases in a single run. If you stop after Phase 2, the dashboard Architecture tab and Learn tab will be empty. Keep going until you see "Knowledge graph saved" at the end of Phase 6.
+
+> **RESUME SUPPORT:** If the graph already exists at `phase: enriched`, skip Phases 0–2 entirely and jump straight to Phase 3 — all file analysis is already done.
+
 ## Options (from $ARGUMENTS)
 - `--full` — Force complete rebuild
 - `--language <lang>` — Output language (default: en). Accepts ISO codes (zh, ja, ko, es, fr, de, pt, ru) or friendly names
@@ -51,6 +55,22 @@ Cascade IS the analysis engine — you read every file and write rich understand
    - Read package.json / pyproject.toml / Cargo.toml / go.mod → MANIFEST_CONTENT
    - Run: `find "$PROJECT_ROOT" -maxdepth 2 -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' | head -100` → DIR_TREE
    - Detect entry point (check in order): src/index.ts, src/main.ts, src/App.tsx, index.js, main.py, manage.py, app.py, main.go, src/main.rs → ENTRY_POINT
+
+**RESUME CHECK (run after resolving PROJECT_ROOT above):**
+```bash
+python3 -c "
+import json, os
+p = os.path.join(os.environ.get('PROJECT_ROOT', '.'), '.sprang', 'knowledge-graph.json')
+if os.path.exists(p):
+    g = json.load(open(p))
+    print('PHASE:', g.get('phase'), '| NODES:', len(g.get('nodes', [])), '| LAYERS:', len(g.get('layers', [])))
+else:
+    print('NO_GRAPH')
+"
+```
+- If output contains `PHASE: enriched` → **skip to Phase 3 immediately** — load nodes from the existing `knowledge-graph.json`, do NOT redo Phase 1 or 2
+- If output contains `PHASE: complete` and no `--full` → ask user if they want to rebuild
+- Otherwise → run from Phase 1
 
 Report: `[Phase 0/6] Pre-flight complete. Project: $PROJECT_ROOT | Ignoring: <N .sprangignore patterns>`
 
@@ -110,6 +130,11 @@ Report: `[Phase 1/6] Scanning project files...`
    }
    EOF
    ```
+
+Write phase marker:
+```bash
+echo '{"phase_completed": "scan", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > "$SPRANG_ROOT/intermediate/phase1-done.json"
+```
 
 Report: `Phase 1 complete. Found <N> files across <langs>. Entry point: <ENTRY_POINT>`
 
@@ -204,6 +229,8 @@ This prevents context overflow in all environments including Devin Desktop.
 Report after each batch: `Batch <X>/<total>: analyzed <files> (files: foo.ts, bar.ts, ...)`
 Report when done: `Phase 2 complete. All <N> batches analyzed.`
 
+> **DO NOT STOP HERE.** Proceed immediately to Phase 3 — Architecture Layers.
+
 ### Merge batches
 After all batches complete:
 1. Read all `batch-*.json` files from `$SPRANG_ROOT/intermediate/`
@@ -250,7 +277,14 @@ Report: `[Phase 3/6] Identifying architectural layers...`
 
 Update each node in assembled-graph.json with its `layer` id.
 
+Write phase marker:
+```bash
+echo '{"phase_completed": "layers", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > "$SPRANG_ROOT/intermediate/phase3-done.json"
+```
+
 Report: `Phase 3 complete. <N> layers identified, <M> nodes assigned.`
+
+> **DO NOT STOP HERE.** Proceed immediately to Phase 4 — Guided Tour.
 
 ---
 
@@ -283,7 +317,14 @@ Report: `[Phase 4/6] Building guided learning tour...`
    EOF
    ```
 
+Write phase marker:
+```bash
+echo '{"phase_completed": "tour", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > "$SPRANG_ROOT/intermediate/phase4-done.json"
+```
+
 Report: `Phase 4 complete. <N>-step tour built.`
+
+> **DO NOT STOP HERE.** Proceed immediately to Phase 5 — Risk + Smells.
 
 ---
 
@@ -327,7 +368,14 @@ Report: `[Phase 5/6] Scoring risk and detecting structural issues...`
 
 5. Write risk data back into each node in assembled-graph.json
 
+Write phase marker:
+```bash
+echo '{"phase_completed": "risk", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > "$SPRANG_ROOT/intermediate/phase5-done.json"
+```
+
 Report: `Phase 5 complete. Risk scored. High: <N>, Medium: <M>, Low: <L>.`
+
+> **DO NOT STOP HERE.** Proceed immediately to Phase 6 — Assemble + Save.
 
 ---
 

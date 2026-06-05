@@ -10,7 +10,10 @@ Arguments: `[path] [--full] [--language <lang>] [--chunk <N>]`
 Produce `.sprang/knowledge-graph.json` for the project with full semantic enrichment.
 You are the analysis engine — read every file and write rich understanding into the graph.
 
-Follow the detailed instructions in `.windsurf/workflows/sprang-analyze.md` (same workflow, adapted for Claude Code).
+> **CRITICAL:** Complete ALL 6 phases in one run. Do not stop after Phase 2 — Architecture and Learn tabs need Phases 3–6.
+> **RESUME:** If graph already exists at `phase: enriched`, skip Phases 0–2 and start at Phase 3.
+
+Follow the detailed instructions in `.windsurf/workflows/sprang-analyze.md`.
 
 Key options:
 - `--full` — force complete rebuild even if graph exists
