@@ -16,8 +16,8 @@
   <a href="#installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-508_passing-10B981?style=flat-square" alt="508 unit tests passing"/>
-  <img src="https://img.shields.io/badge/e2e_tests-32_passing-10B981?style=flat-square" alt="32 e2e tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-547_passing-10B981?style=flat-square" alt="547 unit tests passing"/>
+  <img src="https://img.shields.io/badge/e2e_tests-36_passing-10B981?style=flat-square" alt="36 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
 </p>
@@ -571,6 +571,8 @@ The active bridge is shown below the "Ask Agent" header (`via Claude Code`, `via
 |---|---|---|
 | `cascade-messaging.triggerFile` | `.cascade-trigger-session` | Trigger file path relative to workspace root |
 | `cascade-messaging.autoStart` | `true` | Start watcher automatically on activation |
+
+> **Important:** the `SPRANG_ROOT` in `~/.codeium/windsurf/mcp_config.json` and the `SPRANG_ROOT` you pass to `pnpm preview` must point at the **same project**. The MCP server writes `cascade-response.json` to `SPRANG_ROOT/.sprang/` and the dashboard reads it from the same path. If they differ, responses will be written to one project but never appear in the other's dashboard. Update `mcp_config.json` and restart the MCP server whenever you switch projects.
 
 ---
 
