@@ -109,9 +109,23 @@ export function makeMergeCommand(): Command {
 
         // --- Load layers ---
         const layersPath = join(inter, 'final-layers.json');
-        const layers: unknown[] = existsSync(layersPath)
+        let layers: unknown[] = existsSync(layersPath)
           ? toArray(JSON.parse(readFileSync(layersPath, 'utf-8')))
           : toArray(assembled['layers']);
+        // Normalise: if layers are strings, convert to layer objects
+        if (layers.length > 0 && typeof layers[0] === 'string') {
+          layers = (layers as string[]).map((name) => ({
+            id: name.toLowerCase().replace(/\s+/g, '_'),
+            name: name,
+            node_ids: [],
+          }));
+        }
+        // Normalise: ensure every layer has node_ids array
+        layers = layers.map((l) => {
+          const layer = l as Record<string, unknown>;
+          if (!Array.isArray(layer['node_ids'])) layer['node_ids'] = [];
+          return layer;
+        });
 
         // --- Load tours (agent writes 'tour' or 'tours') ---
         const toursPath = join(inter, 'final-tours.json');
