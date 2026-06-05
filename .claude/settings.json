@@ -6,7 +6,8 @@
       "Bash(pnpm --filter @sprang/dashboard dev*)",
       "Bash(git diff*)",
       "Bash(git log*)",
-      "Bash(git rev-parse*)"
+      "Bash(git rev-parse*)",
+      "Bash(cat .sprang/agent-conversation.md*)"
     ]
   },
   "hooks": {

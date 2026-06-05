@@ -134,16 +134,21 @@ If no graph exists yet: run `/sprang` to build one.
 
 ---
 
-## Dashboard Chat (cascade-messaging)
+## Dashboard Chat (Ask Agent)
 
-The Sprang dashboard has an **Ask Cascade** panel that sends messages via `.cascade-trigger-session`. The `cascade-messaging` VS Code extension forwards these to Cascade and maintains conversation history in `.cascade-conversation.md`.
+The Sprang dashboard has an **Ask Agent** panel that routes questions through whichever agent bridge is active:
+- **Windsurf / Devin Desktop** — writes `.cascade-trigger-session`; the `cascade-messaging` VS Code extension forwards to Cascade
+- **Claude Code** — spawns `claude -p` non-interactively with session continuity via `--resume`
+- **Copilot CLI** — spawns `copilot --prompt` non-interactively with session continuity via `--resume=<id>`
+
+Conversation history is maintained in `.sprang/agent-conversation.md` (gitignored — use `cat` to read it, not `read_file`).
 
 The rule `.devin/rules/cascade-messaging.md` (always_on) governs this — it tells Cascade to:
-1. Read `.cascade-conversation.md` at session start to restore prior context
+1. Run `cat .sprang/agent-conversation.md 2>/dev/null || echo "(no history yet)"` before each message
 2. Answer the message fully
 3. Call `sprang_respond` MCP tool so the reply appears in the dashboard UI
 
 **If you receive a message prefixed with `[SPRANG DASHBOARD MESSAGE]`:**
-- Read `.cascade-conversation.md` first
+- Run `cat .sprang/agent-conversation.md 2>/dev/null || echo "(no history yet)"` first (file is gitignored — `read_file` is blocked)
 - Answer in context of the full conversation history
 - Always end by calling `sprang_respond` with your answer

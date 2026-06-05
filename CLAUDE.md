@@ -92,6 +92,13 @@ Before modifying any file:
 
 For architecture questions: check `.sprang/SPRANG_REPORT.md` first.
 
+### `cascade-messaging.md` (always active)
+
+When you receive a message prefixed with `[SPRANG DASHBOARD MESSAGE]` (from the dashboard Ask Agent panel):
+1. **Run `cat .sprang/agent-conversation.md 2>/dev/null || echo "(no history yet)"`** — reads full conversation history (file is gitignored; the Read tool is blocked, use Bash instead)
+2. Answer the question fully using MCP tools to ground your answer
+3. **Call `sprang_respond`** with your answer so it appears in the dashboard UI
+
 ### `sprang-highrisk.md` (triggered for source files)
 
 When editing a source file:
@@ -114,7 +121,8 @@ When editing a source file:
       "Bash(pnpm --filter @sprang/dashboard dev*)",
       "Bash(git diff*)",
       "Bash(git log*)",
-      "Bash(git rev-parse*)"
+      "Bash(git rev-parse*)",
+      "Bash(cat .sprang/agent-conversation.md*)"
     ]
   }
 }
@@ -182,7 +190,7 @@ Keyboard shortcuts:
 - `?` — keyboard shortcuts help
 - `Esc` — close panel / search
 
-The **Ask Cascade** panel sends messages via `.cascade-trigger-session` → Claude Code receives them and calls `sprang_respond` to display the answer in the UI.
+The **Ask Agent** panel auto-detects the available bridge (Windsurf → Claude Code → Copilot CLI → none). When the Claude Code bridge is active, the Vite server spawns `claude -p` non-interactively and uses `--resume <session_id>` for conversation continuity. The session ID is persisted in `.sprang/claude-session.json`.
 
 ---
 
