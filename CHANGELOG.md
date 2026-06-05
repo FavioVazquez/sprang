@@ -8,7 +8,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [0.2.0] — 2026-06-05
 
-Platform-aware **Ask Agent** bridge — native Claude Code and GitHub Copilot CLI integration, reliable Windsurf detection, and persistent cross-session conversation history.
+Full **v0.2.0** release — platform-aware Ask Agent bridge (Windsurf, Claude Code, Copilot CLI), architecture card view, structural fingerprinting, semantic search, Claude Code native hooks, cross-platform installer, security hardening, and persistent cross-session conversation history.
 
 ### Added
 
@@ -26,6 +26,14 @@ Platform-aware **Ask Agent** bridge — native Claude Code and GitHub Copilot CL
 - **Unit tests** (`bridge/__tests__/bridge.test.ts`) — 85 tests covering all bridge modules + presence marker detection.
 - **e2e tests** (`e2e/app.spec.ts`) — 36 tests including bridge-status, Ask Agent panel, and cascade-ask endpoint.
 - **`.gitignore`** — added `.sprang/agent-conversation.md`, `.sprang/cascade-response.json`, `.sprang/claude-session.json`, `.sprang/copilot-session.json`, `.sprang/.cascade-bridge-active`.
+- **Claude Code native `SessionStart` hook** (`.claude/hooks/session-start.sh`) — runs when Claude Code opens a session. Stdout is injected into Claude's context window. Warns Claude if the knowledge graph is missing or if `stats.gitCommitHash` differs from `git rev-parse HEAD`, showing both truncated hashes. Silent when graph is fresh, when `gitCommitHash` is absent (pre-v0.2 graph), or outside a git repo.
+- **Claude Code native `PostToolUse` hook** (`.claude/hooks/post-tool-use.sh`) — fires after every Bash tool call. Detects `git commit`, `git merge`, `git cherry-pick`, and `git rebase` in `$TOOL_INPUT` and triggers an incremental Phase 1 graph refresh in the background (`nohup node packages/cli/dist/index.js scan --phase1-only --if-stale &`). Three guards: command is a git mutation, graph file exists, CLI is built. Never blocks Claude Code; logs to `${TMPDIR:-/tmp}/sprang-autoupdate.log`.
+- **Plugin-level hooks file** (`hooks/hooks.json`) — equivalent inline hooks for marketplace plugin installations (uses `npx sprang` instead of `node packages/cli/...`).
+- **Hook unit tests** (`packages/cli/tests/hooks-scripts.test.ts`) — 12 tests covering both scripts via `spawnSync('bash', [scriptPath], ...)` against temp git repos. Tests: no-graph warning, fresh-graph silence, stale hash message with truncated display, missing-gitCommitHash silence, non-git-repo silence, non-git-command silence, no-graph silence, no-CLI silence, empty-input silence, merge/cherry-pick detection, and non-triggering commands (`git status`, `git log`, `git diff`, `git push`).
+- **Hooks documentation in `CLAUDE.md`** — new "Claude Code Native Hooks" section explaining both hooks, their behavior, how to disable them, and how to run the tests.
+- **Cross-platform installer** (`install.sh` + `install.ps1`) — clones the repo, builds all packages, and symlinks skills into the platform's skills directory. Supports `windsurf` (`~/.windsurf/skills/`), `copilot` (`~/.copilot/skills/`), and `claude` (per-project setup guide). `--update` and `--uninstall` flags included. Curl-pipe install supported (`curl -fsSL .../install.sh | bash -s windsurf`).
+- **Plugin manifests** — `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` for Claude Code plugin marketplace discovery; `.copilot-plugin/plugin.json` for GitHub Copilot plugin discovery with `skills`/`agents` path references.
+- **Comprehensive `CLAUDE.md`** — standalone Claude Code integration reference with full MCP tool table, slash commands, always-on rules, allowed bash permissions, and troubleshooting guide. Imports `AGENTS.md` for platform-agnostic content.
 
 ### Changed
 
@@ -37,6 +45,9 @@ Platform-aware **Ask Agent** bridge — native Claude Code and GitHub Copilot CL
 - **`README.md`** — documents bridge detection signals and server launch note.
 - **Assets** (`assets/`): `architecture`, `pipeline`, `risk-formula`, `graph-modes`, `mcp-tools` regenerated with dark cinematic aesthetic (matching banner/logo/dashboard). All "Cascade/Devin" references replaced with "AI Agent". `mcp-tools` now shows 9 tools including `sprang_respond`.
 - Test suite: **538 total tests** — 85 dashboard + 383 core + 52 mcp + 18 cli — all passing. 36 e2e all passing.
+- `.claude/settings.json` — added `"hooks"` section wiring both scripts to their respective events.
+- **`CI` workflow** — added "Validate plugin manifests" step that JSON-parses all five config files (`.claude-plugin/`, `.copilot-plugin/`, `.mcp.json`, `.vscode/mcp.json`) in CI. Added Playwright browser cache (`actions/cache@v4`) to speed up e2e job.
+- All package versions bumped from `0.1.0` to `0.2.0` to match CHANGELOG and README badges.
 
 ### Fixed
 
@@ -45,39 +56,6 @@ Platform-aware **Ask Agent** bridge — native Claude Code and GitHub Copilot CL
 - **Copilot CLI bridge** — fixed incorrect `--continue` flag (doesn't exist). Now uses `--output-format json` + `--resume=<session_id>` for correct session continuity.
 - **Conversation history** — `cascade-messaging` extension was hardcoding `.cascade-conversation.md` at workspace root. Fixed to `.sprang/agent-conversation.md`, consistent with all other runtime files.
 - **Agent rules** — both `.devin` and `.claude` rules now use `cat` shell command to read gitignored conversation history (blocked by `read_file`/`Read` tool).
-
----
-
-## [0.2.2] — 2026-06-04
-
-Claude Code native hooks, hook unit tests, and hooks documentation.
-
-### Added
-
-- **Claude Code native `SessionStart` hook** (`.claude/hooks/session-start.sh`) — runs when Claude Code opens a session. Stdout is injected into Claude's context window. Warns Claude if the knowledge graph is missing or if `stats.gitCommitHash` differs from `git rev-parse HEAD`, showing both truncated hashes. Silent when graph is fresh, when `gitCommitHash` is absent (pre-v0.2 graph), or outside a git repo.
-- **Claude Code native `PostToolUse` hook** (`.claude/hooks/post-tool-use.sh`) — fires after every Bash tool call. Detects `git commit`, `git merge`, `git cherry-pick`, and `git rebase` in `$TOOL_INPUT` and triggers an incremental Phase 1 graph refresh in the background (`nohup node packages/cli/dist/index.js scan --phase1-only --if-stale &`). Three guards: command is a git mutation, graph file exists, CLI is built. Never blocks Claude Code; logs to `${TMPDIR:-/tmp}/sprang-autoupdate.log`.
-- **Plugin-level hooks file** (`hooks/hooks.json`) — equivalent inline hooks for marketplace plugin installations (uses `npx sprang` instead of `node packages/cli/...`).
-- **Hook unit tests** (`packages/cli/tests/hooks-scripts.test.ts`) — 12 tests covering both scripts via `spawnSync('bash', [scriptPath], ...)` against temp git repos. Tests: no-graph warning, fresh-graph silence, stale hash message with truncated display, missing-gitCommitHash silence, non-git-repo silence, non-git-command silence, no-graph silence, no-CLI silence, empty-input silence, merge/cherry-pick detection, and non-triggering commands (`git status`, `git log`, `git diff`, `git push`).
-- **Hooks documentation in `CLAUDE.md`** — new "Claude Code Native Hooks" section explaining both hooks, their behavior, how to disable them, and how to run the tests.
-
-### Changed
-
-- `.claude/settings.json` — added `"hooks"` section wiring both scripts to their respective events.
-
----
-
-## [0.2.1] — 2026-06-04
-
-Security hardening, cross-platform installer, and plugin marketplace manifests.
-
-### Added
-
-- **Cross-platform installer** (`install.sh` + `install.ps1`) — clones the repo, builds all packages, and symlinks skills into the platform's skills directory. Supports `windsurf` (`~/.windsurf/skills/`), `copilot` (`~/.copilot/skills/`), and `claude` (per-project setup guide). `--update` and `--uninstall` flags included. Curl-pipe install supported (`curl -fsSL .../install.sh | bash -s windsurf`).
-- **Plugin manifests** — `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` for Claude Code plugin marketplace discovery; `.copilot-plugin/plugin.json` for GitHub Copilot plugin discovery with `skills`/`agents` path references.
-- **Comprehensive `CLAUDE.md`** — standalone Claude Code integration reference with full MCP tool table, slash commands, always-on rules, allowed bash permissions, and troubleshooting guide. Imports `AGENTS.md` for platform-agnostic content.
-
-### Fixed
-
 - **`vite.config.ts` — double `res.end()` bug**: the `/cascade-ask` `data` handler could call `res.end()` multiple times when a request body spans more than two chunks past the 64 KB cap. Fixed with `if (aborted) return` guard at top of handler.
 - **`vite.config.ts` — file allowlist I/O exhaustion**: `buildFileAllowList()` previously called `JSON.parse` + `readFileSync` on the full graph file on every `/file-content.json` request. Now cached in module scope with mtime invalidation.
 - **`vite.config.ts` — CORS wildcard on internal endpoints**: `/cascade-ask` and `/cascade-response` set `Access-Control-Allow-Origin: *`, enabling any website to POST arbitrary prompts to Claude Code while the dashboard is running. Removed — these are same-origin endpoints.
@@ -86,12 +64,8 @@ Security hardening, cross-platform installer, and plugin marketplace manifests.
 - **`graph-loader.ts` — unvalidated graph cast**: MCP server cast `JSON.parse` output directly to `KnowledgeGraph` without Zod schema validation. Now uses `knowledgeGraphSchema.safeParse()` — a malformed graph returns `null` instead of crashing tools.
 - **Test fixtures in `mcp-tools.test.ts`**: `CommitRef` field `hash` corrected to `sha` (matching `types.ts`); added missing `changelog_entries: []`; fixed `risk_factors` from object array to string enum array — all mismatches surfaced by the new Zod validation.
 
-### Changed
-
-- **`CI` workflow** — added "Validate plugin manifests" step that JSON-parses all five config files (`.claude-plugin/`, `.copilot-plugin/`, `.mcp.json`, `.vscode/mcp.json`) in CI. Added Playwright browser cache (`actions/cache@v4`) to speed up e2e job.
-- All package versions bumped from `0.1.0` to `0.2.0` to match CHANGELOG and README badges.
-
 ---
+
 ## [0.1.3] — 2026-06-04
 
 Persistent dashboard chat — send messages from the Sprang dashboard to Cascade and maintain conversation context across sessions.
