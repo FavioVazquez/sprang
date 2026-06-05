@@ -6,6 +6,7 @@ import { makeQueryCommand } from './commands/query.js';
 import { makeWatchCommand } from './commands/watch.js';
 import { makeStatusCommand } from './commands/status.js';
 import { makeInstallHooksCommand } from './commands/install-hooks.js';
+import { makeMergeCommand } from './commands/merge.js';
 
 const program = new Command();
 
@@ -15,6 +16,7 @@ program
   .version('0.1.0');
 
 program.addCommand(makeScanCommand());
+program.addCommand(makeMergeCommand());
 program.addCommand(makeHealthCommand());
 program.addCommand(makeQueryCommand());
 program.addCommand(makeWatchCommand());

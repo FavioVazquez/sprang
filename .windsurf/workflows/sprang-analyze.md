@@ -383,92 +383,37 @@ Report: `Phase 5 complete. Risk scored. High: <N>, Medium: <M>, Low: <L>.`
 
 Report: `[Phase 6/6] Assembling final knowledge graph...`
 
-**Do NOT manually construct the final JSON. Python assembles everything. Your only job is to write the data files then run the script.**
+**Do NOT write the final graph JSON manually. Use the `sprang merge` CLI command — it handles all envelope fields, validation, and normalisation automatically.**
 
-**Step 1 — Write node chunks** (max 50 nodes per file):
-Write each chunk to `$SPRANG_ROOT/intermediate/final-nodes-chunk-1.json`, `final-nodes-chunk-2.json`, etc. Each file is a plain JSON array of node objects.
-
-**Step 2 — Write edges, layers, tours as separate files:**
-- `$SPRANG_ROOT/intermediate/final-edges.json` — array of edge objects
-- `$SPRANG_ROOT/intermediate/final-layers.json` — array of layer objects (from Phase 3)
-- `$SPRANG_ROOT/intermediate/final-tours.json` — array of tour objects (from Phase 4). **Key is `tours` not `tour`.**
-
-**Step 3 — Run this Python script via run_command. It builds the complete envelope automatically:**
-
-```python
-import json, glob, os, subprocess
-from datetime import datetime, timezone
-
-root = os.environ.get("SPRANG_ROOT", ".")
-inter = os.path.join(root, "intermediate")
-
-# Load data files
-nodes = []
-for f in sorted(glob.glob(os.path.join(inter, "final-nodes-chunk-*.json"))):
-    nodes.extend(json.load(open(f)))
-edges = json.load(open(os.path.join(inter, "final-edges.json"))) if os.path.exists(os.path.join(inter, "final-edges.json")) else []
-layers = json.load(open(os.path.join(inter, "final-layers.json"))) if os.path.exists(os.path.join(inter, "final-layers.json")) else []
-tours = json.load(open(os.path.join(inter, "final-tours.json"))) if os.path.exists(os.path.join(inter, "final-tours.json")) else []
-
-# Load enriched assembled graph for metadata (languages, frameworks, description, risk data)
-assembled_path = os.path.join(inter, "assembled-graph.json")
-assembled = json.load(open(assembled_path)) if os.path.exists(assembled_path) else {}
-
-# Get git hash
-try:
-    git_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root).decode().strip()
-except Exception:
-    git_hash = ""
-
-# Build risk summary from nodes
-risk_summary = {"high": 0, "medium": 0, "low": 0}
-for n in nodes:
-    r = n.get("risk_score", 0)
-    if r >= 0.7: risk_summary["high"] += 1
-    elif r >= 0.4: risk_summary["medium"] += 1
-    else: risk_summary["low"] += 1
-
-now = datetime.now(timezone.utc).isoformat()
-project_name = os.path.basename(os.path.abspath(root))
-
-# Assemble complete graph — ALL required fields built by Python, not the agent
-graph = {
-    "version": "0.2.0",
-    "kind": "codebase",
-    "generated_at": now,
-    "project_root": os.path.abspath(root),
-    "project_name": project_name,
-    "description": assembled.get("description", ""),
-    "languages": assembled.get("languages", []),
-    "frameworks": assembled.get("frameworks", []),
-    "phase": "complete",
-    "stats": {
-        "node_count": len(nodes),
-        "edge_count": len(edges),
-        "risk_summary": risk_summary,
-        "smell_summary": assembled.get("smell_summary", {}),
-        "generated_at": now,
-        "gitCommitHash": git_hash,
-    },
-    "nodes": nodes,
-    "edges": edges,
-    "layers": layers,
-    "tours": tours,
-    "domains": assembled.get("domains", []),
-    "annotations": [],
-    "health": assembled.get("health", {}),
-}
-
-# Write to .sprang/knowledge-graph.json
-out_path = os.path.join(root, ".sprang", "knowledge-graph.json")
-os.makedirs(os.path.dirname(out_path), exist_ok=True)
-out = json.dumps(graph, indent=2, ensure_ascii=False)
-open(out_path, "w").write(out)
-print(f"OK: {len(nodes)} nodes, {len(edges)} edges, {len(layers)} layers, {len(tours)} tours, {len(out)} bytes")
-print(f"Written to: {out_path}")
+**Step 1 — Write node chunks** (max 50 nodes per file, plain JSON arrays):
+```
+$SPRANG_ROOT/intermediate/final-nodes-chunk-1.json   ← array of node objects
+$SPRANG_ROOT/intermediate/final-nodes-chunk-2.json   ← next 50, etc.
 ```
 
-This script builds the complete, valid envelope automatically — `version`, `project_name`, `project_root`, `phase`, `stats` are all set by Python. You do not need to write these fields manually.
+**Step 2 — Write edges, layers, tours** (plain JSON arrays):
+```
+$SPRANG_ROOT/intermediate/final-edges.json    ← array of edge objects
+$SPRANG_ROOT/intermediate/final-layers.json   ← array of layer objects
+$SPRANG_ROOT/intermediate/final-tours.json    ← array of tour objects
+```
+
+Also write assembled metadata to `$SPRANG_ROOT/intermediate/assembled-graph.json` — a JSON object with keys: `description`, `languages`, `frameworks`, `smell_summary`, `domains`, `health`.
+
+**Step 3 — Run `sprang merge` via run_command:**
+```bash
+node ~/tools/sprang/packages/cli/dist/index.js merge "$SPRANG_ROOT" --intermediate "$SPRANG_ROOT/intermediate"
+```
+
+That's it. The `sprang merge` command:
+- Reads all `final-nodes-chunk-*.json` files and merges them into a flat array
+- Normalises dicts-as-arrays automatically (common agent mistake)
+- Reads edges, layers, tours (handles both `tour` and `tours` filenames)
+- Builds the complete envelope: `version`, `kind`, `project_root`, `project_name`, `phase: "complete"`, `stats` with risk summary — all computed automatically
+- Validates at least one node exists before writing
+- Writes to `$SPRANG_ROOT/.sprang/knowledge-graph.json`
+
+You do not need to set `version`, `project_name`, `phase`, or `stats` — the CLI sets all of these correctly.
 
 6. Write `$SPRANG_ROOT/SPRANG_REPORT.md`:
    ```markdown
