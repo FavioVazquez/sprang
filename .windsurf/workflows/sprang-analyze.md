@@ -384,7 +384,7 @@ Report: `Phase 5 complete. Risk scored. High: <N>, Medium: <M>, Low: <L>.`
 Report: `[Phase 6/6] Assembling final knowledge graph...`
 
 1. Load `assembled-graph.json` with all enrichments from Phases 3-5
-2. Load `layers.json` and `tour.json`
+2. Load `layers.json` and `tours.json` (note: key is `tours`, not `tour`)
 3. Assemble final graph:
 
 ```json
@@ -437,7 +437,7 @@ Report: `[Phase 6/6] Assembling final knowledge graph...`
    Write each chunk to `$SPRANG_ROOT/intermediate/final-nodes-chunk-<K>.json` (array of node objects).
    Write edges to `$SPRANG_ROOT/intermediate/final-edges.json`.
    Write layers to `$SPRANG_ROOT/intermediate/final-layers.json`.
-   Write tours to `$SPRANG_ROOT/intermediate/final-tours.json`.
+   Write tours to `$SPRANG_ROOT/intermediate/final-tours.json` (array of tour objects — key in final graph must be `tours`, not `tour`).
    Write the graph envelope (everything except nodes/edges) to `$SPRANG_ROOT/intermediate/final-envelope.json`.
 
    **If you have fewer than 50 nodes total:** still use this pattern. Never skip it.
@@ -457,11 +457,45 @@ Report: `[Phase 6/6] Assembling final knowledge graph...`
    graph = {**env, "nodes": nodes, "edges": edges, "layers": layers, "tours": tours}
    graph["stats"]["node_count"] = len(nodes)
    graph["stats"]["edge_count"] = len(edges)
+   # Validate required top-level fields before writing
+   required = ["version", "kind", "generated_at", "project_root", "project_name", "phase", "stats"]
+   missing = [k for k in required if not graph.get(k)]
+   if missing:
+       raise ValueError(f"Envelope missing required fields: {missing}")
+   # Validate stats sub-fields
+   stats_required = ["node_count", "edge_count", "risk_summary", "smell_summary", "generated_at"]
+   stats_missing = [k for k in stats_required if k not in graph["stats"]]
+   if stats_missing:
+       raise ValueError(f"stats missing required fields: {stats_missing}")
    out = json.dumps(graph, indent=2, ensure_ascii=False)
    open(os.path.join(root, "knowledge-graph.json"), "w").write(out)
    print(f"OK: {len(nodes)} nodes, {len(edges)} edges, {len(out)} bytes")
    ```
    This bypasses Cascade's output token limit entirely — Python writes the file directly.
+
+   **IMPORTANT — the envelope file (`final-envelope.json`) MUST contain ALL of these fields or the dashboard will not load the graph:**
+   ```json
+   {
+     "version": "0.2.0",
+     "kind": "codebase",
+     "generated_at": "<ISO timestamp>",
+     "project_root": "<absolute path to PROJECT_ROOT>",
+     "project_name": "<directory name of project>",
+     "description": "<one-line description>",
+     "languages": ["python", "typescript"],
+     "frameworks": ["fastapi", "react"],
+     "phase": "complete",
+     "stats": {
+       "node_count": 0,
+       "edge_count": 0,
+       "risk_summary": {"high": 0, "medium": 0, "low": 0},
+       "smell_summary": {},
+       "generated_at": "<ISO timestamp>",
+       "gitCommitHash": "<git rev-parse HEAD output>"
+     }
+   }
+   ```
+   Note: `node_count` and `edge_count` in stats are updated automatically by the merge script above.
 
 6. Write `$SPRANG_ROOT/SPRANG_REPORT.md`:
    ```markdown
