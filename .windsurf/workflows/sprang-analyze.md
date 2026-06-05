@@ -117,17 +117,17 @@ Report: `Phase 1 complete. Found <N> files across <langs>. Entry point: <ENTRY_P
 
 ## Phase 2 — ANALYZE FILES
 
-Report: `[Phase 2/6] Analyzing files — <N> files in batches of up to 20...`
+Report: `[Phase 2/6] Analyzing files — <N> files in batches of up to 10...`
 
 **Your job:** Read each file and produce semantic graph nodes with rich summaries.
 
 ### Batching strategy
 - Sort files: first by estimated importance (entry points, service files, heavily-imported files first), then by size descending
 - **Semantic batching**: group related files together (same directory, same import cluster) — they share context which improves analysis quality
-- Batch: max 20 files per batch, max ~2000 total lines per batch
-- Config/docs/infra files can be batched more aggressively (up to 30 per batch)
-- Very large files (>500 lines): analyze alone in their own batch
-- Run up to 5 batches concurrently
+- Batch: **max 10 files per batch, max ~800 total lines per batch** — keep batches small to avoid context overflow
+- Config/docs/infra files can be batched more aggressively (up to 15 per batch)
+- Very large files (>300 lines): analyze alone in their own batch
+- Run **at most 3 batches concurrently** — more parallelism increases peak context usage
 
 ### For each file in each batch, produce a GraphNode:
 
@@ -182,22 +182,24 @@ Report: `[Phase 2/6] Analyzing files — <N> files in batches of up to 20...`
 - `moderate`: 50-200 lines, clear structure, some business logic
 - `complex`: >200 lines, multiple responsibilities, nested logic, many dependencies
 
-**Write each batch — use write_to_file per batch, max 100 nodes per file:**
-Never output more than 100 nodes in a single tool call. If a batch has >100 nodes, split into sub-batches:
+**Write each batch — ALWAYS use write_to_file per batch, max 50 nodes per file:**
+Never output more than 50 nodes in a single tool call. Split every batch result into sub-files:
 ```
-batch-1a.json  { nodes: [...up to 100...], edges: [...] }
-batch-1b.json  { nodes: [...next 100...], edges: [...] }
+batch-1a.json  { nodes: [...up to 50...], edges: [...] }
+batch-1b.json  { nodes: [...next 50...], edges: [...] }
 ```
-This prevents Cascade's output token limit from being hit mid-write.
+This is mandatory — not conditional on project size. Prevents output token limit failures.
 
-**Output chunking for large projects (>500 nodes):**
-If `--chunk <N>` was passed or node count exceeds 2000, write intermediate graph as chunks:
+**NEVER write raw JSON node arrays inline for more than 20 nodes.** Always write to a file via write_to_file or a shell heredoc command. If you feel tempted to output a large JSON blob, stop and write it to an intermediate file instead.
+
+**Output chunking — always use chunk files for intermediate data:**
+Regardless of project size, always write intermediate nodes as chunk files:
 ```bash
 cat > "$SPRANG_ROOT/intermediate/nodes-chunk-<K>.json" << 'EOF'
-[...up to 100 nodes...]
+[...up to 50 nodes...]
 EOF
 ```
-This prevents context overflow. Merge all chunks in the merge step below.
+This prevents context overflow in all environments including Devin Desktop.
 
 Report after each batch: `Batch <X>/<total>: analyzed <files> (files: foo.ts, bar.ts, ...)`
 Report when done: `Phase 2 complete. All <N> batches analyzed.`
@@ -379,16 +381,18 @@ Report: `[Phase 6/6] Assembling final knowledge graph...`
    - No dangling edges
    - All nodes have summary, type, id
 
-5. **Safe write — ALWAYS use a script, never emit raw JSON directly.**
-   Cascade's output token limit will cause failures for graphs with >200 nodes if you try to write the JSON inline.
-   Instead, write node/edge data as intermediate chunk files, then merge with a script:
+5. **Safe write — ALWAYS use a script, NEVER emit raw JSON directly. This is mandatory for ALL project sizes.**
+   Even small projects (>50 nodes) will cause failures if you write JSON inline.
+   Always write node/edge data as intermediate chunk files, then merge with a script:
 
-   **Step 5a — Write nodes in chunks of 100:**
+   **Step 5a — Write nodes in chunks of 50 (hard limit):**
    Write each chunk to `$SPRANG_ROOT/intermediate/final-nodes-chunk-<K>.json` (array of node objects).
    Write edges to `$SPRANG_ROOT/intermediate/final-edges.json`.
    Write layers to `$SPRANG_ROOT/intermediate/final-layers.json`.
    Write tours to `$SPRANG_ROOT/intermediate/final-tours.json`.
    Write the graph envelope (everything except nodes/edges) to `$SPRANG_ROOT/intermediate/final-envelope.json`.
+
+   **If you have fewer than 50 nodes total:** still use this pattern. Never skip it.
 
    **Step 5b — Merge with Python (run via run_command):**
    ```python

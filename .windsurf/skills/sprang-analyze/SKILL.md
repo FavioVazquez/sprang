@@ -12,12 +12,12 @@ Follow the detailed instructions in `.windsurf/workflows/sprang-analyze.md`.
 Key options:
 - `--full` — force complete rebuild even if graph exists
 - `--language <lang>` — output summaries in a specific language (ISO code: zh, ja, ko, es, fr, de, pt, ru)
-- `--chunk <N>` — split large graphs into chunks of N nodes (use for projects >2000 nodes)
+- `--chunk <N>` — split output into chunks of N nodes
 
 Quick summary of phases:
 1. **Pre-flight** — resolve project root, check `.sprangignore` (respects glob patterns), detect incremental vs full, collect README/manifest context
 2. **Scan** — enumerate files (filtered by .sprangignore), detect languages/frameworks, build import map
-3. **Analyze files** — **semantic batching** (related files together), batches of up to 20 files, output chunking for large projects
+3. **Analyze files** — **semantic batching** (related files together), **max 10 files/batch, max 800 lines/batch**, always write results as chunk files (never inline JSON)
 4. **Architecture layers** — cluster into 3-10 logical layers (UI, API, services, data, infra, config, docs, tests, utilities)
 5. **Guided tour** — BFS-ordered learning walkthrough from entry point through all layers
 6. **Risk + smells** — git churn, coupling, test gaps, blast radius; 8 smell detectors
