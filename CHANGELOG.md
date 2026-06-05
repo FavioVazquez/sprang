@@ -72,6 +72,11 @@ Full **v0.2.0** release — platform-aware Ask Agent bridge (Windsurf, Claude Co
 - **`store.ts` — crash on malformed layers**: `buildGraphIndexes` iterated `layer.node_ids` without checking if it was an array. Agents sometimes write layers as strings or objects without `node_ids`, causing `TypeError: layer.node_ids is not iterable` which triggered the error screen. Added `Array.isArray(layer.node_ids)` guard.
 - **`merge` command — layers normalisation**: `sprang merge` now converts layers written as an array of strings (`["api_gateway", "worker"]`) to proper layer objects (`{id, name, node_ids: []}`), and ensures every layer object has a `node_ids` array.
 - **Test fixtures in `mcp-tools.test.ts`**: `CommitRef` field `hash` corrected to `sha` (matching `types.ts`); added missing `changelog_entries: []`; fixed `risk_factors` from object array to string enum array — all mismatches surfaced by the new Zod validation.
+- **`merge.py` — node colors (graph grey)**: `merge.py` was backfilling `layer_id` onto nodes but `GraphCanvas.tsx` reads `node.layer`. Fixed field name — all 90 nodes now get the correct `layer` field and render with layer colors.
+- **`merge.py` — Learn tab empty (flat tour steps)**: agents write `tours` as a flat `TourStep[]`; dashboard expects `Tour[{ id, title, steps: [] }]`. `merge.py` now auto-wraps flat step arrays into a proper Tour envelope.
+- **`merge.py` — cross-platform, no install required**: replaced CLI-based merge step in workflow with a self-contained Python 3 stdlib script (`skills/sprang-analyze/scripts/merge.py`). Works on macOS, Linux, Windows WSL — no `sprang` binary on PATH needed. Handles all common agent output mistakes automatically.
+- **`constants.ts` — Sprang infra excluded from scan**: added `.windsurf/skills/**`, `skills/*/scripts/**`, `.claude/commands/**`, `.claude/hooks/**`, `.claude/rules/**` to `DEFAULT_EXCLUDES` so installed Sprang files never appear in the target project's knowledge graph.
+- **Agentic install (Devin Desktop)** — README step 5 was missing three files required for persistent dashboard chat: `.devin/rules/cascade-messaging.md` (always-on conversation history rule), `.devin/hooks.json` + `.windsurf/hooks.json` (post-response hook registration), `.windsurf/hooks/save-conversation.py` (writes `agent-conversation.md`). All added to install prompt.
 
 ---
 
