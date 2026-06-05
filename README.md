@@ -728,13 +728,23 @@ sequenceDiagram
 
 ## Dashboard
 
-```bash
-# Development — live reload at http://localhost:7338
-SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard dev
+> **Important:** always run these commands from the **Sprang monorepo directory** (`~/tools/sprang` or wherever you cloned it), not from your project directory. `SPRANG_ROOT` points at your project; the server lives in the Sprang repo.
 
-# Production preview — pre-built dist/, instant startup at http://localhost:7777
+```bash
+# Production preview — pre-built dist/, instant startup — recommended for daily use
+cd ~/tools/sprang
 SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard preview
+# Opens at http://localhost:7777
+
+# Development — live reload (use when working on the dashboard itself)
+cd ~/tools/sprang
+SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard dev
+# Opens at http://localhost:7338
 ```
+
+**Which one to use?**
+- **`preview`** — always use this for normal codebase analysis. Serves the pre-built `dist/`, starts instantly, port `7777`.
+- **`dev`** — only if you are modifying dashboard source code. Hot-reloads on save, port `7338`.
 
 ### Views
 
@@ -869,10 +879,10 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 508 unit tests across core/dashboard/mcp/cli
+pnpm test              # 538 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
-pnpm --filter @sprang/dashboard test:e2e   # 32 Playwright e2e tests
+pnpm --filter @sprang/dashboard test:e2e   # 36 Playwright e2e tests
 ```
 
 ### Test summary
@@ -880,11 +890,11 @@ pnpm --filter @sprang/dashboard test:e2e   # 32 Playwright e2e tests
 | Package | Runner | Tests | What is tested |
 |---|---|---|---|
 | `@sprang/core` | Vitest | 383 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree |
-| `@sprang/dashboard` | Vitest | 55 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6) |
+| `@sprang/dashboard` | Vitest | 85 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6), bridge detection (30) |
 | `@sprang/mcp` | Vitest | 52 | GraphLoader (3), sprang_node + sprang_annotate (11), all 9 MCP tools (38) |
 | `@sprang/cli` | Vitest | 18 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12) |
-| **Total unit** | | **508** | |
-| `@sprang/dashboard` | Playwright | 32 | Full UI e2e — loading, nav, keyboard shortcuts, architecture tab, cascade bridge, APIs |
+| **Total unit** | | **538** | |
+| `@sprang/dashboard` | Playwright | 36 | Full UI e2e — loading, nav, keyboard shortcuts, architecture tab, cascade bridge, APIs |
 
 <details>
 <summary>Full test structure</summary>
