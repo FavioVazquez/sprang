@@ -492,6 +492,8 @@ SPRANG_ROOT="$(pwd)" pnpm --filter @sprang/dashboard preview
 # Opens at http://localhost:7777
 ```
 
+> **Open in your system browser (Chrome/Firefox) at http://127.0.0.1:7777 — not the IDE's embedded preview.** The embedded Windsurf/Devin proxy does not forward `/knowledge-graph.json` and other middleware routes.
+
 > **Important — start the server from a Windsurf / Devin Desktop terminal.**
 > Bridge detection uses three signals (any one is sufficient):
 > 1. `WINDSURF_CASCADE_TERMINAL_KIND` env var — automatically present in all IDE terminals
@@ -745,6 +747,8 @@ SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard dev
 **Which one to use?**
 - **`preview`** — always use this for normal codebase analysis. Serves the pre-built `dist/`, starts instantly, port `7777`.
 - **`dev`** — only if you are modifying dashboard source code. Hot-reloads on save, port `7338`.
+
+> **Open in your system browser, not the IDE's embedded browser.** Windsurf/Devin Desktop's embedded preview proxy (`127.0.0.1:4xxxx`) does not forward the custom middleware routes (`/knowledge-graph.json`, `/bridge-status`, etc.). Always open **http://127.0.0.1:7777** directly in Chrome or Firefox.
 
 ### Views
 
