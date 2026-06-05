@@ -118,6 +118,25 @@ def main():
     now = datetime.now(timezone.utc).isoformat()
     project_name = meta.get("project_name") or os.path.basename(os.path.abspath(root))
 
+    # ── Wrap flat tour steps into Tour object if needed ───────────────────────
+    if tours and isinstance(tours[0], dict) and 'steps' not in tours[0]:
+        entry = tours[0].get('node_ids', [None])[0] if tours else None
+        tours = [{
+            "id": "tour-main",
+            "title": "Architecture Tour",
+            "description": "Guided walkthrough from entry point through all layers",
+            "entry_point": entry,
+            "steps": tours,
+        }]
+
+    # ── Backfill layer_id onto nodes ──────────────────────────────────────────
+    node_map = {n['id']: n for n in nodes if isinstance(n, dict) and 'id' in n}
+    for layer in layers:
+        for nid in layer.get('node_ids', []):
+            if nid in node_map and not node_map[nid].get('layer_id'):
+                node_map[nid]['layer_id'] = layer['id']
+    nodes = list(node_map.values())
+
     # ── Assemble envelope ──────────────────────────────────────────────────────
     graph = {
         "version": "0.2.0",
