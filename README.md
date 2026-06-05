@@ -745,8 +745,18 @@ SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard dev
 ```
 
 **Which one to use?**
-- **`preview`** — always use this for normal codebase analysis. Serves the pre-built `dist/`, starts instantly, port `7777`.
-- **`dev`** — only if you are modifying dashboard source code. Hot-reloads on save, port `7338`.
+- **`preview`** — use this for normal codebase analysis. Serves the pre-built `dist/` folder, starts instantly, port `7777`. **After pulling a Sprang update you must rebuild before restarting preview** — see below.
+- **`dev`** — use this only if you are modifying dashboard source code. Vite hot-reloads source changes automatically, port `7338`. No rebuild needed for source changes, but the `/knowledge-graph.json` middleware still reads from `SPRANG_ROOT` at runtime — it always serves the latest graph on disk.
+
+**After pulling a Sprang update — rebuild before using `preview`:**
+```bash
+cd ~/tools/sprang
+git pull --ff-only
+pnpm install && pnpm build   # rebuilds dist/ — required for preview to pick up changes
+SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard preview
+```
+
+> **`dev` vs `preview` and the knowledge graph:** Both modes read `SPRANG_ROOT/.sprang/knowledge-graph.json` live from disk via the Vite middleware — they always show the latest graph without any rebuild. The difference is only in the dashboard UI code itself: `preview` serves the last compiled `dist/`, `dev` compiles on the fly.
 
 > **Open in your system browser, not the IDE's embedded browser.** Windsurf/Devin Desktop's embedded preview proxy (`127.0.0.1:4xxxx`) does not forward the custom middleware routes (`/knowledge-graph.json`, `/bridge-status`, etc.). Always open **http://127.0.0.1:7777** directly in Chrome or Firefox.
 
