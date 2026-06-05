@@ -383,119 +383,92 @@ Report: `Phase 5 complete. Risk scored. High: <N>, Medium: <M>, Low: <L>.`
 
 Report: `[Phase 6/6] Assembling final knowledge graph...`
 
-1. Load `assembled-graph.json` with all enrichments from Phases 3-5
-2. Load `layers.json` and `tours.json` (note: key is `tours`, not `tour`)
-3. Assemble final graph:
+**Do NOT manually construct the final JSON. Python assembles everything. Your only job is to write the data files then run the script.**
 
-```json
-{
-  "version": "1.0.0",
-  "kind": "codebase",
-  "generated_at": "<ISO timestamp>",
-  "project_root": "<PROJECT_ROOT>",
-  "project_name": "<name>",
-  "description": "<description>",
-  "languages": ["<languages>"],
-  "frameworks": ["<frameworks>"],
-  "phase": "complete",
-  "stats": {
-    "gitCommitHash": "<current commit hash>",
-    "node_count": 0,
-    "edge_count": 0,
-    "risk_summary": {"high": 0, "medium": 0, "low": 0},
-    "smell_summary": {},
-    "generated_at": "<ISO timestamp>",
-    "phase2_completed_at": "<ISO timestamp>"
-  },
-  "nodes": [...],
-  "edges": [...],
-  "layers": [...],
-  "tours": [
-    {
-      "id": "architecture-tour",
-      "title": "Architecture Tour",
-      "description": "Guided walkthrough from entry point through all layers",
-      "steps": [...]
-    }
-  ],
-  "domains": [],
-  "annotations": []
+**Step 1 — Write node chunks** (max 50 nodes per file):
+Write each chunk to `$SPRANG_ROOT/intermediate/final-nodes-chunk-1.json`, `final-nodes-chunk-2.json`, etc. Each file is a plain JSON array of node objects.
+
+**Step 2 — Write edges, layers, tours as separate files:**
+- `$SPRANG_ROOT/intermediate/final-edges.json` — array of edge objects
+- `$SPRANG_ROOT/intermediate/final-layers.json` — array of layer objects (from Phase 3)
+- `$SPRANG_ROOT/intermediate/final-tours.json` — array of tour objects (from Phase 4). **Key is `tours` not `tour`.**
+
+**Step 3 — Run this Python script via run_command. It builds the complete envelope automatically:**
+
+```python
+import json, glob, os, subprocess
+from datetime import datetime, timezone
+
+root = os.environ.get("SPRANG_ROOT", ".")
+inter = os.path.join(root, "intermediate")
+
+# Load data files
+nodes = []
+for f in sorted(glob.glob(os.path.join(inter, "final-nodes-chunk-*.json"))):
+    nodes.extend(json.load(open(f)))
+edges = json.load(open(os.path.join(inter, "final-edges.json"))) if os.path.exists(os.path.join(inter, "final-edges.json")) else []
+layers = json.load(open(os.path.join(inter, "final-layers.json"))) if os.path.exists(os.path.join(inter, "final-layers.json")) else []
+tours = json.load(open(os.path.join(inter, "final-tours.json"))) if os.path.exists(os.path.join(inter, "final-tours.json")) else []
+
+# Load enriched assembled graph for metadata (languages, frameworks, description, risk data)
+assembled_path = os.path.join(inter, "assembled-graph.json")
+assembled = json.load(open(assembled_path)) if os.path.exists(assembled_path) else {}
+
+# Get git hash
+try:
+    git_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root).decode().strip()
+except Exception:
+    git_hash = ""
+
+# Build risk summary from nodes
+risk_summary = {"high": 0, "medium": 0, "low": 0}
+for n in nodes:
+    r = n.get("risk_score", 0)
+    if r >= 0.7: risk_summary["high"] += 1
+    elif r >= 0.4: risk_summary["medium"] += 1
+    else: risk_summary["low"] += 1
+
+now = datetime.now(timezone.utc).isoformat()
+project_name = os.path.basename(os.path.abspath(root))
+
+# Assemble complete graph — ALL required fields built by Python, not the agent
+graph = {
+    "version": "0.2.0",
+    "kind": "codebase",
+    "generated_at": now,
+    "project_root": os.path.abspath(root),
+    "project_name": project_name,
+    "description": assembled.get("description", ""),
+    "languages": assembled.get("languages", []),
+    "frameworks": assembled.get("frameworks", []),
+    "phase": "complete",
+    "stats": {
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+        "risk_summary": risk_summary,
+        "smell_summary": assembled.get("smell_summary", {}),
+        "generated_at": now,
+        "gitCommitHash": git_hash,
+    },
+    "nodes": nodes,
+    "edges": edges,
+    "layers": layers,
+    "tours": tours,
+    "domains": assembled.get("domains", []),
+    "annotations": [],
+    "health": assembled.get("health", {}),
 }
+
+# Write to .sprang/knowledge-graph.json
+out_path = os.path.join(root, ".sprang", "knowledge-graph.json")
+os.makedirs(os.path.dirname(out_path), exist_ok=True)
+out = json.dumps(graph, indent=2, ensure_ascii=False)
+open(out_path, "w").write(out)
+print(f"OK: {len(nodes)} nodes, {len(edges)} edges, {len(layers)} layers, {len(tours)} tours, {len(out)} bytes")
+print(f"Written to: {out_path}")
 ```
 
-4. Validate:
-   - Every `layers[*].node_ids` entry exists in nodes
-   - Every `tours[*].steps[*].node_ids` entry exists in nodes
-   - No dangling edges
-   - All nodes have summary, type, id
-
-5. **Safe write — ALWAYS use a script, NEVER emit raw JSON directly. This is mandatory for ALL project sizes.**
-   Even small projects (>50 nodes) will cause failures if you write JSON inline.
-   Always write node/edge data as intermediate chunk files, then merge with a script:
-
-   **Step 5a — Write nodes in chunks of 50 (hard limit):**
-   Write each chunk to `$SPRANG_ROOT/intermediate/final-nodes-chunk-<K>.json` (array of node objects).
-   Write edges to `$SPRANG_ROOT/intermediate/final-edges.json`.
-   Write layers to `$SPRANG_ROOT/intermediate/final-layers.json`.
-   Write tours to `$SPRANG_ROOT/intermediate/final-tours.json` (array of tour objects — key in final graph must be `tours`, not `tour`).
-   Write the graph envelope (everything except nodes/edges) to `$SPRANG_ROOT/intermediate/final-envelope.json`.
-
-   **If you have fewer than 50 nodes total:** still use this pattern. Never skip it.
-
-   **Step 5b — Merge with Python (run via run_command):**
-   ```python
-   import json, glob, os
-   root = "$SPRANG_ROOT"
-   inter = os.path.join(root, "intermediate")
-   env = json.load(open(os.path.join(inter, "final-envelope.json")))
-   nodes = []
-   for f in sorted(glob.glob(os.path.join(inter, "final-nodes-chunk-*.json"))):
-       nodes.extend(json.load(open(f)))
-   edges = json.load(open(os.path.join(inter, "final-edges.json")))
-   layers = json.load(open(os.path.join(inter, "final-layers.json")))
-   tours = json.load(open(os.path.join(inter, "final-tours.json")))
-   graph = {**env, "nodes": nodes, "edges": edges, "layers": layers, "tours": tours}
-   graph["stats"]["node_count"] = len(nodes)
-   graph["stats"]["edge_count"] = len(edges)
-   # Validate required top-level fields before writing
-   required = ["version", "kind", "generated_at", "project_root", "project_name", "phase", "stats"]
-   missing = [k for k in required if not graph.get(k)]
-   if missing:
-       raise ValueError(f"Envelope missing required fields: {missing}")
-   # Validate stats sub-fields
-   stats_required = ["node_count", "edge_count", "risk_summary", "smell_summary", "generated_at"]
-   stats_missing = [k for k in stats_required if k not in graph["stats"]]
-   if stats_missing:
-       raise ValueError(f"stats missing required fields: {stats_missing}")
-   out = json.dumps(graph, indent=2, ensure_ascii=False)
-   open(os.path.join(root, "knowledge-graph.json"), "w").write(out)
-   print(f"OK: {len(nodes)} nodes, {len(edges)} edges, {len(out)} bytes")
-   ```
-   This bypasses Cascade's output token limit entirely — Python writes the file directly.
-
-   **IMPORTANT — the envelope file (`final-envelope.json`) MUST contain ALL of these fields or the dashboard will not load the graph:**
-   ```json
-   {
-     "version": "0.2.0",
-     "kind": "codebase",
-     "generated_at": "<ISO timestamp>",
-     "project_root": "<absolute path to PROJECT_ROOT>",
-     "project_name": "<directory name of project>",
-     "description": "<one-line description>",
-     "languages": ["python", "typescript"],
-     "frameworks": ["fastapi", "react"],
-     "phase": "complete",
-     "stats": {
-       "node_count": 0,
-       "edge_count": 0,
-       "risk_summary": {"high": 0, "medium": 0, "low": 0},
-       "smell_summary": {},
-       "generated_at": "<ISO timestamp>",
-       "gitCommitHash": "<git rev-parse HEAD output>"
-     }
-   }
-   ```
-   Note: `node_count` and `edge_count` in stats are updated automatically by the merge script above.
+This script builds the complete, valid envelope automatically — `version`, `project_name`, `project_root`, `phase`, `stats` are all set by Python. You do not need to write these fields manually.
 
 6. Write `$SPRANG_ROOT/SPRANG_REPORT.md`:
    ```markdown
