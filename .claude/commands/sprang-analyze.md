@@ -28,6 +28,6 @@ Quick phases:
 5. **Build tour** — 5-8 ordered pedagogical steps based on graph topology
 6. **Domain mapping** — cluster imports into business domain → flow → step hierarchy
 7. **Risk scoring** — blast radius, coupling, test gap, churn (0.0–1.0 per node)
-8. **Finalize** — run `node ~/tools/sprang/packages/cli/dist/index.js merge $SPRANG_ROOT` to assemble chunk files into valid `knowledge-graph.json` (do NOT write graph JSON manually), then write `SPRANG_REPORT.md`
+8. **Finalize** — run `node ~/tools/sprang/packages/cli/dist/index.js merge $PROJECT_ROOT --intermediate $PROJECT_ROOT/.sprang/intermediate` to assemble chunk files into valid `knowledge-graph.json` (do NOT write graph JSON manually), then write `SPRANG_REPORT.md`
 
 $ARGUMENTS

@@ -33,7 +33,7 @@ This repository has Sprang installed. A knowledge graph is available at `.sprang
 
 ## MCP Tools Reference
 
-All 8 tools available to Cascade via the MCP server:
+All 9 tools available to Cascade via the MCP server:
 
 ### `sprang_query`
 ```

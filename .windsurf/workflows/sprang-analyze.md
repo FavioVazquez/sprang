@@ -9,6 +9,8 @@ Cascade IS the analysis engine — you read every file and write rich understand
 
 > **CRITICAL — DO NOT STOP EARLY:** This workflow has 6 phases. You MUST complete ALL phases in a single run. If you stop after Phase 2, the dashboard Architecture tab and Learn tab will be empty. Keep going until you see "Knowledge graph saved" at the end of Phase 6.
 
+> **⛔ NEVER write `.sprang/knowledge-graph.json` directly.** The ONLY way to produce the final graph is to run `sprang merge` at the end of Phase 6. Writing the graph file yourself will produce a broken file that the dashboard cannot load. All intermediate data goes into `$SPRANG_ROOT/intermediate/` as chunk files.
+
 > **RESUME SUPPORT:** If the graph already exists at `phase: enriched`, skip Phases 0–2 entirely and jump straight to Phase 3 — all file analysis is already done.
 
 ## Options (from $ARGUMENTS)
@@ -207,37 +209,48 @@ Report: `[Phase 2/6] Analyzing files — <N> files in batches of up to 10...`
 - `moderate`: 50-200 lines, clear structure, some business logic
 - `complex`: >200 lines, multiple responsibilities, nested logic, many dependencies
 
-**Write each batch — ALWAYS use write_to_file per batch, max 50 nodes per file:**
-Never output more than 50 nodes in a single tool call. Split every batch result into sub-files:
-```
-batch-1a.json  { nodes: [...up to 50...], edges: [...] }
-batch-1b.json  { nodes: [...next 50...], edges: [...] }
-```
-This is mandatory — not conditional on project size. Prevents output token limit failures.
+**Write each batch — ALWAYS use write_to_file per batch, max 50 nodes per file.**
 
-**NEVER write raw JSON node arrays inline for more than 20 nodes.** Always write to a file via write_to_file or a shell heredoc command. If you feel tempted to output a large JSON blob, stop and write it to an intermediate file instead.
-
-**Output chunking — always use chunk files for intermediate data:**
-Regardless of project size, always write intermediate nodes as chunk files:
+Use this exact naming — `sprang merge` reads these files by name:
 ```bash
-cat > "$SPRANG_ROOT/intermediate/nodes-chunk-<K>.json" << 'EOF'
-[...up to 50 nodes...]
+# Nodes (plain array, max 50 per file):
+cat > "$SPRANG_ROOT/intermediate/final-nodes-chunk-1.json" << 'EOF'
+[...up to 50 node objects...]
+EOF
+
+cat > "$SPRANG_ROOT/intermediate/final-nodes-chunk-2.json" << 'EOF'
+[...next 50 node objects...]
+EOF
+
+# Edges (all edges in one file, plain array):
+cat > "$SPRANG_ROOT/intermediate/final-edges.json" << 'EOF'
+[...all edge objects...]
 EOF
 ```
-This prevents context overflow in all environments including Devin Desktop.
+
+**NEVER write raw JSON inline for more than 5 nodes.** Always use write_to_file or a shell heredoc.
+**NEVER write `.sprang/knowledge-graph.json` yourself at any point.** `sprang merge` does this in Phase 6.
 
 Report after each batch: `Batch <X>/<total>: analyzed <files> (files: foo.ts, bar.ts, ...)`
 Report when done: `Phase 2 complete. All <N> batches analyzed.`
 
 > **DO NOT STOP HERE.** Proceed immediately to Phase 3 — Architecture Layers.
 
-### Merge batches
-After all batches complete:
-1. Read all `batch-*.json` files from `$SPRANG_ROOT/intermediate/`
-2. Merge all nodes (dedup by id, last occurrence wins)
-3. Merge all edges (dedup by source+target+type)
-4. Drop edges whose source or target doesn't exist in the node set
-5. Write to `$SPRANG_ROOT/intermediate/assembled-graph.json`
+### After all batches complete — write a metadata file only
+Do NOT merge nodes yourself. The `sprang merge` CLI does this in Phase 6.
+Only write a small metadata file:
+```bash
+cat > "$SPRANG_ROOT/intermediate/assembled-graph.json" << 'EOF'
+{
+  "project_name": "<name from scan-result.json>",
+  "description": "<description from scan-result.json>",
+  "languages": ["<languages>"],
+  "frameworks": ["<frameworks>"]
+}
+EOF
+```
+
+> ⛔ Do NOT write `knowledge-graph.json` here. Do NOT merge all nodes into a single file here. The batch chunk files are the source of truth — `sprang merge` will read them in Phase 6.
 
 ---
 
@@ -275,7 +288,7 @@ Report: `[Phase 3/6] Identifying architectural layers...`
    EOF
    ```
 
-Update each node in assembled-graph.json with its `layer` id.
+> ⛔ Do NOT rewrite `assembled-graph.json` with all nodes — it's metadata only. The layer assignments are stored in `layers.json`.
 
 Write phase marker:
 ```bash
@@ -366,7 +379,13 @@ Report: `[Phase 5/6] Scoring risk and detecting structural issues...`
    - `unclear_coupling`: file that imports from >5 different layers
    - `duplicate_logic`: two files with very similar summaries/tags
 
-5. Write risk data back into each node in assembled-graph.json
+5. Write risk scores to a separate file:
+```bash
+cat > "$SPRANG_ROOT/intermediate/risk-scores.json" << 'EOF'
+{"<node-id>": {"risk_score": 0.0, "risk_factors": []}, ...}
+EOF
+```
+> ⛔ Do NOT rewrite assembled-graph.json with all nodes. Do NOT write knowledge-graph.json. Risk data will be merged by `sprang merge` in Phase 6.
 
 Write phase marker:
 ```bash
@@ -383,37 +402,32 @@ Report: `Phase 5 complete. Risk scored. High: <N>, Medium: <M>, Low: <L>.`
 
 Report: `[Phase 6/6] Assembling final knowledge graph...`
 
-**Do NOT write the final graph JSON manually. Use the `sprang merge` CLI command — it handles all envelope fields, validation, and normalisation automatically.**
+> ⛔ Do NOT write `.sprang/knowledge-graph.json` yourself. Run the `sprang merge` command below.
 
-**Step 1 — Write node chunks** (max 50 nodes per file, plain JSON arrays):
-```
-$SPRANG_ROOT/intermediate/final-nodes-chunk-1.json   ← array of node objects
-$SPRANG_ROOT/intermediate/final-nodes-chunk-2.json   ← next 50, etc.
-```
+By now you have already written in `$SPRANG_ROOT/intermediate/`:
+- `final-nodes-chunk-1.json`, `final-nodes-chunk-2.json`, ... (from Phase 2)
+- `final-edges.json` (from Phase 2)
+- `assembled-graph.json` (metadata only — from Phase 2)
 
-**Step 2 — Write edges, layers, tours** (plain JSON arrays):
-```
-$SPRANG_ROOT/intermediate/final-edges.json    ← array of edge objects
-$SPRANG_ROOT/intermediate/final-layers.json   ← array of layer objects
-$SPRANG_ROOT/intermediate/final-tours.json    ← array of tour objects
-```
-
-Also write assembled metadata to `$SPRANG_ROOT/intermediate/assembled-graph.json` — a JSON object with keys: `description`, `languages`, `frameworks`, `smell_summary`, `domains`, `health`.
-
-**Step 3 — Run `sprang merge` via run_command:**
+**Step 1 — Copy layers from Phase 3 with the correct filename:**
 ```bash
-node ~/tools/sprang/packages/cli/dist/index.js merge "$SPRANG_ROOT" --intermediate "$SPRANG_ROOT/intermediate"
+cp "$SPRANG_ROOT/intermediate/layers.json" "$SPRANG_ROOT/intermediate/final-layers.json" 2>/dev/null || true
 ```
 
-That's it. The `sprang merge` command:
-- Reads all `final-nodes-chunk-*.json` files and merges them into a flat array
-- Normalises dicts-as-arrays automatically (common agent mistake)
-- Reads edges, layers, tours (handles both `tour` and `tours` filenames)
-- Builds the complete envelope: `version`, `kind`, `project_root`, `project_name`, `phase: "complete"`, `stats` with risk summary — all computed automatically
-- Validates at least one node exists before writing
-- Writes to `$SPRANG_ROOT/.sprang/knowledge-graph.json`
+**Step 2 — Copy tour from Phase 4 with the correct filename:**
+```bash
+cp "$SPRANG_ROOT/intermediate/tour.json" "$SPRANG_ROOT/intermediate/final-tours.json" 2>/dev/null || true
+```
 
-You do not need to set `version`, `project_name`, `phase`, or `stats` — the CLI sets all of these correctly.
+**Step 3 — Run `sprang merge`:**
+```bash
+node ~/tools/sprang/packages/cli/dist/index.js merge "$PROJECT_ROOT" --intermediate "$SPRANG_ROOT/intermediate"
+```
+
+The command reads all chunk files, builds the complete valid graph, and writes `$PROJECT_ROOT/.sprang/knowledge-graph.json`.
+It outputs: `Graph written: <N> nodes, <E> edges, <L> layers, <T> tours → <path>`
+
+**Do not do anything else for the graph after this command.** The file is complete.
 
 6. Write `$SPRANG_ROOT/SPRANG_REPORT.md`:
    ```markdown
