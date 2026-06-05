@@ -3,7 +3,6 @@
   <img src="assets/banner.png" alt="Sprang — The qualitative leap in codebase comprehension" width="100%" />
 </p>
 
-<!-- Logo + tagline -->
 <p align="center">
   <img src="assets/logo.png" alt="Sprang logo" height="80" />
 </p>
@@ -14,20 +13,20 @@
 </p>
 
 <p align="center">
-  <a href="#manual-installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
-  <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-8_tools-7C3AED?style=flat-square" alt="8 MCP tools"/></a>
+  <a href="#installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
+  <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-261_passing-10B981?style=flat-square" alt="261 unit tests passing"/>
-  <img src="https://img.shields.io/badge/e2e_tests-15_passing-10B981?style=flat-square" alt="15 e2e tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-508_passing-10B981?style=flat-square" alt="508 unit tests passing"/>
+  <img src="https://img.shields.io/badge/e2e_tests-32_passing-10B981?style=flat-square" alt="32 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
 </p>
 
 ---
 
-Sprang is a knowledge graph platform for [Windsurf](https://windsurf.com) (Cascade) and [Devin Desktop](https://devin.ai) that creates **total codebase comprehension** — not just symbol search, but *why* code exists, *who* changed it, *what* it risks, and *how* it all fits together.
+Sprang is a knowledge graph platform for [Windsurf](https://windsurf.com) (Cascade / Devin Desktop), [Claude Code](https://claude.ai/code), and [GitHub Copilot](https://github.com/features/copilot) that creates **total codebase comprehension** — not just symbol search, but *why* code exists, *who* changed it, *what* it risks, and *how* it all fits together.
 
-Cascade is the intelligence layer. Sprang is the data layer. Together they answer **"what will break if I change this file?"** in a single tool call.
+Your AI agent is the intelligence layer. Sprang is the data layer. Together they answer **"what will break if I change this file?"** in a single tool call.
 
 > *"The System knows everything about being, but nothing about existence."*  
 > Kierkegaard's critique of Hegel applies equally to symbol indexers and grep tools.  
@@ -35,9 +34,87 @@ Cascade is the intelligence layer. Sprang is the data layer. Together they answe
 
 ---
 
-## Quick install — just ask Cascade
+## Installation
 
-Paste this prompt into Cascade (or any AI agent with terminal access). It will do everything — clone, build, wire up the MCP server, copy the slash commands and rules, run the first scan, and start the dashboard. When it finishes, you reload Windsurf once and you're live.
+> **Note:** Windsurf AI and Devin Desktop are the same product — Windsurf was rebranded as Devin Desktop. All instructions, skills, and workflows are identical for both. Both names appear in this README.
+
+### Claude Code
+
+**Via the plugin marketplace (recommended)**
+
+Run these two commands inside a Claude Code session:
+
+```
+/plugin marketplace add FavioVazquez/sprang
+/plugin install sprang
+```
+
+The first command registers the GitHub repo as a local marketplace source (reads `marketplace.json`). The second installs the plugin from it. Claude Code activates all slash commands, hooks, and rules from `.claude-plugin/`. Then build the MCP server to unlock all 9 tools:
+
+```bash
+# In the installed plugin directory (typically ~/.claude/plugins/sprang/)
+pnpm install && pnpm build
+```
+
+**What the plugin activates:**
+
+| File | What it does |
+|---|---|
+| `.claude-plugin/plugin.json` | Plugin manifest — name, version, metadata |
+| `.claude-plugin/marketplace.json` | Marketplace source — registers this repo as an installable plugin |
+| `.claude/commands/` | 11 slash commands (e.g. `/sprang`, `/sprang-onboard`) |
+| `.claude/hooks/session-start.sh` | Warns Claude on session open if graph is missing or stale |
+| `.claude/hooks/post-tool-use.sh` | Triggers incremental graph refresh after git commits |
+| `.mcp.json` | MCP server config — 9 tools once binary is built |
+
+To build the knowledge graph after install:
+
+```
+/sprang           # build the knowledge graph
+/sprang-onboard   # guided architecture tour
+```
+
+---
+
+### GitHub Copilot
+
+**Via the plugin system (recommended)**
+
+```bash
+copilot plugin install FavioVazquez/sprang
+```
+
+This installs the skills and registers `.copilot-plugin/plugin.json` for Copilot's plugin discovery. Then build the MCP server:
+
+```bash
+# In the installed plugin directory
+pnpm install && pnpm build
+```
+
+**Or clone manually:**
+
+```bash
+git clone https://github.com/FavioVazquez/sprang.git
+cd sprang && pnpm install && pnpm build
+```
+
+Open VS Code with Copilot, switch to **Agent mode** (the model selector in the chat panel), and `.vscode/mcp.json` auto-connects the MCP server.
+
+**What activates:**
+
+| File | What it does |
+|---|---|
+| `.copilot-plugin/plugin.json` | Plugin discovery metadata with `skills` paths |
+| `.vscode/mcp.json` | MCP server — auto-connects in Agent mode |
+| `.github/copilot-instructions.md` | Pre-edit checklist auto-loaded by Copilot |
+
+> MCP tools only work in Copilot **Agent mode** — not the default ask/edit modes.
+
+---
+
+### Windsurf / Devin Desktop — agentic install
+
+Paste this prompt into Cascade or Devin. It handles everything: clones, builds, wires up the MCP server, copies slash commands, skills, and rules, runs the first scan, and starts the dashboard.
 
 ```
 Please install the Sprang knowledge graph platform for this project.
@@ -82,7 +159,7 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 
 5. Copy rules, workflows, and skills into the current project:
 
-   Rules — tell Cascade to use Sprang automatically before/after every edit:
+   Rules — tell Cascade/Devin to use Sprang automatically before/after every edit:
      mkdir -p .devin/rules
      cp ~/tools/sprang/.devin/rules/sprang-context.md .devin/rules/
      cp ~/tools/sprang/.devin/rules/sprang-highrisk.md .devin/rules/
@@ -95,7 +172,7 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
      mkdir -p .windsurf/skills
      cp -r ~/tools/sprang/.windsurf/skills/sprang* .windsurf/skills/
 
-   Symlinks so Devin Desktop also finds them under .devin/:
+   Symlinks so both Windsurf and Devin find them:
      ln -sf ../.windsurf/workflows .devin/workflows
      ln -sf ../.windsurf/skills .devin/skills
 
@@ -103,46 +180,71 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
    sprang scan . --phase1-only
    (If `sprang` is not yet in PATH, use: node ~/tools/sprang/packages/cli/dist/index.js scan . --phase1-only)
 
-7. Start the dashboard (run in ~/tools/sprang, non-blocking).
-   Set SPRANG_ROOT so the dashboard finds the right knowledge-graph.json:
+7. Start the dashboard:
    SPRANG_ROOT="PROJECT_DIR" pnpm --filter @sprang/dashboard preview
-   The dashboard will be available at http://localhost:7777
-   It reads PROJECT_DIR/.sprang/knowledge-graph.json automatically.
+   Dashboard will be at http://localhost:7777
 
-8. Install the cascade-messaging VS Code extension (enables persistent dashboard chat).
-   Check if already installed first, then install only if missing:
-   if ! code --list-extensions 2>/dev/null | grep -q cascade-messaging && \
-      ! windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging; then
-     # Try windsurf CLI first, then fall back to code CLI
+8. Install the cascade-messaging VS Code extension (enables persistent dashboard chat):
+   if ! windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging; then
      windsurf --install-extension ~/tools/sprang/cascade-messaging-0.1.0.vsix 2>/dev/null || \
      code --install-extension ~/tools/sprang/cascade-messaging-0.1.0.vsix 2>/dev/null || \
-     echo "Could not auto-install — open Windsurf → Extensions → Install from VSIX → ~/tools/sprang/cascade-messaging-0.1.0.vsix"
-   else
-     echo "cascade-messaging already installed — skipping"
+     echo "Manual install: Extensions → Install from VSIX → ~/tools/sprang/cascade-messaging-0.1.0.vsix"
    fi
 
-9. Report a summary of what was installed and where. Then tell me:
-   "Please reload Windsurf now (Cmd/Ctrl+Shift+P → Reload Window) so the
-   MCP server and cascade-messaging extension activate.
+9. Report what was installed and where. Then tell me:
+   "Please reload the window now (Cmd/Ctrl+Shift+P → Reload Window) so the MCP server
+   and cascade-messaging extension activate.
    Dashboard is live at http://localhost:7777.
    Once reloaded, type /sprang-onboard to begin."
 ```
 
-> After Cascade finishes, **reload Windsurf once** (`Cmd/Ctrl+Shift+P` → *Reload Window*), then type `/sprang-onboard` in the chat. The dashboard is immediately available at **http://localhost:7777** — no extra steps needed.
+> After the agent finishes, **reload the window** (`Cmd/Ctrl+Shift+P` → *Reload Window*), then type `/sprang-onboard`. Dashboard is at **http://localhost:7777**.
+
+---
+
+### Installer script
+
+For scripted or manual setup on any platform:
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.sh | bash -s windsurf
+# Options:  windsurf  |  copilot  |  claude
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.ps1 | iex
+# Options:  .\install.ps1 windsurf  |  .\install.ps1 copilot  |  .\install.ps1 claude
+```
+
+```bash
+# If you already have the repo cloned:
+./install.sh windsurf     # symlinks 11 skills into ~/.windsurf/skills/
+./install.sh copilot      # symlinks 11 skills into ~/.copilot/skills/
+./install.sh claude       # prints per-project setup guide
+./install.sh --update     # pull latest + rebuild
+./install.sh --uninstall windsurf
+```
+
+| Flag | Skills target | Platform |
+|---|---|---|
+| `windsurf` | `~/.windsurf/skills/` | Windsurf AI / Devin Desktop |
+| `copilot` | `~/.copilot/skills/` | GitHub Copilot |
+| `claude` | project-local | Claude Code (via `.mcp.json` + plugin manifest) |
 
 ---
 
 ## Contents
 
-- [Quick install — just ask Cascade](#quick-install--just-ask-cascade)
+- [Installation](#installation)
 - [What Sprang does](#what-sprang-does)
 - [Platform architecture](#platform-architecture)
 - [Prerequisites](#prerequisites)
-- [Manual installation](#manual-installation)
+- [Manual build](#manual-build)
 - [CLI usage](#cli-usage)
-- [Setup with Windsurf / Cascade](#setup-with-windsurf--cascade)
+- [Windsurf / Devin Desktop — detailed setup](#windsurf--devin-desktop--detailed-setup)
 - [Dashboard chat (cascade-messaging)](#dashboard-chat-cascade-messaging)
-- [Setup with Devin Desktop](#setup-with-devin-desktop)
 - [Slash commands](#slash-commands)
 - [Two-phase pipeline](#two-phase-pipeline)
 - [The three differentiating agents](#the-three-differentiating-agents)
@@ -164,7 +266,7 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
   <em>Force-directed knowledge graph, risk heatmap, node detail panel with decision context, and guided tour player.</em>
 </p>
 
-Sprang gives Cascade a persistent memory of your codebase — not just file names and symbols, but the full context of *why* things exist, *who* changed them, *what* they risk, and *how* they connect.
+Sprang gives your AI agent a persistent memory of the codebase — not just file names and symbols, but the full context of *why* things exist, *who* changed them, *what* they risk, and *how* they connect.
 
 ### One-call answers
 
@@ -187,21 +289,26 @@ sprang_health {}
 → 8-step guided tour, persona-adaptive (junior / senior / PM)
 ```
 
-### What it brings to Cascade
+### Capabilities
 
 | Capability | How |
 |---|---|
 | **Git decision context** | `git-layer` — who changed each file, why, PR references, change frequency |
-| **Code smell detection** | `smell-detector` — 8 deterministic heuristics, fully deterministic |
+| **Code smell detection** | `smell-detector` — 8 deterministic heuristics, zero LLM calls |
 | **Risk scoring** | `risk-scorer` — blast radius × coupling × test gap × churn, 0.0–1.0 per node |
 | **Guided tours** | `tour-builder` — BFS-ordered pedagogical paths through the codebase |
 | **Domain map** | `domain-analyzer` — directory cohesion clustering into named business layers |
 | **Blast-radius diff** | `sprang_diff_impact` — BFS over the graph before any edit, risk-ranked |
 | **Team annotations** | `sprang_annotate` — write `.sprang/annotations/<id>.md`, committed to the repo |
 | **Knowledge graphs** | `/sprang-knowledge` — Obsidian / Logseq / Dendron / Foam / Zettelkasten / plain markdown |
-| **11 slash commands** | Full workflow coverage for both Windsurf/Cascade and Devin Desktop |
-| **8 MCP tools** | Direct graph access — Cascade reads and writes the graph via MCP |
+| **11 slash commands** | Full workflow coverage for Windsurf/Devin Desktop and Claude Code |
+| **9 MCP tools** | Direct graph access — all agents read and write the graph via MCP |
 | **< 60s skeleton** | Phase 1 is fully static — runs anywhere, no network, no waiting |
+| **Architecture card view** | React Flow + ELK layer map — one card per layer, weighted cross-layer edges |
+| **Structural fingerprinting** | SHA-256 + signature extraction — SKIP/COSMETIC/STRUCTURAL per file |
+| **Language lessons** | 12 programming pattern detectors attached to tour steps and graph nodes |
+| **Semantic search** | Cosine similarity + TF-IDF fallback — `sprang_query mode:"semantic"` |
+| **Auto-update hooks** | `sprang install-hooks` or native Claude Code hooks — incremental refresh after every commit |
 | **Live dashboard** | Sigma.js force-directed graph, risk heatmap, diff overlay, BFS pathfinder, tour player |
 
 ---
@@ -211,15 +318,15 @@ sprang_health {}
 <!-- Architecture diagram — generated with Gemini gemini-3.1-flash-image-preview -->
 <p align="center">
   <img src="assets/architecture.png" alt="Sprang platform architecture — four packages: core, cli, mcp, dashboard" width="100%" />
-  <em>Four packages. One data layer. Cascade is the intelligence; Sprang is the memory.</em>
+  <em>Four packages. One data layer. Your AI agent is the intelligence; Sprang is the memory.</em>
 </p>
 
 ```
 packages/
-├── core/       Pipeline: 9 agents, schema, watcher, graph store
-├── cli/        sprang scan | health | query | watch | status
-├── mcp/        stdio MCP server — 8 tools for Cascade
-└── dashboard/  React + Vite + Sigma.js — 4 views, 25 components
+├── core/       Pipeline: 9 agents, schema, watcher, graph store, fingerprinting, semantic search
+├── cli/        sprang scan | health | query | watch | status | install-hooks
+├── mcp/        stdio MCP server — 9 tools for all AI platforms
+└── dashboard/  React + Vite + Sigma.js — 5 views (Graph/Health/Domains/Architecture/Learn)
 ```
 
 ```mermaid
@@ -229,8 +336,14 @@ graph LR
     DASH["@sprang/dashboard"] -->|"fetches knowledge-graph.json"| FS["filesystem (.sprang/)"]
     CORE --> FS
     MCP --> FS
-    CASCADE["Cascade / Devin"] -->|"MCP tools"| MCP
-    CASCADE -->|"slash commands"| CLI
+
+    CASCADE["Windsurf / Devin Desktop\n(mcp_config.json or .devin/config.json)"] -->|"MCP tools"| MCP
+    CASCADE -->|"slash commands / skills"| CLI
+
+    CLAUDE["Claude Code\n(.mcp.json)"] -->|"MCP tools"| MCP
+    CLAUDE -->|"slash commands (.claude/commands/)"| CLI
+
+    COPILOT["GitHub Copilot\n(.vscode/mcp.json)"] -->|"MCP tools"| MCP
 ```
 
 ---
@@ -243,43 +356,30 @@ graph LR
 
 ---
 
-## Manual installation
+## Manual build
+
+If you've cloned the repo and want to build without using the installer:
 
 ```bash
-# 1. Clone (or pull latest if already cloned)
-if [ -d ~/tools/sprang ]; then
-  git -C ~/tools/sprang pull --ff-only
-else
-  git clone https://github.com/FavioVazquez/sprang.git ~/tools/sprang
-fi
-cd ~/tools/sprang
+cd ~/tools/sprang   # or wherever you cloned to
 
-# 2. Install all dependencies
-pnpm install
+pnpm install        # install all dependencies
+pnpm build          # build all packages
 
-# 3. Build all packages
-pnpm build
-
-# 4. Link CLI globally (so `sprang` works from anywhere)
-#    pnpm setup adds PNPM_HOME to your shell profile automatically
+# Link the CLI globally
 cd packages/cli
 pnpm setup
 export PNPM_HOME="$HOME/.local/share/pnpm"
 export PATH="$PNPM_HOME:$PATH"
 pnpm link --global
 cd ../..
+
+which sprang        # verify: should print $PNPM_HOME/sprang
+sprang --version    # 0.2.0
 ```
 
 ```bash
-# Verify
-which sprang        # should print $PNPM_HOME/sprang
-sprang --version    # 0.1.2
-sprang --help
-```
-
-```bash
-# 5. Start the dashboard (serves the pre-built dist/ — instant, no compilation)
-#    Set SPRANG_ROOT to tell the dashboard which project's graph to load
+# Start the dashboard (serves pre-built dist/, instant startup)
 SPRANG_ROOT="/path/to/your/project" pnpm --filter @sprang/dashboard preview
 # Open http://localhost:7777
 ```
@@ -292,8 +392,14 @@ SPRANG_ROOT="/path/to/your/project" pnpm --filter @sprang/dashboard preview
 # Phase 1 — static analysis, < 60s, builds the skeleton graph
 sprang scan /path/to/your/project --phase1-only
 
-# Full scan — Phase 1 now + Phase 2 enrichment triggered by Cascade
+# Full scan — Phase 1 now + Phase 2 enrichment via your AI agent
 sprang scan /path/to/your/project
+
+# Skip scan if graph is already current (compares git HEAD vs stats.gitCommitHash)
+sprang scan . --phase1-only --if-stale
+
+# Install a post-commit git hook that auto-refreshes the graph after each commit
+sprang install-hooks
 
 # Check graph age, phase, and node/edge count
 sprang status
@@ -301,8 +407,9 @@ sprang status
 # Print health report: smells, risk table, orphans, circular deps
 sprang health
 
-# Fuzzy-search nodes by name or summary
+# Search nodes by name or summary
 sprang query "authentication"
+sprang query "authentication" --semantic   # cosine similarity over TF-IDF embeddings
 
 # Watch for file changes and incrementally update the graph
 sprang watch
@@ -315,28 +422,27 @@ your-project/
 └── .sprang/
     ├── knowledge-graph.json   ← main graph (nodes, edges, risk scores, smells)
     ├── SPRANG_REPORT.md       ← human-readable architecture summary
-    ├── annotations/           ← Cascade-written node annotations (commit these)
+    ├── annotations/           ← agent-written node annotations (commit these)
     ├── config.json            ← optional thresholds + excludes
     └── intermediate/          ← Phase 2 progress (gitignored)
 ```
 
 ---
 
-## Setup with Windsurf / Cascade
+## Windsurf / Devin Desktop — detailed setup
 
-The fastest path is the [agentic install prompt](#quick-install--just-ask-cascade) at the top — paste it into Cascade and it handles everything. For manual setup:
+The fastest path is the [agentic install prompt](#installation) above. For manual step-by-step control:
 
-### Step 1 — Scan your project
+### 1 — Build and scan
 
 ```bash
-sprang scan . --phase1-only
+cd ~/tools/sprang && pnpm install && pnpm build
+sprang scan /path/to/your/project --phase1-only
 ```
 
-Produces `.sprang/knowledge-graph.json` in under 60 seconds — fully static, no network calls.
+### 2 — Add the MCP server
 
-### Step 2 — Add the MCP server
-
-Add to `~/.codeium/windsurf/mcp_config.json` (merge if the file already exists):
+For **Windsurf** — add to `~/.codeium/windsurf/mcp_config.json` (merge if the file exists):
 
 ```json
 {
@@ -350,106 +456,9 @@ Add to `~/.codeium/windsurf/mcp_config.json` (merge if the file already exists):
 }
 ```
 
-> Use full absolute paths. `${workspaceFolder}` is **not** resolved in `mcp_config.json`.
+> `${workspaceFolder}` is **not** resolved in this file — use full absolute paths.
 
-### Step 3 — Copy workflows, skills, and rules
-
-```bash
-mkdir -p .windsurf/workflows .windsurf/skills .devin/rules
-cp /path/to/sprang/.windsurf/workflows/*.md .windsurf/workflows/
-cp -r /path/to/sprang/.windsurf/skills/sprang* .windsurf/skills/
-cp /path/to/sprang/.devin/rules/*.md .devin/rules/
-ln -sf ../.windsurf/workflows .devin/workflows
-ln -sf ../.windsurf/skills .devin/skills
-```
-
-### Step 4 — Start the dashboard
-
-The dashboard serves the pre-built `dist/` — no compilation, instant startup:
-
-```bash
-SPRANG_ROOT="$(pwd)" pnpm --filter @sprang/dashboard preview
-```
-
-Open **http://localhost:7777**. It reads `.sprang/knowledge-graph.json` directly from your project.
-
-### Step 5 — Install the cascade-messaging extension
-
-This enables persistent chat from the Sprang dashboard — messages keep their context across Cascade sessions.
-
-```bash
-# Check if already installed
-windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging && echo "already installed" || \
-  windsurf --install-extension /path/to/sprang/cascade-messaging-0.1.0.vsix
-```
-
-Or manually: **Extensions** → **Install from VSIX** → select `cascade-messaging-0.1.0.vsix` from the Sprang root.
-
-### Step 6 — Reload Windsurf and run onboarding
-
-Reload the window (`Cmd/Ctrl+Shift+P` → *Reload Window*) to activate the MCP server and extension, then:
-
-```
-/sprang-onboard
-```
-
-### What Cascade does automatically
-
-Once the MCP server is active and `.devin/rules/` files are present, Cascade will automatically:
-
-- **Before editing any file** — call `sprang_node` to check `risk_score` and `structural_warnings`
-- **On high-risk files (risk > 0.7)** — call `sprang_why` to read decision context before changing anything
-- **After changes** — call `sprang_diff_impact` to assess blast radius
-
-Driven by `.devin/rules/sprang-context.md` (always-on) and `.devin/rules/sprang-highrisk.md` (glob trigger on `*.ts`, `*.tsx`, `packages/*/src`).
-
----
-
-## Dashboard chat (cascade-messaging)
-
-The **cascade-messaging** extension bridges the Sprang dashboard's **Ask Cascade** panel to Windsurf, maintaining conversation context across sessions even though each message technically opens a new Cascade tab.
-
-### How it works
-
-1. You type a message in the dashboard's Ask Cascade panel and press Send
-2. The dashboard writes the message to `.cascade-trigger-session` in the workspace root
-3. The extension detects the file change and forwards the message to Cascade via `devin.sendChatActionMessage`
-4. Cascade loads `.devin/rules/cascade-messaging.md` (`always_on`) — which tells it to:
-   - Read `.cascade-conversation.md` to restore prior conversation history
-   - Answer the message in context
-   - Call `sprang_respond` so the reply appears in the dashboard UI
-5. The extension polls `~/.windsurf/transcripts/` for the new session transcript, extracts the exchange, and appends it to `.cascade-conversation.md`
-6. Next message: Cascade reads the updated history — full continuity restored
-
-### Installation
-
-```bash
-# From the Sprang root directory
-windsurf --install-extension cascade-messaging-0.1.0.vsix
-# Or: Extensions → Install from VSIX → cascade-messaging-0.1.0.vsix
-```
-
-The extension activates automatically on startup. A status bar item `$(broadcast) Cascade Messaging: watching` confirms it is running.
-
-### Configuration
-
-| Setting | Default | Description |
-|---|---|---|
-| `cascade-messaging.triggerFile` | `.cascade-trigger-session` | Trigger file path relative to workspace root |
-| `cascade-messaging.autoStart` | `true` | Start watcher automatically on activation |
-
-### Runtime files (all gitignored)
-
-| File | Purpose |
-|---|---|
-| `.cascade-trigger-session` | Written by dashboard, read by extension |
-| `.cascade-conversation.md` | Append-only conversation log — gives every new session its memory |
-
----
-
-## Setup with Devin Desktop
-
-Add to `.devin/config.json` in your project root:
+For **Devin Desktop** — add to `.devin/config.json` in your project root instead:
 
 ```json
 {
@@ -463,25 +472,113 @@ Add to `.devin/config.json` in your project root:
 }
 ```
 
-> In `.devin/config.json`, `${workspaceFolder}` **is** resolved to the project root.
+> In `.devin/config.json`, `${workspaceFolder}` **is** resolved automatically.
 
-Skills and workflows live in `.windsurf/skills/` and `.windsurf/workflows/`, symlinked to `.devin/skills/` and `.devin/workflows/` so both Cascade and Devin agents discover them automatically.
+### 3 — Copy workflows, skills, and rules
+
+```bash
+mkdir -p .windsurf/workflows .windsurf/skills .devin/rules
+cp /path/to/sprang/.windsurf/workflows/*.md .windsurf/workflows/
+cp -r /path/to/sprang/.windsurf/skills/sprang* .windsurf/skills/
+cp /path/to/sprang/.devin/rules/*.md .devin/rules/
+ln -sf ../.windsurf/workflows .devin/workflows
+ln -sf ../.windsurf/skills .devin/skills
+```
+
+### 4 — Start the dashboard
+
+```bash
+SPRANG_ROOT="$(pwd)" pnpm --filter @sprang/dashboard preview
+# Opens at http://localhost:7777
+```
+
+> **Important — start the server from a Windsurf / Devin Desktop terminal.**
+> Bridge detection uses three signals (any one is sufficient):
+> 1. `WINDSURF_CASCADE_TERMINAL_KIND` env var — automatically present in all IDE terminals
+> 2. `.sprang/.cascade-bridge-active` — written by the cascade-messaging extension on activation (works even if the server was started outside the IDE)
+> 3. `.cascade-trigger-session` exists — legacy fallback
+>
+> If the server is started outside the IDE (e.g. via SSH without the env) and the extension hasn't written the marker yet, the bridge falls through to Claude Code or Copilot CLI if those are installed.
+
+### 5 — Install the cascade-messaging extension
+
+Enables persistent chat from the Sprang dashboard with context across Cascade sessions.
+
+```bash
+windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging && echo "already installed" || \
+  windsurf --install-extension /path/to/sprang/cascade-messaging-0.1.0.vsix
+```
+
+Or: **Extensions** → **Install from VSIX** → `cascade-messaging-0.1.0.vsix`.
+
+### 6 — Reload and run onboarding
+
+Reload (`Cmd/Ctrl+Shift+P` → *Reload Window*) to activate the MCP server, then:
+
+```
+/sprang-onboard
+```
+
+### What the agent does automatically
+
+With `.devin/rules/` files present, your agent will:
+
+- **Before editing any file** — call `sprang_node` to check `risk_score` and `structural_warnings`
+- **On high-risk files (risk > 0.7)** — call `sprang_why` to read decision context first
+- **After changes** — call `sprang_diff_impact` to assess blast radius
+
+Driven by `sprang-context.md` (always-on) and `sprang-highrisk.md` (glob: `*.ts`, `*.tsx`, `packages/*/src`).
+
+---
+
+## Ask Agent (dashboard chat)
+
+The **Ask Agent** panel in the Sprang dashboard lets you ask questions about your codebase and see answers inline — routed through whichever AI agent is active. The bridge auto-detects the available agent at each request.
+
+### Bridge priority
+
+| Priority | Agent | How it works |
+|---|---|---|
+| 1 | **Windsurf / Devin Desktop** | Writes to `.cascade-trigger-session` — the `cascade-messaging` VS Code extension forwards it to Cascade, which calls `sprang_respond` MCP tool to write the reply. Async (poll). |
+| 2 | **Claude Code** (`claude` CLI) | Spawns `claude -p "<question>" --output-format json` non-interactively. Session ID persisted to `.sprang/claude-session.json` — resumes previous conversation via `--resume`. Sync. |
+| 3 | **GitHub Copilot CLI** (`copilot`) | Spawns `copilot -p "<question>"` non-interactively. Uses `--continue` for session continuity once a session exists. Sync. |
+| — | **None** | Panel shows instructions to install one of the above. |
+
+The active bridge is shown below the "Ask Agent" header (`via Claude Code`, `via Copilot CLI`, `via Windsurf`).
+
+### Session files (gitignored)
+
+| File | Purpose |
+|---|---|
+| `.sprang/cascade-response.json` | Response written by `sprang_respond` MCP tool or by the CLI bridge; polled by dashboard |
+| `.sprang/claude-session.json` | Persisted Claude Code session ID for `--resume` |
+| `.sprang/copilot-session.json` | Copilot CLI session marker for `--continue` |
+| `.cascade-trigger-session` | Written by dashboard Windsurf bridge, read by cascade-messaging extension |
+
+### Windsurf / Devin Desktop setup
+
+| Setting | Default | Description |
+|---|---|---|
+| `cascade-messaging.triggerFile` | `.cascade-trigger-session` | Trigger file path relative to workspace root |
+| `cascade-messaging.autoStart` | `true` | Start watcher automatically on activation |
 
 ---
 
 ## Slash commands
 
+Available in Windsurf / Cascade, Devin Desktop, and Claude Code:
+
 | Command | Description |
 |---|---|
 | `/sprang` | Build or refresh the knowledge graph — auto-detects codebase vs knowledge base |
-| `/sprang-analyze [path] [--full] [--language <lang>] [--chunk N]` | Full Cascade-driven codebase analysis — summaries, layers, tour, risk |
+| `/sprang-analyze [path] [--full] [--language <lang>] [--chunk N]` | Full AI-driven analysis — summaries, layers, tour, risk |
 | `/sprang-knowledge [path] [--format obsidian\|logseq\|...] [--full]` | Build knowledge graph from markdown notes |
-| `/sprang-chat <question>` | Ask any question about the codebase using the knowledge graph |
+| `/sprang-chat <question>` | Ask any question about the codebase |
 | `/sprang-explain <file>` | Deep-dive: what, why, who, risk, history for a file or function |
 | `/sprang-onboard` | Guided architecture tour — adapts to persona (junior / senior / PM) |
-| `/sprang-diff [files...]` | Blast radius analysis — writes diff overlay for dashboard amber highlight |
+| `/sprang-diff [files...]` | Blast radius analysis — writes diff overlay for dashboard |
 | `/sprang-domain [name]` | Explore business domain architecture and flows |
-| `/sprang-why <file>` | Why does this file exist? Git history + rationale + team annotations |
+| `/sprang-why <file>` | Git history + rationale + team annotations for a file |
 | `/sprang-health` | Full health report: risk, smells, orphans, circular deps |
 | `/sprang-team [node]` | Browse/write team annotations with staleness detection |
 
@@ -491,8 +588,8 @@ Skills and workflows live in `.windsurf/skills/` and `.windsurf/workflows/`, sym
 
 <!-- Pipeline diagram — generated with Gemini gemini-3.1-flash-image-preview -->
 <p align="center">
-  <img src="assets/pipeline.png" alt="Sprang two-phase pipeline: Phase 1 static skeleton, Phase 2 Cascade-driven enrichment" width="100%" />
-  <em>Phase 1 is fully static — runs in under 60 seconds, no network calls. Phase 2 is driven by Cascade as the intelligence layer.</em>
+  <img src="assets/pipeline.png" alt="Sprang two-phase pipeline: Phase 1 static skeleton, Phase 2 AI-driven enrichment" width="100%" />
+  <em>Phase 1 is fully static — runs in under 60 seconds, no network calls. Phase 2 is driven by your AI agent.</em>
 </p>
 
 ```mermaid
@@ -504,15 +601,18 @@ flowchart TB
         SD --> SG[skeleton graph written]
         RS --> SG
     end
-    subgraph Phase2 ["Phase 2 — Background enrichment"]
-        G1[architecture-analyzer · domain-analyzer · git-layer] --> G2
-        G2[tour-builder · risk-scorer update] --> GR[graph-reviewer]
+    subgraph Phase2 ["Phase 2 — Enrichment (via /sprang-analyze)"]
+        G1[architecture-analyzer] --> TB[tour-builder]
+        G2[domain-analyzer] --> TB
+        G3[git-layer] --> RS2[risk-scorer update]
+        RS2 --> TB
+        TB --> GR[graph-reviewer]
         GR --> FG[final graph + SPRANG_REPORT.md]
     end
-    SG -->|"Phase 2 via /sprang-analyze"| Phase2
+    SG -->|"forks Phase 2"| Phase2
 ```
 
-**Cascade is the intelligence layer.** There is no external API. Phase 2 enrichment is performed by Cascade using its own context window — it reads the graph, writes summaries, and calls `sprang_annotate` to record what it learns.
+**Your AI agent is the intelligence layer.** Phase 2 enrichment is performed by the agent using its own context window — it reads the graph, writes summaries, and calls `sprang_annotate` to record what it learns. No external API.
 
 ---
 
@@ -535,7 +635,7 @@ node.decision_context: { commits, primary_authors, last_changed,
                           change_frequency, rationale_snippets, pr_references }
 ```
 
-### `smell-detector` — 8 deterministic heuristics, fully deterministic
+### `smell-detector` — 8 deterministic heuristics, no LLM calls
 
 | Smell | Trigger |
 |---|---|
@@ -572,19 +672,22 @@ risk_score = clamp(
 
 <!-- MCP tools reference — generated with Gemini gemini-3.1-flash-image-preview -->
 <p align="center">
-  <img src="assets/mcp-tools.png" alt="Sprang MCP server — 8 tools for Cascade" width="100%" />
+  <img src="assets/mcp-tools.png" alt="Sprang MCP server — 9 tools for all AI platforms" width="100%" />
 </p>
 
 | Tool | Input | Output |
 |---|---|---|
-| `sprang_node` | `{ node_id }` | Full node + 1-hop neighbors + layer + in/out degree + annotation |
-| `sprang_query` | `{ query, node_types?, limit? }` | Fuzzy-ranked nodes with summaries |
+| `sprang_node` | `{ node_id }` | Full node + 1-hop neighbors + layer + in/out degree + annotation status |
+| `sprang_query` | `{ query, node_types?, limit?, mode? }` | Fuzzy or semantic-ranked nodes with summaries |
 | `sprang_diff_impact` | `{ files: string[] }` | BFS blast-radius, risk-ranked impact list |
 | `sprang_why` | `{ node_id }` | Decision context + git history + team annotation |
 | `sprang_health` | `{}` | Smell summary, top-10 risk, orphans, circular deps |
-| `sprang_tour` | `{ tour_id?, persona? }` | Ordered pedagogical tour, persona-filtered |
+| `sprang_tour` | `{ tour_id?, persona? }` | Ordered pedagogical tour with language lessons per step |
 | `sprang_domain` | `{ domain_name? }` | Business domain flows and entry points |
 | `sprang_annotate` | `{ node_id, content, tags? }` | Write `.sprang/annotations/<id>.md` |
+| `sprang_respond` | `{ response, question? }` | Write response to `.sprang/cascade-response.json` for dashboard display |
+
+`sprang_query` accepts `mode: "semantic"` for cosine similarity search over TF-IDF embeddings.
 
 ### Enriched `sprang_node` response
 
@@ -601,12 +704,12 @@ risk_score = clamp(
 }
 ```
 
-### Cascade interaction flow
+### Agent interaction flow
 
 ```mermaid
 sequenceDiagram
     participant D as Developer
-    participant C as Cascade
+    participant C as AI Agent
     participant M as sprang-mcp
     participant F as filesystem
 
@@ -626,12 +729,11 @@ sequenceDiagram
 ## Dashboard
 
 ```bash
-# Development — live reload
+# Development — live reload at http://localhost:7338
 SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard dev
-# Opens at http://localhost:5173
 
-# Point at this repo itself
-SPRANG_ROOT=$(pwd) pnpm --filter @sprang/dashboard dev
+# Production preview — pre-built dist/, instant startup at http://localhost:7777
+SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard preview
 ```
 
 ### Views
@@ -641,9 +743,25 @@ SPRANG_ROOT=$(pwd) pnpm --filter @sprang/dashboard dev
 | **Graph** | `g` / `1` | Sigma.js force-directed canvas — risk heatmap, layer filter, diff overlay, BFS pathfinder |
 | **Health** | `h` / `2` | Smell breakdown, top-10 risky nodes, circular deps, orphan count |
 | **Domains** | `d` / `3` | Business domain explorer — list view + React Flow layout toggle |
-| **Learn** | `l` / `4` | Persona-adaptive guided tour with language lessons |
+| **Architecture** | `a` / `4` | React Flow + ELK layer map — one card per layer, weighted cross-layer edge count |
+| **Learn** | `l` / `5` | Persona-adaptive guided tour with language lessons per step |
 
-### Toolbar components (25 total)
+### Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| `Cmd/Ctrl+K` | Open node search |
+| `Esc` | Close panel / search |
+| `g` / `1` | Graph view |
+| `h` / `2` | Health view |
+| `d` / `3` | Domains view |
+| `a` / `4` | Architecture view |
+| `l` / `5` | Learn view |
+| `r` | Toggle risk overlay |
+| `?` | Keyboard shortcuts help |
+
+<details>
+<summary>Toolbar components (25 total)</summary>
 
 | Component | Role |
 |---|---|
@@ -664,18 +782,7 @@ SPRANG_ROOT=$(pwd) pnpm --filter @sprang/dashboard dev
 | MobileBottomNav | Bottom nav on screens < 768px |
 | BreadCrumb | Layer → Node drill-down above the graph panel |
 
-### Keyboard shortcuts
-
-| Key | Action |
-|---|---|
-| `Cmd/Ctrl+K` | Open node search |
-| `Esc` | Close panel / search |
-| `g` `1` | Graph view |
-| `h` `2` | Health view |
-| `d` `3` | Domains view |
-| `l` `4` | Learn view |
-| `r` | Toggle risk overlay |
-| `?` | Keyboard shortcuts help |
+</details>
 
 ---
 
@@ -684,7 +791,6 @@ SPRANG_ROOT=$(pwd) pnpm --filter @sprang/dashboard dev
 `/sprang-knowledge [path]` builds a `kind: "knowledge"` graph from markdown notes — Obsidian vaults, Logseq databases, Dendron workspaces, Foam wikis, Zettelkasten archives, or plain markdown.
 
 ```bash
-# In Cascade chat
 /sprang-knowledge /path/to/your/notes
 ```
 
@@ -700,6 +806,9 @@ The dashboard auto-switches to knowledge mode: `KnowledgeInfo` sidebar, `Reading
 ---
 
 ## Graph schema
+
+<details>
+<summary>Extended node schema</summary>
 
 ```typescript
 interface SprangNode {
@@ -740,6 +849,8 @@ interface SprangNode {
 
 Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatter — **commit these files** so team knowledge persists across sessions.
 
+</details>
+
 ---
 
 ## Live watcher
@@ -758,70 +869,106 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 277 unit tests across core/dashboard/mcp, zero failures
+pnpm test              # 508 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
-pnpm --filter @sprang/dashboard dev        # dashboard at localhost:5173
-pnpm --filter @sprang/dashboard test:e2e   # 15 Playwright e2e tests (15 parallel workers)
+pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
+pnpm --filter @sprang/dashboard test:e2e   # 32 Playwright e2e tests
 ```
 
-### Test structure
+### Test summary
 
-| Package | Runner | Count | What is tested |
+| Package | Runner | Tests | What is tested |
 |---|---|---|---|
-| `@sprang/core` | Vitest | 228 | Schema validators, all 6 agents, pipeline integration, multi-language |
-| `@sprang/dashboard` | Vitest | 33 | Zustand store (26), BFS pathfinder (7) |
-| `@sprang/mcp` | Vitest | 49 | GraphLoader (3), sprang_node + sprang_annotate (11), all 8 MCP tools (35) |
-| **Total unit** | | **277** | |
-| `@sprang/dashboard` | Playwright | 15 | Full UI e2e — loading, nav, keyboard shortcuts, health, domains, search, onboarding |
+| `@sprang/core` | Vitest | 383 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree |
+| `@sprang/dashboard` | Vitest | 55 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6) |
+| `@sprang/mcp` | Vitest | 52 | GraphLoader (3), sprang_node + sprang_annotate (11), all 9 MCP tools (38) |
+| `@sprang/cli` | Vitest | 18 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12) |
+| **Total unit** | | **508** | |
+| `@sprang/dashboard` | Playwright | 32 | Full UI e2e — loading, nav, keyboard shortcuts, architecture tab, cascade bridge, APIs |
+
+<details>
+<summary>Full test structure</summary>
 
 ```
 packages/core/tests/
 ├── schema/
-│   └── validators.test.ts        21 tests — Zod schema, round-trip serialization
+│   └── validators.test.ts                  21 tests — Zod schema, round-trip serialization
 ├── agents/
-│   ├── project-scanner.test.ts      6 tests — file discovery, language detection
-│   ├── file-analyzer.test.ts        5 tests — AST parsing, edge extraction
-│   ├── smell-detector.test.ts      14 tests — circular-deps, god-node, clean baseline
-│   ├── risk-scorer.test.ts         15 tests — formula weights, factor tags
-│   ├── git-layer.test.ts            6 tests — commit association, PR refs
-│   ├── architecture-analyzer.test.ts  8 tests — layer clustering
-│   ├── multi-lang-imports.test.ts  50 tests — per-language import extraction + resolver
-│   └── multi-lang-symbols.test.ts  34 tests — per-language symbol parsing
-└── integration/
-    ├── pipeline.test.ts            13 tests — full Phase 1 against simple-ts/ fixture
-    ├── pipeline-python.test.ts      8 tests — full Phase 1 against simple-python/ fixture
-    └── pipeline-multilang.test.ts  16 tests — Go, Rust, Java, Ruby, C, Kotlin pipelines
+│   ├── project-scanner.test.ts              6 tests — file discovery, language detection
+│   ├── project-scanner-fingerprint.test.ts  6 tests — fingerprint stats, skip/structural detection
+│   ├── file-analyzer.test.ts                5 tests — AST parsing, edge extraction
+│   ├── smell-detector.test.ts              14 tests — circular-deps, god-node, clean baseline
+│   ├── risk-scorer.test.ts                 15 tests — formula weights, factor tags
+│   ├── git-layer.test.ts                    6 tests — commit association, PR refs
+│   ├── architecture-analyzer.test.ts        8 tests — layer clustering
+│   ├── language-lessons.test.ts            52 tests — 12 pattern detectors, positive + negative
+│   ├── language-lessons-priority.test.ts   15 tests — priority ladder, multi-language
+│   ├── multi-lang-imports.test.ts          50 tests — per-language import extraction + resolver
+│   └── multi-lang-symbols.test.ts          34 tests — per-language symbol parsing
+├── graph/
+│   ├── normalize.test.ts                   14 tests — all 6 normalization steps
+│   └── merge-subgraphs.test.ts              9 tests — pnpm workspace, prefix namespacing
+├── utils/
+│   ├── fingerprint.test.ts                 20 tests — SHA-256, TS/Python/Go extraction, classifyChange
+│   └── embedding-search.test.ts            25 tests — cosine similarity, TF-IDF, vocabulary
+└── orchestrator/
+    ├── worktree.test.ts                      4 tests — worktree redirect, git-not-found
+    ├── pipeline.test.ts                     13 tests — full Phase 1 against simple-ts/ fixture
+    ├── pipeline-python.test.ts               8 tests — full Phase 1 against simple-python/ fixture
+    └── pipeline-multilang.test.ts           16 tests — Go, Rust, Java, Ruby, C, Kotlin pipelines
 
 packages/dashboard/src/
-├── store.test.ts           26 tests — Zustand store state transitions
-└── pathfinder.test.ts       7 tests — BFS shortest path
+├── store.test.ts                26 tests — Zustand store state transitions
+└── pathfinder.test.ts            7 tests — BFS shortest path
+
+packages/dashboard/src/pages/
+└── ArchitectureView.test.ts      9 tests — empty-state detection, card count, edge aggregation
+
+packages/dashboard/src/utils/
+├── edge-aggregation.test.ts      7 tests — cross-layer counting, intra-layer exclusion
+└── elk-layout.test.ts            6 tests — ELK mock, coordinate pass-through, fallback
 
 packages/dashboard/e2e/
-└── app.spec.ts             15 tests — Playwright, 15 parallel workers
+└── app.spec.ts                  32 tests — Playwright, full UI coverage
     ├── error state (no graph, retry button)
-    ├── loaded state (nav, tabs)
-    ├── navigation (graph → health → domains)
-    ├── keyboard shortcuts (Ctrl+K, h, g, d, ?)
+    ├── loaded state (all 5 nav tabs)
+    ├── navigation (graph → health → domains → architecture → learn)
+    ├── keyboard shortcuts (Ctrl+K, h, g, d, a, l, ?, 1-5)
     ├── health view (heading, god_node smell)
     ├── domains view (domain label rendered)
     ├── search dialog (open, type, filter, close)
     ├── onboarding overlay (dismiss)
-    ├── graph toolbar (project name)
-    └── nav bar (logo persistence)
+    ├── architecture view (empty state, layer count, card click, clear selection)
+    ├── cascade bridge (/cascade-ask POST validation + success, /cascade-response)
+    ├── graph APIs (/knowledge-graph.json, /diff-overlay.json, /file-content.json)
+    └── nav bar (logo + Architecture tab persistence)
 
 packages/mcp/tests/
-├── graph-loader.test.ts     3 tests — load, null-on-missing, hot-reload
-├── sprang-node.test.ts     11 tests — sprang_node enrichment, sprang_annotate
-└── mcp-tools.test.ts       35 tests — all 8 MCP tools:
+├── graph-loader.test.ts          3 tests — load, null-on-missing, hot-reload
+├── sprang-node.test.ts          11 tests — sprang_node enrichment, sprang_annotate
+└── mcp-tools.test.ts            38 tests — all 9 MCP tools:
     ├── sprang_health  (7)  — counts, risk summary, smells, orphan detection
-    ├── sprang_tour    (7)  — default/id, junior/senior/pm persona, step enrichment
-    ├── sprang_query   (6)  — label/summary match, empty, type filter, limit
+    ├── sprang_tour    (7)  — default/id, junior/senior/pm persona, languageLesson
+    ├── sprang_query   (9)  — label/summary match, empty, type filter, limit, mode:semantic
     ├── sprang_diff    (5)  — changed nodes, BFS blast radius, unknown files
     ├── sprang_domain  (4)  — list all, detail by name, unknown error
     └── sprang_why     (6)  — label/summary, decision_context, graceful no-context
+
+packages/cli/tests/
+├── scan-if-stale.test.ts         3 tests — hash-match skip, hash-mismatch scan, missing graph
+├── install-hooks.test.ts         3 tests — fresh creation, append-to-existing, duplicate guard
+└── hooks-scripts.test.ts        12 tests — session-start.sh and post-tool-use.sh via bash:
+    ├── session-start.sh (5): no-graph warning, fresh silence, stale hash display,
+    │                         missing-gitCommitHash silence, non-git-repo silence
+    └── post-tool-use.sh (7): non-git-command silence, no-graph silence, no-CLI silence,
+                               empty-input silence, merge detection, cherry-pick detection,
+                               no trigger on git status/log/diff/push
 ```
 
-### Test fixtures
+</details>
+
+<details>
+<summary>Test fixtures</summary>
 
 | Fixture | Purpose |
 |---|---|
@@ -839,12 +986,16 @@ packages/mcp/tests/
 | `god-node/` | 30+ imports, 300+ LOC |
 | `git-repo/` | 20 scripted commits, 3 authors, PR refs in messages |
 | `well-tested/` | Every source file has a `tested_by` edge |
+| `monorepo-root/` | pnpm workspace with 2 packages for subgraph merge testing |
+
+</details>
 
 ---
 
 ## Configuration
 
-`.sprang/config.json` in your project root:
+<details>
+<summary>.sprang/config.json — thresholds and options</summary>
 
 ```json
 {
@@ -866,6 +1017,8 @@ packages/mcp/tests/
 }
 ```
 
+</details>
+
 ---
 
 ## License
@@ -874,4 +1027,4 @@ MIT
 
 ---
 
-*The name Sprang comes from Kierkegaard's concept of the* qualitative spring *— the leap that cannot be reached by gradual accumulation alone, but only by a discontinuous jump in understanding. The git-layer, smell-detector, risk-scorer agents and the Devin Desktop integration are original work. Sprang was inspired by the open-source codebase comprehension space, particularly the work in [Understand-Anything](https://github.com/Lum1104/Understand-Anything).*
+*The name Sprang comes from Kierkegaard's concept of the* qualitative spring *— the leap that cannot be reached by gradual accumulation alone, but only by a discontinuous jump in understanding. The git-layer, smell-detector, risk-scorer agents and the Windsurf / Devin Desktop integration are original work. Sprang was inspired by the open-source codebase comprehension space, particularly the work in [Understand-Anything](https://github.com/Lum1104/Understand-Anything).*

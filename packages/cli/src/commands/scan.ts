@@ -1,7 +1,10 @@
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
+import { execSync } from 'node:child_process';
 import { Command } from 'commander';
 import ora from 'ora';
+import { readFile } from 'node:fs/promises';
 import { runPhase1Only, runSprangAnalysis } from '@sprang/core';
+import type { KnowledgeGraph } from '@sprang/core';
 
 export function makeScanCommand(): Command {
   const cmd = new Command('scan');
@@ -10,8 +13,31 @@ export function makeScanCommand(): Command {
     .argument('[path]', 'Path to the project root to scan', undefined)
     .option('--no-background', 'Run Phase 2 enrichment inline instead of in the background')
     .option('--phase1-only', 'Static analysis only — build the skeleton graph without Phase 2 enrichment')
-    .action(async (pathArg: string | undefined, options: { background: boolean; phase1Only: boolean }) => {
+    .option('--if-stale', 'Only scan if the graph is out of date (git HEAD ≠ graph commit hash)')
+    .action(async (pathArg: string | undefined, options: { background: boolean; phase1Only: boolean; ifStale: boolean }) => {
       const projectRoot = resolve(pathArg ?? process.cwd());
+
+      // --if-stale: skip scan when graph's recorded hash matches current HEAD
+      if (options.ifStale) {
+        const graphPath = join(projectRoot, '.sprang', 'knowledge-graph.json');
+        let graph: KnowledgeGraph | null = null;
+        try {
+          const raw = await readFile(graphPath, 'utf-8');
+          graph = JSON.parse(raw) as KnowledgeGraph;
+        } catch { /* file missing or parse error — treat as stale */ }
+
+        let currentHead: string | undefined;
+        try {
+          currentHead = execSync('git rev-parse HEAD', { cwd: projectRoot, encoding: 'utf-8' }).trim();
+        } catch { /* not a git repo or git unavailable */ }
+
+        if (currentHead && graph?.stats?.gitCommitHash === currentHead) {
+          const shortSha = currentHead.slice(0, 7);
+          process.stdout.write(`[sprang] Graph is current (commit: ${shortSha}). Skipping scan.\n`);
+          return;
+        }
+      }
+
       const spinner = ora('Phase 1: Scanning files...').start();
 
       try {

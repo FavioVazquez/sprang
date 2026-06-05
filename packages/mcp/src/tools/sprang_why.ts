@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { GraphLoader } from '../graph-loader.js';
 import type { DecisionContext } from '@sprang/core';
 
@@ -17,7 +17,10 @@ export interface SprangWhyResult {
 }
 
 function sanitizeNodeId(nodeId: string): string {
-  return nodeId.replace(/[:/]/g, '-');
+  const sanitized = nodeId
+    .replace(/[:/\\<>"|?*\x00-\x1f]/g, '-')
+    .replace(/\.{2,}/g, '-');
+  return basename(sanitized) || 'unknown-node';
 }
 
 export async function sprangWhy(

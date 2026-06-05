@@ -8,6 +8,7 @@ import {
   Terminal,
   Sparkles,
   BookOpen,
+  Layers,
 } from 'lucide-react';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { Button } from './components/ui/Button';
@@ -15,18 +16,19 @@ import { Badge } from './components/ui/Badge';
 import { GraphView } from './pages/GraphView';
 import { HealthView } from './pages/HealthView';
 import { DomainView } from './pages/DomainView';
+import { ArchitectureView } from './pages/ArchitectureView';
 import { LearnPanel } from './components/LearnPanel';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { WarningBanner } from './components/WarningBanner';
 import { ThemePicker, useTheme } from './components/ThemePicker';
 import { OnboardingOverlay, useOnboarding } from './components/OnboardingOverlay';
-import { MobileBottomNav } from './components/MobileLayout';
-import { AskCascadePanel } from './components/AskCascadePanel';
+import { MobileBottomNav, type MobileView } from './components/MobileLayout';
+import { AskAgentPanel } from './components/AskCascadePanel';
 import { loadGraph } from './api/graphApi';
 import { useDashboardStore } from './store';
 import type { KnowledgeGraph } from './types';
 
-type View = 'graph' | 'health' | 'domain' | 'learn';
+type View = MobileView;
 
 const NAV_ITEMS: Array<{
   id: View;
@@ -36,6 +38,7 @@ const NAV_ITEMS: Array<{
   { id: 'graph', label: 'Graph', icon: Network },
   { id: 'health', label: 'Health', icon: Activity },
   { id: 'domain', label: 'Domains', icon: Globe },
+  { id: 'architecture', label: 'Architecture', icon: Layers },
   { id: 'learn', label: 'Learn', icon: BookOpen },
 ];
 
@@ -193,7 +196,9 @@ export default function App() {
           setCurrentView('health'); break;
         case 'd': case '3':
           setCurrentView('domain'); break;
-        case 'l': case '4':
+        case 'a': case '4':
+          setCurrentView('architecture'); break;
+        case 'l': case '5':
           setCurrentView('learn'); break;
         case 'r':
           setShowRiskOverlay((v) => !v); break;
@@ -267,8 +272,8 @@ export default function App() {
             <span className="text-xs text-surface-600">v{graph.version}</span>
           </div>
 
-          {/* Ask Cascade */}
-          <AskCascadePanel />
+          {/* Ask Agent */}
+          <AskAgentPanel />
 
           {/* Theme picker */}
           <ThemePicker theme={theme} onChange={setTheme} />
@@ -330,6 +335,19 @@ export default function App() {
                 transition={{ duration: 0.12 }}
               >
                 <DomainView graph={graph} onNodeSelect={handleNodeSelect} />
+              </motion.div>
+            )}
+
+            {currentView === 'architecture' && (
+              <motion.div
+                key="architecture"
+                className="flex-1 flex overflow-hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+              >
+                <ArchitectureView />
               </motion.div>
             )}
 

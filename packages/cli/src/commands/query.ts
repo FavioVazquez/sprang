@@ -1,6 +1,7 @@
 import { resolve, join } from 'node:path';
 import { Command } from 'commander';
-import { loadGraphOrNull } from '@sprang/core';
+import { loadGraphOrNull, readJsonFileOrNull, semanticSearch } from '@sprang/core';
+import type { EmbeddingStore } from '@sprang/core';
 
 function truncate(str: string, len: number): string {
   if (str.length <= len) return str;
@@ -19,7 +20,8 @@ export function makeQueryCommand(): Command {
     .option('-t, --types <types>', 'Comma-separated node types to filter (e.g. function,class)')
     .option('-n, --limit <n>', 'Maximum results to show', '20')
     .option('-p, --path <path>', 'Project root path', undefined)
-    .action(async (question: string, options: { types?: string; limit: string; path?: string }) => {
+    .option('--semantic', 'Use semantic similarity search instead of keyword matching')
+    .action(async (question: string, options: { types?: string; limit: string; path?: string; semantic?: boolean }) => {
       const projectRoot = resolve(options.path ?? process.cwd());
       const sprangDir = join(projectRoot, '.sprang');
 
@@ -38,6 +40,62 @@ export function makeQueryCommand(): Command {
         ? options.types.split(',').map((t) => t.trim()).filter(Boolean)
         : undefined;
 
+      if (options.semantic) {
+        // ── Semantic mode ──────────────────────────────────────────────────────
+        const embeddingStorePath = join(sprangDir, 'cache', 'embeddings.json');
+        const embeddingStore = await readJsonFileOrNull<EmbeddingStore>(embeddingStorePath);
+
+        const candidates = nodeTypes && nodeTypes.length > 0
+          ? graph.nodes.filter((n) => nodeTypes.includes(n.type))
+          : graph.nodes;
+
+        const usingTfIdf = embeddingStore === null || Object.keys(embeddingStore.embeddings).length === 0;
+
+        const results = semanticSearch(
+          question,
+          candidates,
+          embeddingStore?.embeddings ?? null,
+          { limit }
+        );
+
+        if (results.length === 0) {
+          process.stdout.write(`No semantically similar nodes found for "${question}".\n`);
+          return;
+        }
+
+        // Build node lookup
+        const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
+
+        process.stdout.write('\n');
+        if (usingTfIdf) {
+          process.stdout.write(
+            `(using TF-IDF fallback — run /sprang-analyze to generate richer embeddings)\n\n`
+          );
+        }
+        process.stdout.write(
+          `Found ${results.length} semantic match${results.length !== 1 ? 'es' : ''} for "${question}"\n\n`
+        );
+        process.stdout.write(
+          `${pad('Label', 30)} ${pad('Type', 12)} ${'Score'.padStart(5)}  Summary\n`
+        );
+        process.stdout.write('-'.repeat(90) + '\n');
+
+        for (const result of results) {
+          const node = nodeMap.get(result.nodeId);
+          const label = node?.label ?? result.nodeId;
+          const type = node?.type ?? 'unknown';
+          const summary = node?.summary ? truncate(node.summary, 100) : '';
+          const scoreStr = result.score.toFixed(2);
+          process.stdout.write(
+            `${pad(truncate(label, 30), 30)} ${pad(type, 12)} ${scoreStr.padStart(5)}  ${summary}\n`
+          );
+        }
+
+        process.stdout.write('\n');
+        return;
+      }
+
+      // ── Text mode (default) ────────────────────────────────────────────────
       const lowerQuery = question.toLowerCase();
 
       type ScoredNode = {

@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { ensureDir, writeFileAtomic, fileExists } from '../utils/fs.js';
 import { createEmptyGraph, saveGraph } from '../graph/store.js';
+import { normalizeGraph } from '../graph/normalize.js';
 import { ProjectScannerAgent } from '../agents/project-scanner.js';
 import { FileAnalyzerAgent } from '../agents/file-analyzer.js';
 import type { LLMClient } from '../llm/client.js';
@@ -83,6 +84,16 @@ export async function runPhase1(
       generated_at: now,
     },
   };
+
+  // Normalize graph before saving
+  const { graph: normalizedGraph, report } = normalizeGraph(graph);
+  if (report.dedupedNodes > 0 || report.danglingEdges > 0 || report.doublePrefix > 0) {
+    log(
+      `[sprang] Graph normalized: ${report.doublePrefix} ID fixes, ${report.dedupedNodes} dup nodes, ` +
+        `${report.dedupedEdges} dup edges, ${report.danglingEdges} dangling edges removed`
+    );
+  }
+  graph = normalizedGraph;
 
   // Save skeleton graph
   log('[phase1] Saving skeleton knowledge graph...');

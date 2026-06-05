@@ -2,7 +2,7 @@
 """
 Hook: post_cascade_response_with_transcript
 Reads the JSONL transcript and appends the latest exchange
-(user message + Cascade response) to .cascade-conversation.md
+(user message + Cascade response) to .sprang/agent-conversation.md
 in the workspace root.
 
 This script is workspace-agnostic — it uses WINDSURF_WORKSPACE_ROOT
@@ -29,7 +29,9 @@ def main():
     if not workspace:
         return
 
-    conv_file = os.path.join(workspace, ".cascade-conversation.md")
+    sprang_dir = os.path.join(workspace, ".sprang")
+    os.makedirs(sprang_dir, exist_ok=True)
+    conv_file = os.path.join(sprang_dir, "agent-conversation.md")
 
     # Read transcript lines
     try:

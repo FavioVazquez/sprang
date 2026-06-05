@@ -1,6 +1,7 @@
 import { stat, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { KnowledgeGraph } from '@sprang/core';
+import { knowledgeGraphSchema } from '@sprang/core';
 
 export class GraphLoader {
   private graphCache: KnowledgeGraph | null = null;
@@ -50,8 +51,13 @@ export class GraphLoader {
         return;
       }
       const raw = await readFile(filePath, 'utf-8');
-      const parsed = JSON.parse(raw) as KnowledgeGraph;
-      this.graphCache = parsed;
+      const result = knowledgeGraphSchema.safeParse(JSON.parse(raw));
+      if (!result.success) {
+        this.graphCache = null;
+        this.lastMtime = 0;
+        return;
+      }
+      this.graphCache = result.data as KnowledgeGraph;
       this.lastMtime = mtime;
     } catch {
       this.graphCache = null;

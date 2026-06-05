@@ -26,7 +26,7 @@ const loader = new GraphLoader(sprangRoot);
 const server = new Server(
   {
     name: 'sprang',
-    version: '0.1.0',
+    version: '0.2.0',
   },
   {
     capabilities: {
@@ -181,7 +181,7 @@ const TOOLS = [
   {
     name: 'sprang_respond',
     description:
-      'Write a response to .sprang/cascade-response.json so the Sprang dashboard can display it. Use this after answering a question triggered via the dashboard Ask Cascade feature.',
+      'Write a response to .sprang/cascade-response.json so the Sprang dashboard can display it. Use this after answering a question triggered via the dashboard Ask Agent feature.',
     inputSchema: {
       type: 'object' as const,
       properties: {

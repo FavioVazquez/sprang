@@ -2,6 +2,20 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Send, Loader2, X, AlertCircle, MessageSquare, Trash2 } from 'lucide-react';
 
+type BridgeKind = 'windsurf' | 'claude' | 'copilot' | 'none';
+
+interface BridgeStatus {
+  kind: BridgeKind;
+  detail: string;
+}
+
+const BRIDGE_LABELS: Record<BridgeKind, string> = {
+  windsurf: 'Windsurf',
+  claude: 'Claude Code',
+  copilot: 'Copilot CLI',
+  none: 'No bridge',
+};
+
 interface CascadeResponse {
   response: string;
   question: string | null;
@@ -18,16 +32,30 @@ interface ChatMessage {
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 120_000;
 
-async function postAsk(message: string): Promise<boolean> {
+async function fetchBridgeStatus(): Promise<BridgeStatus> {
+  try {
+    const res = await fetch('/bridge-status');
+    if (!res.ok) return { kind: 'none', detail: 'bridge-status endpoint unavailable' };
+    return (await res.json()) as BridgeStatus;
+  } catch {
+    return { kind: 'none', detail: 'bridge-status fetch failed' };
+  }
+}
+
+async function postAsk(message: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch('/cascade-ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message }),
     });
-    return res.ok;
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({} as Record<string, unknown>)) as Record<string, unknown>;
+      return { ok: false, error: typeof body['error'] === 'string' ? body['error'] : `HTTP ${res.status}` };
+    }
+    return { ok: true };
   } catch {
-    return false;
+    return { ok: false, error: 'Network error' };
   }
 }
 
@@ -47,12 +75,13 @@ async function clearResponse(): Promise<void> {
   try { await fetch('/cascade-response', { method: 'DELETE' }); } catch { /* ignore */ }
 }
 
-export function AskCascadePanel() {
+export function AskAgentPanel() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [waiting, setWaiting] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [bridgeOk, setBridgeOk] = useState(true);
+  const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -74,9 +103,12 @@ export function AskCascadePanel() {
     }
   }, [messages, waiting]);
 
-  // Focus input when panel opens
+  // Focus input + fetch bridge status when panel opens
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 80);
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 80);
+      fetchBridgeStatus().then(setBridgeStatus).catch(() => null);
+    }
   }, [open]);
 
   const startPolling = useCallback((sentQuestion: string) => {
@@ -139,12 +171,13 @@ export function AskCascadePanel() {
       ts: new Date().toISOString(),
     }]);
 
-    const ok = await postAsk(msg);
-    if (!ok) {
+    const askResult = await postAsk(msg);
+    if (!askResult.ok) {
+      fetchBridgeStatus().then(setBridgeStatus).catch(() => null);
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
         role: 'error',
-        text: 'Could not reach the dashboard server. Is it running with SPRANG_ROOT set?',
+        text: askResult.error ?? 'Could not reach the dashboard server. Is it running with SPRANG_ROOT set?',
         ts: new Date().toISOString(),
       }]);
       return;
@@ -173,7 +206,7 @@ export function AskCascadePanel() {
       {/* Nav button */}
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Ask Cascade"
+        title="Ask Agent"
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
           open
             ? 'bg-sprang-500/20 text-sprang-300'
@@ -181,7 +214,7 @@ export function AskCascadePanel() {
         }`}
       >
         <Sparkles className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">Ask Cascade</span>
+        <span className="hidden sm:inline">Ask Agent</span>
         {messages.length > 0 && (
           <span className="ml-0.5 px-1 rounded-full bg-sprang-500/30 text-sprang-300 text-[9px] font-bold">
             {messages.filter(m => m.role !== 'error').length}
@@ -217,7 +250,14 @@ export function AskCascadePanel() {
                   <div className="w-5 h-5 rounded bg-sprang-500/20 flex items-center justify-center">
                     <Sparkles className="w-3 h-3 text-sprang-400" />
                   </div>
-                  <span className="text-xs font-semibold text-surface-200">Ask Cascade</span>
+                  <div>
+                    <span className="text-xs font-semibold text-surface-200">Ask Agent</span>
+                    {bridgeStatus && bridgeStatus.kind !== 'none' && (
+                      <span className="ml-1.5 text-[9px] text-surface-500 font-normal">
+                        via {BRIDGE_LABELS[bridgeStatus.kind]}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-1">
                   {messages.length > 0 && (
@@ -243,7 +283,10 @@ export function AskCascadePanel() {
                 <div className="flex items-start gap-2 mx-3 mt-3 px-3 py-2 rounded-lg bg-amber-950/50 border border-amber-800/50 flex-shrink-0">
                   <AlertCircle className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
                   <p className="text-[10px] text-amber-300 leading-relaxed">
-                    cascade-bridge not responding. Ensure Windsurf has the extension active and is watching this workspace.
+                    {bridgeStatus?.kind === 'none'
+                      ? 'No agent bridge detected. Install the cascade-messaging Windsurf extension, or install the claude / copilot CLI.'
+                      : `Bridge error (${BRIDGE_LABELS[bridgeStatus?.kind ?? 'none']}). Check that the agent is running and try again.`
+                    }
                   </p>
                 </div>
               )}
@@ -259,8 +302,12 @@ export function AskCascadePanel() {
                     <div>
                       <p className="text-xs font-medium text-surface-500">Ask about the codebase</p>
                       <p className="text-[10px] text-surface-700 mt-1">
-                        Questions go to Cascade via cascade-bridge.<br />
-                        Answers appear here automatically.
+                        {bridgeStatus
+                          ? bridgeStatus.kind === 'none'
+                            ? 'No bridge detected. Install claude CLI, copilot CLI, or the cascade-messaging Windsurf extension.'
+                            : `Connected via ${BRIDGE_LABELS[bridgeStatus.kind]}.`
+                          : 'Detecting agent bridge…'
+                        }
                       </p>
                     </div>
                   </div>
@@ -315,7 +362,7 @@ export function AskCascadePanel() {
                     onKeyDown={handleKeyDown}
                     rows={2}
                     disabled={waiting}
-                    placeholder={waiting ? 'Waiting for Cascade…' : 'Ask about the codebase… (Enter to send)'}
+                    placeholder={waiting ? 'Waiting for agent…' : 'Ask about the codebase… (Enter to send)'}
                     className="flex-1 resize-none rounded-xl bg-surface-800 border border-surface-700 text-xs text-surface-200 placeholder-surface-600 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-sprang-500 disabled:opacity-50"
                   />
                   <button

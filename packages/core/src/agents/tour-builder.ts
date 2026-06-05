@@ -1,7 +1,10 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { AgentContext, AgentResult } from './base.js';
 import { BaseAgent } from './base.js';
 import type { KnowledgeGraph, Tour, TourStep, SprangNode } from '../schema/types.js';
 import { ENTRY_POINT_PATTERNS } from '../schema/constants.js';
+import { detectLanguageLessons } from './language-lessons.js';
 
 export class TourBuilderAgent extends BaseAgent {
   readonly id = 'tour-builder';
@@ -129,6 +132,9 @@ export class TourBuilderAgent extends BaseAgent {
 
     if (steps.length < 2) return null;
 
+    // Attach language lessons to steps (and back-annotate nodes)
+    await this.attachLanguageLessons(steps, graph, ctx);
+
     return {
       id: 'default-tour',
       title: 'Architecture Overview',
@@ -136,6 +142,66 @@ export class TourBuilderAgent extends BaseAgent {
       entry_point: startNode.id,
       steps,
     };
+  }
+
+  private async attachLanguageLessons(
+    steps: TourStep[],
+    graph: KnowledgeGraph,
+    ctx: AgentContext,
+  ): Promise<void> {
+    const nodeMap = new Map<string, SprangNode>(graph.nodes.map(n => [n.id, n]));
+
+    for (const step of steps) {
+      const node = nodeMap.get(step.node_id ?? '');
+      if (!node) continue;
+
+      const filePath = node.location?.file ?? node.filePath;
+      if (!filePath) continue;
+
+      let content: string;
+      try {
+        content = await readFile(join(ctx.projectRoot, filePath), 'utf-8');
+      } catch {
+        continue;
+      }
+
+      // Infer language from extension
+      const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+      const extToLang: Record<string, string> = {
+        ts: 'typescript', tsx: 'typescript',
+        js: 'javascript', jsx: 'javascript',
+        py: 'python',
+        go: 'go',
+        rs: 'rust',
+        java: 'java',
+        kt: 'kotlin',
+        cs: 'csharp',
+        rb: 'ruby',
+        php: 'php',
+      };
+      const language = extToLang[ext] ?? ext;
+
+      const lessons = detectLanguageLessons(content, language, filePath);
+      const lesson = lessons[0];
+      if (!lesson) continue;
+
+      step.languageLesson = {
+        pattern: lesson.pattern,
+        title: lesson.title,
+        explanation: lesson.explanation,
+        lines: lesson.lines,
+      };
+
+      // Back-annotate node in the graph
+      if (!node.languageLesson) {
+        node.languageLesson = {
+          pattern: lesson.pattern,
+          title: lesson.title,
+          explanation: lesson.explanation,
+          lines: lesson.lines,
+        };
+      }
+    }
   }
 
   private buildRiskTour(graph: KnowledgeGraph, fileNodes: SprangNode[]): Tour | null {

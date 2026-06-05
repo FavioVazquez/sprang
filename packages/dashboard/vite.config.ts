@@ -2,8 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { detectBridge, askAgent, clearAgentSession } from './src/bridge/index.js';
 
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024; // 1 MB cap for source files
+
+// Allowlist cache — rebuilt only when knowledge-graph.json mtime changes
+let allowlistCache: Set<string> | null = null;
+let allowlistCacheMtime = 0;
 
 function getSprangRoot(): string {
   return process.env['SPRANG_ROOT'] ?? process.cwd();
@@ -19,12 +24,17 @@ function resolveGraphFile(fileName: string): string | null {
 }
 
 /** Build the allowlist of relative file paths from the graph so we only serve
- *  files that are actually part of the analyzed project (security guard). */
+ *  files that are actually part of the analyzed project (security guard).
+ *  Result is cached and invalidated only when the graph file's mtime changes. */
 function buildFileAllowList(): Set<string> {
-  const allowed = new Set<string>();
   const graphFile = resolveGraphFile('knowledge-graph.json');
-  if (!graphFile) return allowed;
+  if (!graphFile) return new Set();
   try {
+    const mtime = fs.statSync(graphFile).mtimeMs;
+    if (allowlistCache !== null && mtime === allowlistCacheMtime) {
+      return allowlistCache;
+    }
+    const allowed = new Set<string>();
     const raw = JSON.parse(fs.readFileSync(graphFile, 'utf-8')) as {
       nodes?: Array<{ filePath?: unknown; location?: { file?: unknown } }>;
     };
@@ -37,8 +47,12 @@ function buildFileAllowList(): Set<string> {
         }
       }
     }
-  } catch { /* graph not ready yet */ }
-  return allowed;
+    allowlistCache = allowed;
+    allowlistCacheMtime = mtime;
+    return allowed;
+  } catch {
+    return allowlistCache ?? new Set();
+  }
 }
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -53,23 +67,10 @@ const EXT_TO_LANG: Record<string, string> = {
 type ConnectServer = { middlewares: import('vite').Connect.Server };
 
 // ---------------------------------------------------------------------------
-// Cascade Bridge helpers
+// Response file path (shared by all bridge kinds)
 // ---------------------------------------------------------------------------
-function getTriggerFilePath(): string {
-  // Use .cascade-trigger-session (cascade-messaging extension) for session continuity.
-  // cascade-bridge still watches .cascade-trigger — both can coexist.
-  return path.join(getSprangRoot(), '.cascade-trigger-session');
-}
-
 function getResponseFilePath(): string {
   return path.join(getSprangRoot(), '.sprang', 'cascade-response.json');
-}
-
-/** Write a message to .cascade-trigger so the cascade-bridge extension picks it up */
-function writeCascadeTrigger(message: string): void {
-  const tmp = getTriggerFilePath() + '.tmp';
-  fs.writeFileSync(tmp, message, 'utf-8');
-  fs.renameSync(tmp, getTriggerFilePath());
 }
 
 function attachSprangMiddlewares(server: ConnectServer) {
@@ -159,17 +160,38 @@ function attachSprangMiddlewares(server: ConnectServer) {
     res.end(JSON.stringify({ path: normalized, language, content }));
   });
 
+  // GET /bridge-status — returns which agent bridge is currently active.
+  server.middlewares.use('/bridge-status', (_req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+    res.setHeader('Content-Type', 'application/json');
+    const status = detectBridge(getSprangRoot());
+    res.statusCode = 200;
+    res.end(JSON.stringify(status));
+  });
+
   // POST /cascade-ask  { "message": "..." }
-  // Writes the message to .cascade-trigger so cascade-bridge picks it up.
+  // Routes to the appropriate agent bridge (windsurf / claude / copilot).
   server.middlewares.use('/cascade-ask', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
     if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
     if (req.method !== 'POST') { res.statusCode = 405; res.end(JSON.stringify({ error: 'POST only' })); return; }
 
+    const MAX_BODY_BYTES = 64 * 1024;
     let body = '';
-    req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+    let bodyBytes = 0;
+    let aborted = false;
+    req.on('data', (chunk: Buffer) => {
+      if (aborted) return;
+      bodyBytes += chunk.length;
+      if (bodyBytes > MAX_BODY_BYTES) {
+        aborted = true;
+        res.statusCode = 413;
+        res.end(JSON.stringify({ error: 'Request body too large' }));
+        return;
+      }
+      body += chunk.toString('utf-8');
+    });
     req.on('end', () => {
+      if (aborted) return;
       try {
         const { message } = JSON.parse(body) as { message?: string };
         if (!message || typeof message !== 'string' || message.trim() === '') {
@@ -177,20 +199,15 @@ function attachSprangMiddlewares(server: ConnectServer) {
           res.end(JSON.stringify({ error: 'message field required' }));
           return;
         }
-        // Clear previous response before asking
-        const responsePath = getResponseFilePath();
-        if (fs.existsSync(responsePath)) fs.unlinkSync(responsePath);
-
-        const userMessage = message.trim();
-        // Wrap with mandatory instruction so Cascade always calls sprang_respond
-        const triggerMessage = `[SPRANG DASHBOARD MESSAGE — you MUST call the sprang_respond MCP tool with your answer when done, so it appears in the dashboard]
-
-Question: ${userMessage}
-
-After answering, call sprang_respond with: { "response": "<your answer>", "question": "${userMessage.replace(/"/g, '\\"')}" }`;
-        writeCascadeTrigger(triggerMessage);
+        const userMessage = message.trim().slice(0, 4096);
+        const result = askAgent(userMessage, getSprangRoot());
+        if (!result.ok) {
+          res.statusCode = 503;
+          res.end(JSON.stringify({ error: result.error ?? 'Agent bridge unavailable' }));
+          return;
+        }
         res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, sent: userMessage }));
+        res.end(JSON.stringify({ ok: true, sent: userMessage, mode: result.mode }));
       } catch {
         res.statusCode = 400;
         res.end(JSON.stringify({ error: 'Invalid JSON body' }));
@@ -202,10 +219,8 @@ After answering, call sprang_respond with: { "response": "<your answer>", "quest
   // Polls for the response written by the sprang_respond MCP tool.
   server.middlewares.use('/cascade-response', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
     if (req.method === 'DELETE') {
-      const responsePath = getResponseFilePath();
-      if (fs.existsSync(responsePath)) fs.unlinkSync(responsePath);
+      clearAgentSession(getSprangRoot());
       res.statusCode = 200;
       res.end(JSON.stringify({ ok: true }));
       return;
@@ -251,6 +266,6 @@ export default defineConfig({
   },
   preview: {
     port: 7777,
-    host: true,
+    host: '127.0.0.1',
   },
 });

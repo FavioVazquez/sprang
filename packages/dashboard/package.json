@@ -1,6 +1,6 @@
 {
   "name": "@sprang/dashboard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -34,7 +34,8 @@
     "tailwind-merge": "^2.5.5",
     "lucide-react": "^0.469.0",
     "cmdk": "^1.0.4",
-    "fuse.js": "^7.0.0"
+    "fuse.js": "^7.0.0",
+    "elkjs": "^0.9.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",

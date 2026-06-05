@@ -40,7 +40,8 @@ packages/dashboard/test-results/
 packages/dashboard/playwright-report/
 
 # Development tool artifacts (never commit)
-.claude/
+.claude/worktrees/
+.claude/settings.local.json
 .impeccable/
 .agents/skills/impeccable/
 
@@ -50,8 +51,12 @@ generate_images.py
 # cascade-messaging VS Code extension — source not shipped, only the .vsix
 packages/cascade-messaging/
 
-# Cascade runtime files (generated, never committed)
-.cascade-conversation.md
+# Agent bridge runtime files (generated, never committed)
 .cascade-trigger-session
 .cascade-trigger
 .cascade-session
+.sprang/agent-conversation.md
+.sprang/cascade-response.json
+.sprang/claude-session.json
+.sprang/copilot-session.json
+.sprang/.cascade-bridge-active
