@@ -263,6 +263,7 @@ export default defineConfig({
   },
   server: {
     port: 7338,
+    host: true,
   },
   preview: {
     port: 7777,
