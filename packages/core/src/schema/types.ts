@@ -236,7 +236,7 @@ export interface GraphStats {
   gitCommitHash?: string;
 }
 
-export type GraphPhase = 'skeleton' | 'complete';
+export type GraphPhase = 'skeleton' | 'enriched' | 'complete';
 
 export interface KnowledgeGraph {
   version: string;

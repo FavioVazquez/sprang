@@ -134,7 +134,7 @@ export const knowledgeGraphSchema = z.object({
   description: z.string().optional(),
   languages: z.array(z.string()).optional(),
   frameworks: z.array(z.string()).optional(),
-  phase: z.enum(['skeleton', 'complete']),
+  phase: z.enum(['skeleton', 'enriched', 'complete']),
   nodes: z.array(sprangNodeSchema),
   edges: z.array(sprangEdgeSchema),
   layers: z.array(layerSchema),

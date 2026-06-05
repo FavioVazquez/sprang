@@ -360,13 +360,21 @@ export function GraphView({
       {/* Path finder modal — rendered outside header so it overlays the whole view */}
       <PathFinderModal />
 
-      {/* Phase 2 enrichment banner */}
+      {/* Phase banners */}
       {graph.phase === 'skeleton' && (
         <div className="flex items-center gap-2 px-4 py-1.5 bg-sprang-500/10 border-b border-sprang-500/20 text-xs text-sprang-300 flex-shrink-0">
           <span className="relative flex h-2 w-2 flex-shrink-0">
             <span className="relative inline-flex h-2 w-2 rounded-full bg-sprang-500" />
           </span>
-          Skeleton graph ready — run <code className="mx-1 px-1 py-0.5 rounded bg-surface-800 text-sprang-200 font-mono">/sprang</code> in Cascade to enrich with git history, risk scores, and code smell analysis.
+          Skeleton graph ready — run <code className="mx-1 px-1 py-0.5 rounded bg-surface-800 text-sprang-200 font-mono">/sprang-analyze</code> to enrich with architecture layers, guided tour, and risk scores.
+        </div>
+      )}
+      {graph.phase === 'enriched' && (
+        <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-300 flex-shrink-0">
+          <span className="relative flex h-2 w-2 flex-shrink-0">
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+          </span>
+          Analysis incomplete — Architecture and Learn tabs need phases 3–6. Run <code className="mx-1 px-1 py-0.5 rounded bg-surface-800 text-amber-200 font-mono">/sprang-analyze</code> to resume from where it stopped.
         </div>
       )}
 
