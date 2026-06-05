@@ -419,30 +419,123 @@ cp "$SPRANG_ROOT/intermediate/layers.json" "$SPRANG_ROOT/intermediate/final-laye
 cp "$SPRANG_ROOT/intermediate/tour.json" "$SPRANG_ROOT/intermediate/final-tours.json" 2>/dev/null || true
 ```
 
-**Step 3 — Run `sprang merge`** using this portable resolver:
-```bash
-# Find sprang CLI — works regardless of install method
-SPRANG_CLI=""
-if command -v sprang &>/dev/null; then
-  # Installed via install.sh → ~/.local/bin/sprang (most users)
-  SPRANG_CLI="sprang"
-elif [[ -f "$HOME/.sprang/repo/packages/cli/dist/index.js" ]]; then
-  # Standard install.sh clone location
-  SPRANG_CLI="node $HOME/.sprang/repo/packages/cli/dist/index.js"
-elif [[ -f "$HOME/tools/sprang/packages/cli/dist/index.js" ]]; then
-  # Dev/EC2 fallback
-  SPRANG_CLI="node $HOME/tools/sprang/packages/cli/dist/index.js"
-else
-  echo "ERROR: sprang CLI not found. Run install.sh first." && exit 1
-fi
+**Step 3 — Assemble the graph** using this self-contained Python script (works on ANY machine — no install required):
 
-$SPRANG_CLI merge "$PROJECT_ROOT" --intermediate "$PROJECT_ROOT/.sprang/intermediate"
+Run this exact script via run_command. Do not modify it:
+
+```python
+import json, glob, os, subprocess
+from datetime import datetime, timezone
+
+root = os.environ.get("PROJECT_ROOT", os.getcwd())
+inter = os.path.join(root, ".sprang", "intermediate")
+
+def to_array(val):
+    if not val: return []
+    if isinstance(val, list): return val
+    if isinstance(val, dict): return list(val.values())
+    return []
+
+# Load nodes from final-nodes-chunk-*.json
+nodes = []
+for f in sorted(glob.glob(os.path.join(inter, "final-nodes-chunk-*.json"))):
+    try:
+        data = json.load(open(f))
+        nodes.extend(to_array(data))
+    except Exception as e:
+        print(f"Warning: skipping {f}: {e}")
+
+if not nodes:
+    print("ERROR: No nodes found in final-nodes-chunk-*.json files")
+    exit(1)
+
+# Load edges
+edges_path = os.path.join(inter, "final-edges.json")
+raw_edges = to_array(json.load(open(edges_path))) if os.path.exists(edges_path) else []
+# Deduplicate edges
+edge_set = {}
+for e in raw_edges:
+    key = f"{e.get('source')}::{e.get('target')}::{e.get('type')}"
+    edge_set[key] = e
+edges = list(edge_set.values())
+
+# Load layers — normalise strings to objects
+layers_path = os.path.join(inter, "final-layers.json")
+raw_layers = to_array(json.load(open(layers_path))) if os.path.exists(layers_path) else []
+layers = []
+for l in raw_layers:
+    if isinstance(l, str):
+        layers.append({"id": l.lower().replace(" ", "_"), "name": l, "node_ids": []})
+    elif isinstance(l, dict):
+        if not isinstance(l.get("node_ids"), list): l["node_ids"] = []
+        layers.append(l)
+
+# Load tours (try both filenames)
+tours = []
+for fname in ["final-tours.json", "final-tour.json"]:
+    p = os.path.join(inter, fname)
+    if os.path.exists(p):
+        tours = to_array(json.load(open(p)))
+        break
+
+# Load metadata
+meta_path = os.path.join(inter, "assembled-graph.json")
+meta = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
+
+# Git hash
+try:
+    git_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root).decode().strip()
+except Exception:
+    git_hash = ""
+
+# Risk summary
+risk = {"high": 0, "medium": 0, "low": 0}
+for n in nodes:
+    r = n.get("risk_score", 0) if isinstance(n, dict) else 0
+    if r >= 0.7: risk["high"] += 1
+    elif r >= 0.4: risk["medium"] += 1
+    else: risk["low"] += 1
+
+now = datetime.now(timezone.utc).isoformat()
+project_name = meta.get("project_name") or os.path.basename(os.path.abspath(root))
+
+graph = {
+    "version": "0.2.0",
+    "kind": "codebase",
+    "generated_at": now,
+    "project_root": os.path.abspath(root),
+    "project_name": project_name,
+    "description": meta.get("description", ""),
+    "languages": meta.get("languages", []),
+    "frameworks": meta.get("frameworks", []),
+    "phase": "complete",
+    "stats": {
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+        "risk_summary": risk,
+        "smell_summary": meta.get("smell_summary", {}),
+        "generated_at": now,
+        "gitCommitHash": git_hash,
+    },
+    "nodes": nodes,
+    "edges": edges,
+    "layers": layers,
+    "tours": tours,
+    "domains": meta.get("domains", []),
+    "annotations": [],
+    "health": meta.get("health", {}),
+}
+
+out_path = os.path.join(root, ".sprang", "knowledge-graph.json")
+os.makedirs(os.path.dirname(out_path), exist_ok=True)
+with open(out_path, "w") as f:
+    json.dump(graph, f, indent=2, ensure_ascii=False)
+
+print(f"OK: {len(nodes)} nodes, {len(edges)} edges, {len(layers)} layers, {len(tours)} tours")
+print(f"Written: {out_path}")
 ```
 
-The command reads all chunk files, builds the complete valid graph, and writes `$PROJECT_ROOT/.sprang/knowledge-graph.json`.
-It outputs: `Graph written: <N> nodes, <E> edges, <L> layers, <T> tours → <path>`
-
-**Do not do anything else for the graph after this command.** The file is complete.
+Set `PROJECT_ROOT` to the project root before running. The script writes `$PROJECT_ROOT/.sprang/knowledge-graph.json` with all required fields. **Do not write the graph file yourself.**
 
 6. Write `$SPRANG_ROOT/SPRANG_REPORT.md`:
    ```markdown
