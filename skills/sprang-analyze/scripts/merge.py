@@ -129,12 +129,12 @@ def main():
             "steps": tours,
         }]
 
-    # ── Backfill layer_id onto nodes ──────────────────────────────────────────
+    # ── Backfill layer onto nodes (GraphCanvas reads node.layer for color) ─────
     node_map = {n['id']: n for n in nodes if isinstance(n, dict) and 'id' in n}
     for layer in layers:
         for nid in layer.get('node_ids', []):
-            if nid in node_map and not node_map[nid].get('layer_id'):
-                node_map[nid]['layer_id'] = layer['id']
+            if nid in node_map and not node_map[nid].get('layer'):
+                node_map[nid]['layer'] = layer['id']
     nodes = list(node_map.values())
 
     # ── Assemble envelope ──────────────────────────────────────────────────────
