@@ -24,6 +24,6 @@ Quick summary of phases:
 4. **Architecture layers** — cluster into 3-10 logical layers (UI, API, services, data, infra, config, docs, tests, utilities)
 5. **Guided tour** — BFS-ordered learning walkthrough from entry point through all layers
 6. **Risk + smells** — git churn, coupling, test gaps, blast radius; 8 smell detectors
-7. **Save** — run the self-contained Python merge script from Phase 6 of `.windsurf/workflows/sprang-analyze.md`. No install needed — Python 3 stdlib only. Do NOT write `knowledge-graph.json` manually.
+7. **Save** — run `PROJECT_ROOT="$PROJECT_ROOT" python3 .windsurf/skills/sprang-analyze/scripts/merge.py` (or locate `merge.py` in the skill's `scripts/` folder). No install needed — Python 3 stdlib only. Do NOT write `knowledge-graph.json` manually.
 
 After completion: report files analyzed, nodes/edges, top risks, architecture layers found. Suggest `/sprang-chat` to ask questions, `/sprang-onboard` for guided tour, open dashboard with `pnpm --filter @sprang/dashboard dev`.

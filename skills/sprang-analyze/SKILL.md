@@ -28,6 +28,6 @@ Quick phases:
 5. **Build tour** — 5-8 ordered pedagogical steps based on graph topology
 6. **Domain mapping** — cluster imports into business domain → flow → step hierarchy
 7. **Risk scoring** — blast radius, coupling, test gap, churn (0.0–1.0 per node)
-8. **Finalize** — run the self-contained Python merge script from Phase 6 of `.windsurf/workflows/sprang-analyze.md` (works on any machine, no install needed — Python 3 stdlib only). Do NOT write `knowledge-graph.json` manually. Then write `SPRANG_REPORT.md`.
+8. **Finalize** — run `PROJECT_ROOT="$PROJECT_ROOT" python3 skills/sprang-analyze/scripts/merge.py`. Python 3 stdlib only, no install needed. Do NOT write `knowledge-graph.json` manually. Then write `SPRANG_REPORT.md`.
 
 $ARGUMENTS

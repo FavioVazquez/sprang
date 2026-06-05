@@ -90,9 +90,13 @@ export const DEFAULT_EXCLUDES = [
   // the target project should not appear in the project's knowledge graph.
   '**/.windsurf/workflows/**',
   '**/.windsurf/skills/**',
+  '**/skills/sprang*/scripts/**',
   '**/.devin/rules/**',
   '**/.devin/workflows/**',
   '**/.devin/skills/**',
+  '**/.claude/commands/**',
+  '**/.claude/hooks/**',
+  '**/.claude/rules/**',
 ];
 
 // Entry point patterns for tour-builder (TypeScript/JavaScript + multi-language)
