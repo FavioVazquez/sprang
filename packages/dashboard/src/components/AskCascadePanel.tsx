@@ -103,12 +103,14 @@ export function AskAgentPanel() {
     }
   }, [messages, waiting]);
 
-  // Focus input + fetch bridge status when panel opens
+  // Focus input + fetch bridge status when panel opens; close on Escape
   useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 80);
-      fetchBridgeStatus().then(setBridgeStatus).catch(() => null);
-    }
+    if (!open) return;
+    setTimeout(() => inputRef.current?.focus(), 80);
+    fetchBridgeStatus().then(setBridgeStatus).catch(() => null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
   const startPolling = useCallback((sentQuestion: string) => {
