@@ -1,6 +1,6 @@
 ---
 name: sprang-diff
-description: Blast radius analysis for changed files. Pass a list of file paths as $ARGUMENTS, or leave empty to use git-diff to detect changed files automatically.
+description: Blast radius analysis for changed files — shows what will break if you change something. Use when the user says "/sprang-diff", "what will break", "blast radius", "impact analysis", or "what depends on this".
 ---
 
 1. If `$ARGUMENTS` is provided, parse as space/comma-separated file paths. Otherwise run:

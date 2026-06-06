@@ -1,6 +1,6 @@
 ---
 name: sprang-analyze
-description: Analyze a codebase to produce a rich semantic knowledge graph — file summaries, architecture layers, guided tour, domain map, risk scores. Better than /understand. Use when asked to understand, analyze, or map a codebase.
+description: Analyze a codebase to produce a rich semantic knowledge graph — file summaries, architecture layers, guided tour, domain map, risk scores. Use when the user says "/sprang-analyze", "analyze the codebase", "full analysis", or "run sprang-analyze".
 argument-hint: ["[path] [--full] [--language <lang>] [--chunk <N>]"]
 ---
 

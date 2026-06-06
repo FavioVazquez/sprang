@@ -1,6 +1,6 @@
 ---
 name: sprang-knowledge
-description: Build an interactive knowledge graph from a folder of markdown notes — Obsidian, Logseq, Dendron, Foam, Zettelkasten, or plain markdown
+description: Build an interactive knowledge graph from a folder of markdown notes — Obsidian, Logseq, Dendron, Foam, Zettelkasten, or plain markdown. Use when the user says "/sprang-knowledge", "index my notes", "build graph from notes", or "analyze my Obsidian vault".
 argument-hint: ["[path] [--format obsidian|logseq|dendron|foam|zettelkasten|plain] [--language <lang>] [--full]"]
 ---
 
