@@ -551,7 +551,7 @@ The **Ask Agent** panel in the Sprang dashboard lets you ask questions about you
 |---|---|---|
 | 1 | **Windsurf / Devin Desktop** | Writes to `.cascade-trigger-session` — the `cascade-messaging` VS Code extension forwards it to Cascade, which calls `sprang_respond` MCP tool to write the reply. Async (poll). |
 | 2 | **Claude Code** (`claude` CLI) | Spawns `claude -p "<question>" --output-format json` non-interactively. Session ID persisted to `.sprang/claude-session.json` — resumes previous conversation via `--resume`. Sync. |
-| 3 | **GitHub Copilot CLI** (`copilot`) | Spawns `copilot -p "<question>"` non-interactively. Uses `--continue` for session continuity once a session exists. Sync. |
+| 3 | **GitHub Copilot CLI** (`copilot`) | Spawns `copilot -p "<question>"` non-interactively. Uses `--resume=<session-id>` for session continuity once a session exists. Sync. |
 | — | **None** | Panel shows instructions to install one of the above. |
 
 The active bridge is shown below the "Ask Agent" header (`via Claude Code`, `via Copilot CLI`, `via Windsurf`).
@@ -562,7 +562,7 @@ The active bridge is shown below the "Ask Agent" header (`via Claude Code`, `via
 |---|---|
 | `.sprang/cascade-response.json` | Response written by `sprang_respond` MCP tool or by the CLI bridge; polled by dashboard |
 | `.sprang/claude-session.json` | Persisted Claude Code session ID for `--resume` |
-| `.sprang/copilot-session.json` | Copilot CLI session marker for `--continue` |
+| `.sprang/copilot-session.json` | Persisted Copilot CLI session ID for `--resume=<id>` |
 | `.cascade-trigger-session` | Written by dashboard Windsurf bridge, read by cascade-messaging extension |
 
 ### Windsurf / Devin Desktop setup

@@ -1,5 +1,20 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { KnowledgeGraph } from '../src/types';
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
+
+// After each test run, remove session artifacts created by cascade-ask/bridge tests
+// so they don't leak into subsequent runs and cause false bridge detection.
+test.afterAll(async () => {
+  const cwd = process.cwd(); // playwright runs from packages/dashboard/
+  const artifacts = [
+    join(cwd, '.cascade-trigger-session'),
+    join(cwd, '.sprang', 'cascade-response.json'),
+    join(cwd, '.sprang', 'claude-session.json'),
+    join(cwd, '.sprang', 'copilot-session.json'),
+  ];
+  await Promise.allSettled(artifacts.map((f) => rm(f, { force: true })));
+});
 
 // ---------------------------------------------------------------------------
 // Mock graph – rich enough to exercise health, domains, risk, smells,
