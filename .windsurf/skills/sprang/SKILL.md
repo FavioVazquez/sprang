@@ -1,6 +1,6 @@
 ---
 name: sprang
-description: Build or refresh the Sprang knowledge graph. Analyzes all files, builds nodes/edges, detects code smells, scores risk.
+description: Build or refresh the Sprang knowledge graph for this workspace. Use when the user says "/sprang", "build the knowledge graph", "scan the codebase", "index this project", or "run sprang".
 ---
 
 1. Check if `.sprang/knowledge-graph.json` exists — note its `generated_at`, `phase`, and `kind` (`codebase` or `knowledge`).

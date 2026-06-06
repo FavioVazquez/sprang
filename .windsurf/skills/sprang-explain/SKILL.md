@@ -1,6 +1,6 @@
 ---
 name: sprang-explain
-description: Deep-dive explanation of a specific file, function, or module — what it does, why it exists, who changed it, what depends on it
+description: Deep-dive explanation of a specific file, function, or module. Use when the user says "/sprang-explain", "explain this file", "what does this function do", or "deep dive on X".
 argument-hint: ["<file path or path:functionName>"]
 ---
 

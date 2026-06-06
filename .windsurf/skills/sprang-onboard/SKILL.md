@@ -1,6 +1,6 @@
 ---
 name: sprang-onboard
-description: Guided architecture tour for new team members. Walks through the codebase structure, domains, and risk areas using the Sprang knowledge graph.
+description: Guided architecture tour for new team members — adapts to junior, senior, or PM persona. Use when the user says "/sprang-onboard", "onboard me", "give me a tour", "I'm new to this codebase", or "walk me through the architecture".
 ---
 
 1. Ensure `.sprang/knowledge-graph.json` exists with `phase: complete`. If not, run `/sprang-analyze` first.

@@ -1,6 +1,6 @@
 ---
 name: sprang-health
-description: Structural health report for the knowledge graph. Shows risk distribution, code smells, top risky nodes, orphans, and test coverage gaps.
+description: Full structural health report — code smells, risk nodes, orphans, circular dependencies. Use when the user says "/sprang-health", "health report", "code smells", "show risks", "what's broken", or "architectural health".
 ---
 
 1. Call `sprang_health` to retrieve the full health report from the current knowledge graph.

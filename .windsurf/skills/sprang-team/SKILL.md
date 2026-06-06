@@ -1,6 +1,6 @@
 ---
 name: sprang-team
-description: Surface all team annotations attached to graph nodes. Browse and display knowledge that teammates have written about specific files and functions.
+description: Browse and write team annotations attached to graph nodes — institutional knowledge, decision history, ownership. Use when the user says "/sprang-team", "add annotation", "team knowledge", "who owns this", or "document this decision".
 ---
 
 Follow the detailed instructions in `.windsurf/workflows/sprang-team.md`.

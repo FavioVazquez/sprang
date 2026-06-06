@@ -1,6 +1,6 @@
 ---
 name: sprang-domain
-description: Map code to business processes. Pass a domain name as $ARGUMENTS to inspect a specific domain, or leave empty to list all domains.
+description: Map code to business processes and domain hierarchy. Use when the user says "/sprang-domain", "business domains", "domain map", "what business process does X implement", or "show me the domain structure".
 ---
 
 1. If $ARGUMENTS is provided, call `sprang_domain` with `domain_name: "$ARGUMENTS"` to get the full domain detail including flows and steps.
