@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { GraphLoader } from '../graph-loader.js';
-import type { DecisionContext } from '@sprang/core';
+import type { DecisionContext, SprangNode } from '@sprang/core';
 
 export interface SprangWhyInput {
   node_id: string;
@@ -14,6 +14,7 @@ export interface SprangWhyResult {
   decision_context?: DecisionContext;
   annotation?: string;
   annotation_path?: string;
+  phase_note?: string;
 }
 
 function sanitizeNodeId(nodeId: string): string {
@@ -23,6 +24,23 @@ function sanitizeNodeId(nodeId: string): string {
     .replace(/\.{2,}/g, '-')
     .replace(/^-+|-+$/g, '');  // trim leading/trailing hyphens
   return sanitized || 'unknown-node';
+}
+
+function resolveNode(nodes: SprangNode[], nodeId: string): SprangNode | undefined {
+  // Try exact match first
+  let found = nodes.find((n) => n.id === nodeId);
+  if (found) return found;
+  // Try with file: prefix
+  found = nodes.find((n) => n.id === `file:${nodeId}`);
+  if (found) return found;
+  // Try without file: prefix
+  if (nodeId.startsWith('file:')) {
+    found = nodes.find((n) => n.id === nodeId.slice(5));
+    if (found) return found;
+  }
+  // Try suffix match (for cases where stored ID includes project root prefix)
+  found = nodes.find((n) => n.id.endsWith(`/${nodeId}`) || n.id.endsWith(nodeId));
+  return found;
 }
 
 export async function sprangWhy(
@@ -35,12 +53,12 @@ export async function sprangWhy(
     return { error: 'Knowledge graph not found', code: 'GRAPH_NOT_FOUND' };
   }
 
-  const node = graph.nodes.find((n) => n.id === input.node_id);
+  const node = resolveNode(graph.nodes, input.node_id);
   if (!node) {
     return { error: 'Node not found', code: 'NODE_NOT_FOUND' };
   }
 
-  const sanitizedId = sanitizeNodeId(input.node_id);
+  const sanitizedId = sanitizeNodeId(node.id);
   const annotationPath = join(sprangRoot, '.sprang', 'annotations', `${sanitizedId}.md`);
 
   let annotation: string | undefined;
@@ -60,5 +78,8 @@ export async function sprangWhy(
     decision_context: node.decision_context,
     annotation,
     annotation_path: resolvedAnnotationPath,
+    phase_note: (!node.decision_context && !node.summary)
+      ? 'decision_context and summary require Phase 2 enrichment — run /sprang-analyze to populate'
+      : undefined,
   };
 }

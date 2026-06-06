@@ -82,8 +82,8 @@ Use for: understanding business processes and which code owns each domain.
 ### `sprang_health`
 ```
 Input:  {}
-Output: { phase, node_count, edge_count, risk_summary, smell_summary, top_risky_nodes,
-          orphan_count, circular_dep_count, nodes_without_tests }
+Output: { phase, total_nodes, total_edges, risk_summary, smell_summary, top_10_risky_nodes,
+          orphan_count, circular_dependency_count, nodes_without_tests }
 ```
 Use for: structural health check, prioritizing refactoring targets.
 
