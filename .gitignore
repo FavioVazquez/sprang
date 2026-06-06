@@ -15,6 +15,7 @@ dist/
 .sprang/knowledge-graph.json
 .sprang/SPRANG_REPORT.md
 .sprang/config.json
+.sprang/annotations/*.md
 
 # Dashboard build
 packages/dashboard/dist/
