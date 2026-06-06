@@ -711,8 +711,10 @@ test('Ask Agent panel – opens and displays bridge info', async ({ page }) => {
   // Empty state shows bridge detection message
   await expect(page.getByText(/no bridge detected|detecting agent bridge/i)).toBeVisible({ timeout: 3000 });
 
-  // Close by pressing Escape
+  // Close by pressing Escape — the slide-in panel should disappear
   await page.keyboard.press('Escape');
+  // The panel header span is only rendered when open=true; after Escape it should be gone
+  await expect(page.locator('span.text-xs.font-semibold', { hasText: 'Ask Agent' })).not.toBeVisible({ timeout: 2000 });
 });
 
 // ---------------------------------------------------------------------------
