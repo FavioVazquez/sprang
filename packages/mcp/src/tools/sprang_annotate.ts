@@ -24,6 +24,23 @@ function sanitizeNodeId(nodeId: string): string {
   return basename(sanitized) || 'unknown-node';
 }
 
+function resolveNode(nodes: SprangNode[], nodeId: string): SprangNode | undefined {
+  // Try exact match first
+  let found = nodes.find((n) => n.id === nodeId);
+  if (found) return found;
+  // Try with file: prefix
+  found = nodes.find((n) => n.id === `file:${nodeId}`);
+  if (found) return found;
+  // Try without file: prefix
+  if (nodeId.startsWith('file:')) {
+    found = nodes.find((n) => n.id === nodeId.slice(5));
+    if (found) return found;
+  }
+  // Try suffix match (for cases where stored ID includes project root prefix)
+  found = nodes.find((n) => n.id.endsWith(`/${nodeId}`) || n.id.endsWith(nodeId));
+  return found;
+}
+
 export async function sprangAnnotate(
   loader: GraphLoader,
   input: SprangAnnotateInput,
@@ -34,12 +51,12 @@ export async function sprangAnnotate(
     return { error: 'Knowledge graph not found', code: 'GRAPH_NOT_FOUND' };
   }
 
-  const node = graph.nodes.find((n: SprangNode) => n.id === input.node_id);
+  const node = resolveNode(graph.nodes, input.node_id);
   if (!node) {
     return { error: 'Node not found', code: 'NODE_NOT_FOUND' };
   }
 
-  const sanitizedId = sanitizeNodeId(input.node_id);
+  const sanitizedId = sanitizeNodeId(node.id);
   const annotationsDir = join(sprangRoot, '.sprang', 'annotations');
   const filename = `${sanitizedId}.md`;
   const filePath = join(annotationsDir, filename);
@@ -68,7 +85,7 @@ export async function sprangAnnotate(
   return {
     success: true,
     path: relativePath,
-    node_id: input.node_id,
+    node_id: node.id,
     node_label: node.label,
   };
 }

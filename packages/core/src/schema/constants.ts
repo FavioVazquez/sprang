@@ -97,6 +97,11 @@ export const DEFAULT_EXCLUDES = [
   '**/.claude/commands/**',
   '**/.claude/hooks/**',
   '**/.claude/rules/**',
+  // Claude Code worktree directories (created by parallel agent execution — not project code)
+  '**/.claude/worktrees/**',
+  // Playwright test artifacts
+  '**/test-results/**',
+  '**/playwright-report/**',
 ];
 
 // Entry point patterns for tour-builder (TypeScript/JavaScript + multi-language)

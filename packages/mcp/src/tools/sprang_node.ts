@@ -36,6 +36,23 @@ function sanitizeNodeId(nodeId: string): string {
   return basename(sanitized) || 'unknown-node';
 }
 
+function resolveNode(nodes: SprangNode[], nodeId: string): SprangNode | undefined {
+  // Try exact match first
+  let found = nodes.find((n) => n.id === nodeId);
+  if (found) return found;
+  // Try with file: prefix
+  found = nodes.find((n) => n.id === `file:${nodeId}`);
+  if (found) return found;
+  // Try without file: prefix
+  if (nodeId.startsWith('file:')) {
+    found = nodes.find((n) => n.id === nodeId.slice(5));
+    if (found) return found;
+  }
+  // Try suffix match (for cases where stored ID includes project root prefix)
+  found = nodes.find((n) => n.id.endsWith(`/${nodeId}`) || n.id.endsWith(nodeId));
+  return found;
+}
+
 export async function sprangNode(
   loader: GraphLoader,
   input: SprangNodeInput
@@ -45,11 +62,12 @@ export async function sprangNode(
     return { error: 'Knowledge graph not found', code: 'GRAPH_NOT_FOUND' };
   }
 
-  const node = graph.nodes.find((n) => n.id === input.node_id);
+  const node = resolveNode(graph.nodes, input.node_id);
   if (!node) {
     return { error: 'Node not found', code: 'NODE_NOT_FOUND' };
   }
 
+  const resolvedId = node.id;
   const nodeMap = new Map<string, SprangNode>(graph.nodes.map((n) => [n.id, n]));
 
   const neighbors: NeighborInfo[] = [];
@@ -57,7 +75,7 @@ export async function sprangNode(
   let outDegree = 0;
 
   for (const edge of graph.edges) {
-    if (edge.source === input.node_id) {
+    if (edge.source === resolvedId) {
       outDegree++;
       const target = nodeMap.get(edge.target);
       if (target) {
@@ -69,7 +87,7 @@ export async function sprangNode(
           edge_type: edge.type,
         });
       }
-    } else if (edge.target === input.node_id) {
+    } else if (edge.target === resolvedId) {
       inDegree++;
       const source = nodeMap.get(edge.source);
       if (source) {
@@ -89,7 +107,7 @@ export async function sprangNode(
   let layerMateCount: number | undefined;
   for (const l of graph.layers ?? []) {
     const nodeIds: string[] = (l as unknown as { node_ids?: string[] }).node_ids ?? [];
-    if (nodeIds.includes(input.node_id)) {
+    if (nodeIds.includes(resolvedId)) {
       layer = { id: l.id, name: l.name };
       layerMateCount = nodeIds.length - 1;
       break;
@@ -99,7 +117,7 @@ export async function sprangNode(
   // Annotation presence check
   let hasAnnotation = false;
   let annotationPath: string | undefined;
-  const sanitizedId = sanitizeNodeId(input.node_id);
+  const sanitizedId = sanitizeNodeId(resolvedId);
   const annotationFile = join(loader.getRoot(), '.sprang', 'annotations', `${sanitizedId}.md`);
   try {
     await access(annotationFile);
