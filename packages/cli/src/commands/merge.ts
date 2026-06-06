@@ -37,6 +37,12 @@ export function makeMergeCommand(): Command {
 
       const spinner = ora('Merging intermediate chunk files...').start();
 
+      // Reject absolute paths that escape the project root (path injection guard)
+      if (!inter.startsWith(projectRoot + '/') && inter !== projectRoot) {
+        spinner.fail(`--intermediate must be a path within the project root, got: ${options.intermediate}`);
+        process.exit(1);
+      }
+
       try {
         if (!existsSync(inter)) {
           spinner.fail(`Intermediate directory not found: ${inter}`);

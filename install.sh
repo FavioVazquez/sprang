@@ -23,6 +23,8 @@
 
 set -euo pipefail
 
+# WARNING: Setting SPRANG_REPO_URL redirects the clone to an arbitrary URL with
+# no integrity check. Only use this to point to a trusted fork.
 REPO_URL="${SPRANG_REPO_URL:-https://github.com/faviovazquez/sprang.git}"
 REPO_DIR="${SPRANG_DIR:-$HOME/.sprang/repo}"
 
@@ -96,14 +98,11 @@ install_cli_bin() {
   local bin_dir="${HOME}/.local/bin"
   mkdir -p "$bin_dir"
   # Write a wrapper script so it works without 'node' prefix
-  cat > "$bin_dir/sprang" <<WRAPPER
-#!/usr/bin/env sh
-exec node "$cli_bin" "\$@"
-WRAPPER
+  printf '#!/usr/bin/env sh\nexec node "%s" "$@"\n' "$cli_bin" > "$bin_dir/sprang"
   chmod +x "$bin_dir/sprang"
   printf '  ✓ sprang CLI linked → %s/sprang\n' "$bin_dir"
   # Remind user to add ~/.local/bin to PATH if not already there
-  if ! echo "$PATH" | grep -q "$bin_dir"; then
+  if ! echo "$PATH" | grep -qF "$bin_dir"; then
     printf '  ℹ Add %s to your PATH if not already present:\n' "$bin_dir"
     printf '      echo '\''export PATH="$HOME/.local/bin:$PATH"'\'' >> ~/.zshrc  # or ~/.bashrc\n'
   fi

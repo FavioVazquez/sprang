@@ -108,12 +108,12 @@ function Install-CliBin {
 function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
         Write-Host "→ Updating existing checkout at $RepoDir"
-        git -C $RepoDir pull --ff-only
+        git -C "$RepoDir" pull --ff-only
     } else {
         Write-Host "→ Cloning $RepoUrl → $RepoDir"
         $parent = Split-Path -Parent $RepoDir
         if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
-        git clone $RepoUrl $RepoDir
+        git clone "$RepoUrl" "$RepoDir"
     }
     Write-Host '→ Installing dependencies and building...'
     Push-Location $RepoDir
@@ -146,7 +146,7 @@ function Link-Skills([string]$Target, [string]$Style) {
                     New-Item -ItemType Junction -Path $dest -Target $src | Out-Null
                     Write-Host "  ✓ linked $skill (junction)"
                 } catch {
-                    cmd /c mklink /D `"$dest`" `"$src`" | Out-Null
+                    New-Item -ItemType SymbolicLink -Path "$dest" -Target "$src" | Out-Null
                     Write-Host "  ✓ linked $skill (symlink)"
                 }
             }
@@ -158,7 +158,7 @@ function Link-Skills([string]$Target, [string]$Style) {
                 New-Item -ItemType Junction -Path $dest -Target $root | Out-Null
                 Write-Host "  ✓ linked skills folder → $dest (junction)"
             } catch {
-                cmd /c mklink /D `"$dest`" `"$root`" | Out-Null
+                New-Item -ItemType SymbolicLink -Path "$dest" -Target "$root" | Out-Null
                 Write-Host "  ✓ linked skills folder → $dest (symlink)"
             }
         }
