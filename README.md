@@ -935,18 +935,19 @@ packages/core/tests/
 │   ├── risk-scorer.test.ts                 15 tests — formula weights, factor tags
 │   ├── git-layer.test.ts                    6 tests — commit association, PR refs
 │   ├── architecture-analyzer.test.ts        8 tests — layer clustering
-│   ├── language-lessons.test.ts            52 tests — 12 pattern detectors, positive + negative
+│   ├── language-lessons.test.ts            51 tests — 12 pattern detectors, positive + negative
 │   ├── language-lessons-priority.test.ts   15 tests — priority ladder, multi-language
 │   ├── multi-lang-imports.test.ts          50 tests — per-language import extraction + resolver
 │   └── multi-lang-symbols.test.ts          34 tests — per-language symbol parsing
 ├── graph/
-│   ├── normalize.test.ts                   14 tests — all 6 normalization steps
+│   ├── normalize.test.ts                   17 tests — all 6 normalization steps
 │   └── merge-subgraphs.test.ts              9 tests — pnpm workspace, prefix namespacing
 ├── utils/
-│   ├── fingerprint.test.ts                 20 tests — SHA-256, TS/Python/Go extraction, classifyChange
-│   └── embedding-search.test.ts            25 tests — cosine similarity, TF-IDF, vocabulary
-└── orchestrator/
-    ├── worktree.test.ts                      4 tests — worktree redirect, git-not-found
+│   ├── fingerprint.test.ts                 28 tests — SHA-256, TS/Python/Go extraction, classifyChange
+│   └── embedding-search.test.ts            26 tests — cosine similarity, TF-IDF, vocabulary
+├── orchestrator/
+│   ├── worktree.test.ts                      4 tests — worktree redirect, git-not-found
+└── integration/
     ├── pipeline.test.ts                     13 tests — full Phase 1 against simple-ts/ fixture
     ├── pipeline-python.test.ts               8 tests — full Phase 1 against simple-python/ fixture
     └── pipeline-multilang.test.ts           16 tests — Go, Rust, Java, Ruby, C, Kotlin pipelines
@@ -963,7 +964,7 @@ packages/dashboard/src/utils/
 └── elk-layout.test.ts            6 tests — ELK mock, coordinate pass-through, fallback
 
 packages/dashboard/e2e/
-└── app.spec.ts                  32 tests — Playwright, full UI coverage
+└── app.spec.ts                  36 tests — Playwright, full UI coverage
     ├── error state (no graph, retry button)
     ├── loaded state (all 5 nav tabs)
     ├── navigation (graph → health → domains → architecture → learn)
@@ -980,7 +981,7 @@ packages/dashboard/e2e/
 packages/mcp/tests/
 ├── graph-loader.test.ts          3 tests — load, null-on-missing, hot-reload
 ├── sprang-node.test.ts          11 tests — sprang_node enrichment, sprang_annotate
-└── mcp-tools.test.ts            38 tests — all 9 MCP tools:
+└── mcp-tools.test.ts            38 tests — 6 MCP tools (health, tour, query, diff_impact, domain, why):
     ├── sprang_health  (7)  — counts, risk summary, smells, orphan detection
     ├── sprang_tour    (7)  — default/id, junior/senior/pm persona, languageLesson
     ├── sprang_query   (9)  — label/summary match, empty, type filter, limit, mode:semantic

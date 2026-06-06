@@ -16,10 +16,15 @@ Build the knowledge graph on first use:
 /sprang
 ```
 
-The dashboard opens at `http://localhost:7338`:
+The dashboard opens at `http://localhost:7777` (for daily use, run `preview`):
 
+```bash
+pnpm --filter @sprang/dashboard preview
 ```
-pnpm --filter @sprang/dashboard dev
+
+For dashboard source development only (hot-reload):
+```bash
+pnpm --filter @sprang/dashboard dev  # port 7338
 ```
 
 ---
@@ -55,7 +60,7 @@ If you copy Sprang into another project: set `SPRANG_ROOT` to the project root, 
 | `sprang_health` | `{}` | Smell summary, top-10 risky nodes, orphans, circular deps |
 | `sprang_why` | `{ node_id }` | Git history + decision context + annotation for a node |
 | `sprang_annotate` | `{ node_id, content, tags? }` | Write team annotation to `.sprang/annotations/<node>.md` |
-| `sprang_respond` | `{ response, question }` | Dashboard bridge — writes answer to `.sprang/cascade-response.json` |
+| `sprang_respond` | `{ response, question? }` | Dashboard bridge — writes answer to `.sprang/cascade-response.json` |
 
 ---
 
@@ -166,6 +171,8 @@ This writes `.sprang/diff-overlay.json` which the dashboard highlights in amber.
 | `.sprang/SPRANG_REPORT.md` | Human-readable architecture summary |
 | `.sprang/annotations/` | Team knowledge tied to nodes (YAML frontmatter + markdown) |
 | `.sprang/diff-overlay.json` | Blast radius for dashboard highlight (can gitignore) |
+
+> **Note:** In the Sprang source repo itself, `knowledge-graph.json` and `SPRANG_REPORT.md` are gitignored (this repo uses Sprang but doesn't commit its own graph). In projects that _use_ Sprang, commit these files so the team shares the same graph.
 
 ---
 
