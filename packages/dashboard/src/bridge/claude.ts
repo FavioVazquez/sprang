@@ -83,6 +83,12 @@ Question: ${question}`;
     '--allowedTools', ALLOWED_MCP_TOOLS,
   ];
 
+  // Explicitly pass --mcp-config so MCP tools are available regardless of CWD
+  const mcpConfigPath = path.join(sprangRoot, '.mcp.json');
+  if (fs.existsSync(mcpConfigPath)) {
+    args.push('--mcp-config', mcpConfigPath);
+  }
+
   if (sessionId) {
     args.push('--resume', sessionId);
   }

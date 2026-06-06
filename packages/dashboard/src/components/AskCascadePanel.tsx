@@ -380,7 +380,7 @@ export function AskAgentPanel() {
                   </button>
                 </div>
                 <p className="text-[9px] text-surface-700 mt-1.5 text-center">
-                  Shift+Enter for newline · responses via sprang_respond MCP
+                  Shift+Enter for newline · agent responds; result appears here
                 </p>
               </div>
             </motion.div>
