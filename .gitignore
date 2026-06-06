@@ -60,3 +60,7 @@ packages/cascade-messaging/
 .sprang/claude-session.json
 .sprang/copilot-session.json
 .sprang/.cascade-bridge-active
+.sprang/diff-overlay.json
+
+# Nested .sprang dirs from e2e test fixtures (vite server CWD artifacts)
+packages/dashboard/.sprang/
