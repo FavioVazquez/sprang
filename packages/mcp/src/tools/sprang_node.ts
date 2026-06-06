@@ -1,5 +1,5 @@
 import { access } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import type { GraphLoader } from '../graph-loader.js';
 import type { SprangNode } from '@sprang/core';
 
@@ -32,8 +32,12 @@ export interface SprangNodeError {
 }
 
 function sanitizeNodeId(nodeId: string): string {
-  const sanitized = nodeId.replace(/[:/\\<>"\|?*\x00-\x1f]/g, '-').replace(/\.{2,}/g, '-');
-  return basename(sanitized) || 'unknown-node';
+  // Preserve full path to prevent monorepo collisions; no basename() to avoid id conflicts
+  const sanitized = nodeId
+    .replace(/[:/\\<>"|?*\x00-\x1f]/g, '-')
+    .replace(/\.{2,}/g, '-')
+    .replace(/^-+|-+$/g, '');  // trim leading/trailing hyphens
+  return sanitized || 'unknown-node';
 }
 
 export async function sprangNode(

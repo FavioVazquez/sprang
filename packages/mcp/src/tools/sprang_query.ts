@@ -8,11 +8,11 @@ export interface SprangQueryInput {
   node_types?: string[];
   limit?: number;
   /**
-   * mode?: "text" | "semantic"
-   *   text (default) for keyword matching,
+   * mode?: "keyword" | "text" | "semantic"
+   *   keyword/text (default) for TF-IDF text match,
    *   semantic for concept similarity (uses embeddings if available, TF-IDF fallback otherwise)
    */
-  mode?: 'text' | 'semantic';
+  mode?: 'keyword' | 'text' | 'semantic';
 }
 
 export interface SprangQueryResult {

@@ -264,11 +264,6 @@ export default function App() {
                 skeleton
               </Badge>
             )}
-            {graph.phase === 'enriched' && (
-              <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/40">
-                enriched
-              </Badge>
-            )}
             {graph.languages && graph.languages.length > 0 && (
               <Badge variant="outline" className="text-[10px]">
                 {graph.languages.slice(0, 2).join(', ')}

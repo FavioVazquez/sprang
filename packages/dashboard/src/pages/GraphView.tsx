@@ -369,15 +369,6 @@ export function GraphView({
           Skeleton graph ready — run <code className="mx-1 px-1 py-0.5 rounded bg-surface-800 text-sprang-200 font-mono">/sprang-analyze</code> to enrich with architecture layers, guided tour, and risk scores.
         </div>
       )}
-      {graph.phase === 'enriched' && (
-        <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-300 flex-shrink-0">
-          <span className="relative flex h-2 w-2 flex-shrink-0">
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-          </span>
-          Analysis incomplete — Architecture and Learn tabs need phases 3–6. Run <code className="mx-1 px-1 py-0.5 rounded bg-surface-800 text-amber-200 font-mono">/sprang-analyze</code> to resume from where it stopped.
-        </div>
-      )}
-
       {/* Main content */}
       <div className="flex-1 relative overflow-hidden">
         {/* Left sidebar: FileExplorer + CodeViewer */}

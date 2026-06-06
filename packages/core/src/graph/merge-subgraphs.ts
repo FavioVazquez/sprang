@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { readJsonFileOrNull } from '../utils/fs.js';
-import type { KnowledgeGraph, SprangNode, SprangEdge } from '../schema/types.js';
+import type { KnowledgeGraph, SprangNode, SprangEdge, Layer, Tour, Domain } from '../schema/types.js';
 import { SPRANG_DIR, GRAPH_FILE } from '../schema/constants.js';
 
 export interface MergeResult {
@@ -131,6 +131,53 @@ async function expandGlobPatterns(
   return results;
 }
 
+// ── Layer/tour/domain merging helpers ───────────────────────────────────────
+
+/**
+ * Merge layers from subgraph into the accumulator map.
+ * When the same layer id appears in multiple subgraphs, merge their node_ids.
+ */
+function mergeLayers(
+  acc: Map<string, Layer>,
+  layers: Layer[],
+  prefix: string
+): void {
+  for (const layer of layers) {
+    // Prefix node_ids to match prefixed node IDs
+    const prefixedNodeIds = layer.node_ids.map((nid) => prefixNodeId(prefix, nid));
+    const existing = acc.get(layer.id);
+    if (existing) {
+      // Merge node_ids, deduplicate
+      const merged = Array.from(new Set([...existing.node_ids, ...prefixedNodeIds]));
+      acc.set(layer.id, { ...existing, node_ids: merged });
+    } else {
+      acc.set(layer.id, { ...layer, node_ids: prefixedNodeIds });
+    }
+  }
+}
+
+/**
+ * Merge tours from subgraph into the accumulator map, deduplicating by id.
+ */
+function mergeTours(acc: Map<string, Tour>, tours: Tour[]): void {
+  for (const tour of tours) {
+    if (!acc.has(tour.id)) {
+      acc.set(tour.id, tour);
+    }
+  }
+}
+
+/**
+ * Merge domains from subgraph into the accumulator map, deduplicating by id.
+ */
+function mergeDomains(acc: Map<string, Domain>, domains: Domain[]): void {
+  for (const domain of domains) {
+    if (!acc.has(domain.id)) {
+      acc.set(domain.id, domain);
+    }
+  }
+}
+
 // ── Node/edge prefixing ──────────────────────────────────────────────────────
 
 function prefixNodeId(packagePath: string, nodeId: string): string {
@@ -174,6 +221,11 @@ export async function mergeSubgraphs(
     rootGraph.edges.map((e) => `${e.source}:${e.target}:${e.type}`)
   );
 
+  // Seed layer/tour/domain accumulators from root graph
+  const layerAcc = new Map<string, Layer>(rootGraph.layers.map((l) => [l.id, l]));
+  const tourAcc = new Map<string, Tour>(rootGraph.tours.map((t) => [t.id, t]));
+  const domainAcc = new Map<string, Domain>(rootGraph.domains.map((d) => [d.id, d]));
+
   const newNodes: SprangNode[] = [];
   const newEdges: SprangEdge[] = [];
 
@@ -204,6 +256,11 @@ export async function mergeSubgraphs(
       }
     }
 
+    // Merge layers, tours, and domains from subgraph
+    mergeLayers(layerAcc, subgraph.layers ?? [], prefix);
+    mergeTours(tourAcc, subgraph.tours ?? []);
+    mergeDomains(domainAcc, subgraph.domains ?? []);
+
     mergeResult.mergedPackages.push(pkgPath);
   }
 
@@ -218,6 +275,9 @@ export async function mergeSubgraphs(
     ...rootGraph,
     nodes: mergedNodes,
     edges: mergedEdges,
+    layers: Array.from(layerAcc.values()),
+    tours: Array.from(tourAcc.values()),
+    domains: Array.from(domainAcc.values()),
     stats: {
       ...rootGraph.stats,
       node_count: mergedNodes.length,
