@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { detectBridge, askAgent, clearAgentSession } from './src/bridge/index.js';
+import { detectBridge, clearAgentSession } from './src/bridge/index.js';
+import { askClaudeBackground } from './src/bridge/claude.js';
+import { askCopilotBackground } from './src/bridge/copilot.js';
+import { writeWindsurfTrigger, getWindsurfResponsePath } from './src/bridge/windsurf.js';
 
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024; // 1 MB cap for source files
 
@@ -200,14 +203,32 @@ function attachSprangMiddlewares(server: ConnectServer) {
           return;
         }
         const userMessage = message.trim().slice(0, 4096);
-        const result = askAgent(userMessage, getSprangRoot());
-        if (!result.ok) {
+        const sprangRoot = getSprangRoot();
+        const bridge = detectBridge(sprangRoot);
+
+        if (bridge.kind === 'none') {
           res.statusCode = 503;
-          res.end(JSON.stringify({ error: result.error ?? 'Agent bridge unavailable' }));
+          res.end(JSON.stringify({ error: bridge.detail ?? 'No agent bridge available' }));
           return;
         }
+
+        // Clear any previous response so the dashboard knows to wait for the new one
+        const responsePath = getWindsurfResponsePath(sprangRoot);
+        if (fs.existsSync(responsePath)) { try { fs.unlinkSync(responsePath); } catch { /* ignore */ } }
+
+        // Return 200 immediately — all bridges are fire-and-forget from the HTTP perspective.
+        // Claude/Copilot spawn in the background and write cascade-response.json when done.
+        // The dashboard polls /cascade-response to pick up the result.
         res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, sent: userMessage, mode: result.mode }));
+        res.end(JSON.stringify({ ok: true, sent: userMessage, mode: bridge.kind === 'windsurf' ? 'async' : 'async' }));
+
+        if (bridge.kind === 'windsurf') {
+          writeWindsurfTrigger(userMessage, sprangRoot);
+        } else if (bridge.kind === 'claude') {
+          askClaudeBackground(userMessage, sprangRoot, responsePath);
+        } else if (bridge.kind === 'copilot') {
+          askCopilotBackground(userMessage, sprangRoot, responsePath);
+        }
       } catch {
         res.statusCode = 400;
         res.end(JSON.stringify({ error: 'Invalid JSON body' }));

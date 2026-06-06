@@ -17,7 +17,7 @@ import {
   getWindsurfResponsePath,
 } from './windsurf.js';
 
-export { detectBridge, clearClaudeSession, clearCopilotSession };
+export { detectBridge, clearClaudeSession, clearCopilotSession, getWindsurfResponsePath };
 export type { BridgeStatus };
 
 export type AskAgentMode = 'async' | 'sync';

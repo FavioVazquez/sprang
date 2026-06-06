@@ -43,6 +43,7 @@ jobs:
               '.claude-plugin/plugin.json',
               '.claude-plugin/marketplace.json',
               '.copilot-plugin/plugin.json',
+              '.devin/config.json',
               '.mcp.json',
               '.vscode/mcp.json',
             ];

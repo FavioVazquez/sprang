@@ -12,7 +12,7 @@
  * next call. Falls back to plain-text output if JSONL parsing fails.
  */
 
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -127,6 +127,56 @@ Question: ${question}`;
   }
 
   return { ok: true, response: responseText, session_id: parsedSessionId };
+}
+
+/**
+ * Non-blocking variant — spawns `copilot` in the background and writes
+ * `.sprang/cascade-response.json` when done. Returns immediately.
+ */
+export function askCopilotBackground(
+  question: string,
+  sprangRoot: string,
+  responsePath: string,
+): void {
+  const sessionId = loadSessionId(sprangRoot);
+
+  const prompt = `You are answering a question from the Sprang dashboard about this codebase.
+Use the available MCP tools (sprang_query, sprang_node, sprang_health, etc.) to ground your answer in the knowledge graph.
+Be concise — this answer will be displayed in a small chat panel.
+
+Question: ${question}`;
+
+  const args = ['--prompt', prompt, '--output-format', 'json'];
+  if (sessionId) args.push(`--resume=${sessionId}`);
+
+  const child = spawn('copilot', args, { cwd: sprangRoot, timeout: COPILOT_TIMEOUT_MS });
+
+  let stdout = '';
+  child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf-8'); });
+
+  child.on('close', (code) => {
+    if (code !== 0 || !stdout.trim()) return;
+    let responseText = stdout.trim();
+    let parsedSessionId: string | undefined;
+    const textParts: string[] = [];
+    for (const line of stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const obj = JSON.parse(trimmed) as CopilotJsonLine;
+        if (obj.session_id) parsedSessionId = obj.session_id;
+        if (obj.message?.content) textParts.push(obj.message.content);
+        else if (obj.text) textParts.push(obj.text);
+      } catch { textParts.push(trimmed); }
+    }
+    if (textParts.length) responseText = textParts.join('\n').trim();
+    if (parsedSessionId) saveSessionId(sprangRoot, parsedSessionId);
+    const payload = { response: responseText, question, written_at: new Date().toISOString(), bridge: 'copilot', session_id: parsedSessionId };
+    const dir = path.dirname(responsePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const tmp = responsePath + '.tmp';
+    try { fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf-8'); fs.renameSync(tmp, responsePath); } catch { /* ignore */ }
+  });
 }
 
 /** Clear the persisted session marker. */

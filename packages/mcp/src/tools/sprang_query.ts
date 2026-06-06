@@ -78,6 +78,8 @@ export async function sprangQuery(
 
   // ── Text mode (default) ───────────────────────────────────────────────────
   const lowerQuery = query.toLowerCase();
+  // Split on whitespace so multi-word queries ("schema types") match individual tokens
+  const tokens = lowerQuery.split(/\s+/).filter(Boolean);
 
   type ScoredNode = {
     id: string;
@@ -95,24 +97,42 @@ export async function sprangQuery(
       continue;
     }
 
+    const idLower = node.id.toLowerCase();
     const labelLower = node.label.toLowerCase();
     const summaryLower = node.summary?.toLowerCase() ?? '';
 
-    const labelMatch = labelLower.includes(lowerQuery);
-    const summaryMatch = summaryLower.includes(lowerQuery);
+    // Full-phrase matching (highest priority)
+    const phraseLabelExact = labelLower === lowerQuery;
+    const phraseLabelMatch = labelLower.includes(lowerQuery);
+    const phraseIdMatch = idLower.includes(lowerQuery);
+    const phraseSummaryMatch = summaryLower.includes(lowerQuery);
 
-    if (!labelMatch && !summaryMatch) {
-      continue;
-    }
+    // Token matching — any token matches the field
+    const tokenMatchLabel = tokens.filter((t) => labelLower.includes(t)).length;
+    const tokenMatchId = tokens.filter((t) => idLower.includes(t)).length;
+    const tokenMatchSummary = tokens.filter((t) => summaryLower.includes(t)).length;
 
-    // Score: label exact match = 3, label contains = 2, summary match = 1
+    const anyMatch =
+      phraseLabelMatch || phraseIdMatch || phraseSummaryMatch ||
+      tokenMatchLabel > 0 || tokenMatchId > 0 || tokenMatchSummary > 0;
+
+    if (!anyMatch) continue;
+
+    // Score: exact match > phrase match > token match; label > id > summary
     let score = 0;
-    if (labelLower === lowerQuery) {
+    if (phraseLabelExact) {
+      score = 5;
+    } else if (phraseLabelMatch) {
+      score = 4;
+    } else if (phraseIdMatch || phraseSummaryMatch) {
       score = 3;
-    } else if (labelMatch) {
-      score = 2;
-    } else if (summaryMatch) {
-      score = 1;
+    } else if (tokenMatchLabel > 0) {
+      // Reward matching more tokens (all tokens = 2, partial = 1.x)
+      score = 1 + tokenMatchLabel / tokens.length;
+    } else if (tokenMatchId > 0) {
+      score = 0.5 + tokenMatchId / tokens.length;
+    } else {
+      score = 0.5; // summary-only token match
     }
 
     scored.push({

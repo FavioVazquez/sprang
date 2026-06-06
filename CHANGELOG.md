@@ -6,6 +6,49 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.1] — 2026-06-06
+
+Correctness, security, and platform polish. No API surface changes.
+
+### Fixed
+
+- **`sprang_query` — multi-word queries returned zero results.** The text-mode search only did a single `includes()` check on the full query string. A query like `"schema types"` never matched because no node label is `"schema types"` verbatim. Fixed: query is now tokenized on whitespace and each token is matched independently against `label`, `id`, and `summary`. Scoring rewards full-phrase matches over token matches, and label matches over ID/path matches.
+- **`sprang_query` — node IDs (file paths) not searched.** Querying `"src/auth"` returned nothing even though `file:src/auth.ts` existed. Fixed: the text scorer now also checks `node.id.toLowerCase()` against both the full phrase and each token.
+- **`sprang_node` / `sprang_why` / `sprang_annotate` — bare path lookups returned `NODE_NOT_FOUND`.** Graph stores IDs with `file:` prefix; tool inputs often omit it. Fixed: `resolveNode` helper tries exact match → `file:` prefix → strip `file:` prefix → suffix match. All three tools now resolve any reasonable node ID form.
+- **`sanitizeNodeId` — `basename()` caused monorepo collisions.** Two files at `packages/a/src/utils.ts` and `packages/b/src/utils.ts` both sanitized to `utils.ts`, making one annotation overwrite the other. Fixed: `basename()` removed; full path preserved with only path-unsafe characters replaced.
+- **`GraphPhase` — dead `'enriched'` value removed.** `'skeleton' | 'complete'` is the correct schema; `'enriched'` was never written or read by any agent code. Removes Zod validation false positives.
+- **`merge-subgraphs.ts` — layers, tours, and domains not merged.** Parallel agent worktrees produced subgraphs with their own layer/tour/domain data; the merge step only joined `nodes` and `edges`. Fixed: `mergeLayers`, `mergeTours`, `mergeDomains` helpers added.
+- **`graph-loader.ts` — Zod validation failures were silent.** An invalid `knowledge-graph.json` caused `getGraph()` to return `null` with no log output, making MCP tools fail with `GRAPH_NOT_FOUND` rather than a helpful error. Fixed: error is now written to `process.stderr` with the validation issue.
+- **`graph-loader.ts` — TOCTOU race in hot-reload.** Two `stat()` calls (mtime check + size check) could race with a concurrent file write. Fixed: single `stat()` call, result reused.
+- **`ArchitectureView.tsx` — `aggregateLayerEdges` `useMemo` declared after the `useEffect` that consumes it.** Caused a React hooks ordering violation (benign at runtime, but wrong). Fixed: `useMemo` moved before its dependent `useEffect`.
+- **`AskCascadePanel.tsx` — Escape key did not close the panel.** Fixed: `keydown` listener added in the panel open `useEffect`.
+- **`claude` bridge — `--mcp-config` not passed explicitly.** When `SPRANG_ROOT` was not the project root, `claude -p` launched without the MCP server, so sprang tools were unavailable in Ask Agent sessions. Fixed: `--mcp-config <sprangRoot>/.mcp.json` added when the file exists.
+- **`install.sh` — heredoc injection in wrapper script creation.** `cli_bin` path was interpolated directly into a `cat <<WRAPPER` heredoc, allowing a maliciously named path to inject arbitrary shell commands. Fixed: replaced with `printf '%s\n'` with proper quoting.
+- **`install.sh` — `grep` pattern was a regex, not a literal string.** Path characters like `.` were treated as regex wildcards in the PATH check. Fixed: `grep -qF` (literal match).
+- **`install.ps1` — unquoted path variables in git commands.** Paths with spaces caused `git -C $RepoDir` and `git clone $RepoUrl $RepoDir` to fail on Windows. Fixed: proper quoting added.
+- **`install.ps1` — `cmd /c mklink /D` fallback.** `mklink` is a `cmd.exe` builtin, not available in PowerShell's execution model on all configurations. Fixed: replaced with `New-Item -ItemType SymbolicLink`.
+- **`merge.ts` — path containment not enforced.** `--intermediate` flag allowed any absolute path. Fixed: guard added after `resolve()` that rejects paths outside `projectRoot`.
+- **`.devin/config.json` — hardcoded developer machine path.** `args` contained `/home/ec2-user/favio/sprang/packages/mcp/dist/server.js`. Fixed: replaced with relative `packages/mcp/dist/server.js`.
+- **`.copilot-plugin/plugin.json` — wrong `skills` path.** `"./.windsurf/skills/"` resolved from inside `.copilot-plugin/` to `.copilot-plugin/.windsurf/skills/` which does not exist. Fixed: `"../.windsurf/skills/"`.
+- **All 11 `.windsurf/skills/*/SKILL.md` — description fields missing trigger phrases.** Windsurf uses the `description:` field to route slash commands to skills. Skills were missing phrases like "index this project", "onboard me", "show me the domain structure". Fixed: all 11 synced from `skills/*/SKILL.md`.
+- **`DEFAULT_EXCLUDES` — scanner indexed its own worktrees.** `.claude/worktrees/**`, `test-results/**`, `playwright-report/**` were missing, causing Playwright artifacts and Claude Code worktrees to appear as nodes in the knowledge graph. Fixed: all three patterns added.
+- **CI manifest validation — `.devin/config.json` not checked.** The `ci.yml` "Validate plugin manifests" step parsed 5 files but omitted `.devin/config.json`. Fixed: added to the list.
+
+### Added
+
+- **`sprang_why` — `phase_note` field.** When `decision_context` is absent (Phase 2 not yet run), the tool now returns `phase_note: "decision_context and summary require Phase 2 enrichment — run /sprang-analyze to populate"` so callers get a clear explanation rather than a silent `null`.
+- **`sprang_respond` — 8 new unit tests** covering: response+question write, null question, whitespace trimming, empty response error, whitespace-only error, directory creation, overwrite behavior, and ISO-8601 timestamp validation.
+- **3 new `sprang_query` tests** covering: multi-word token matching, node ID (path) search, and label-over-ID ranking.
+- **9 new e2e tests** covering: path traversal rejection, absolute path rejection, allowlist enforcement, `DELETE /cascade-response`, risk overlay toggle, Learn empty state, bridge status shape, high-risk node in health view, and Sigma canvas presence.
+- **`.sprang/annotations/.gitkeep`** — tracks the empty annotations directory so the path is always present in fresh clones.
+
+### Changed
+
+- `ci.yml` — `pnpm test` → `pnpm test -- --coverage` to enforce Vitest coverage thresholds on every CI run.
+- Test counts: **572 unit tests** (383 core + 85 dashboard + 60 mcp + 27 cli → 63 mcp after new query tests + 11 new e2e = **45 e2e tests**).
+
+---
+
 ## [0.2.0] — 2026-06-05
 
 Full **v0.2.0** release — platform-aware Ask Agent bridge (Windsurf, Claude Code, Copilot CLI), architecture card view, structural fingerprinting, semantic search, Claude Code native hooks, cross-platform installer, security hardening, and persistent cross-session conversation history.

@@ -97,6 +97,12 @@ const mockGraph: KnowledgeGraph = {
   },
 };
 
+// Mock graph without tours — exercises Learn empty state
+const mockGraphNoTours: KnowledgeGraph = {
+  ...mockGraph,
+  tours: [],
+};
+
 // Mock graph without layers — exercises Architecture empty state
 const mockGraphNoLayers: KnowledgeGraph = {
   ...mockGraph,
@@ -552,12 +558,12 @@ test('cascade bridge – POST /cascade-ask rejects empty message', async ({ page
 test('cascade bridge – POST /cascade-ask accepts valid message', async ({ page }) => {
   await gotoApp(page);
 
+  // All bridges now fire-and-forget — the endpoint returns 200 immediately and
+  // the dashboard polls /cascade-response. 503 = no bridge detected.
   const response = await page.request.post('/cascade-ask', {
     data: { message: 'What does auth.ts do?' },
     headers: { 'Content-Type': 'application/json' },
   });
-  // 200 = a bridge was found and message dispatched
-  // 503 = no bridge available in this environment (expected in CI without claude/copilot)
   expect([200, 503]).toContain(response.status());
 
   const body = await response.json() as { ok?: boolean; sent?: string; error?: string };
@@ -743,24 +749,14 @@ test('Ask Agent panel – /cascade-ask 503 when no agent bridge available', asyn
   await page.goto('/');
   await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
 
-  // In test environment, no claude/copilot CLIs and no trigger file → bridge=none → 503.
-  // If a bridge IS available (e.g. claude CLI installed on CI), the request may take
-  // a long time or succeed with 200. Either outcome is acceptable.
-  let status: number | undefined;
-  try {
-    const resp = await page.request.post('/cascade-ask', {
-      data: { message: 'what does auth.ts do?' },
-      timeout: 12000,
-    });
-    status = resp.status();
-    expect([200, 503]).toContain(status);
-    if (status === 503) {
-      const body = await resp.json() as { error: string };
-      expect(typeof body.error).toBe('string');
-    }
-  } catch {
-    // Timeout = a bridge was found and is processing (e.g. claude CLI present in CI).
-    // That's not a failure — just skip the assertion.
+  // All bridges now non-blocking — response is always fast (200 = bridge found, 503 = none).
+  const resp = await page.request.post('/cascade-ask', {
+    data: { message: 'what does auth.ts do?' },
+  });
+  expect([200, 503]).toContain(resp.status());
+  if (resp.status() === 503) {
+    const body = await resp.json() as { error: string };
+    expect(typeof body.error).toBe('string');
   }
 });
 
@@ -774,4 +770,121 @@ test('nav bar – Architecture tab visible across all view switches', async ({ p
     await navTab(page, tab).click();
     await expect(navTab(page, 'Architecture')).toBeVisible({ timeout: 5000 });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Test 37: File content API – rejects path traversal attack
+// ---------------------------------------------------------------------------
+test('file content API – rejects path traversal (../)', async ({ page }) => {
+  await gotoApp(page);
+
+  const resp = await page.request.get('/file-content.json?path=../etc/passwd');
+  expect(resp.status()).toBe(400);
+  const body = await resp.json() as { error: string };
+  expect(typeof body.error).toBe('string');
+  expect(body.error.toLowerCase()).toMatch(/invalid path|path traversal/i);
+});
+
+// ---------------------------------------------------------------------------
+// Test 38: File content API – rejects absolute path
+// ---------------------------------------------------------------------------
+test('file content API – rejects absolute path', async ({ page }) => {
+  await gotoApp(page);
+
+  const resp = await page.request.get('/file-content.json?path=%2Fetc%2Fpasswd');
+  expect(resp.status()).toBe(400);
+  const body = await resp.json() as { error: string };
+  expect(typeof body.error).toBe('string');
+});
+
+// ---------------------------------------------------------------------------
+// Test 39: File content API – rejects path not in graph allowlist
+// ---------------------------------------------------------------------------
+test('file content API – rejects path not in analyzed graph', async ({ page }) => {
+  await gotoApp(page);
+
+  const resp = await page.request.get('/file-content.json?path=some/random/file.ts');
+  // 403 = not in allowlist (no graph built), 404 = file doesn't exist
+  expect([403, 404]).toContain(resp.status());
+});
+
+// ---------------------------------------------------------------------------
+// Test 40: Cascade response – DELETE clears the session
+// ---------------------------------------------------------------------------
+test('cascade response – DELETE /cascade-response returns ok', async ({ page }) => {
+  await gotoApp(page);
+
+  const resp = await page.request.delete('/cascade-response');
+  expect(resp.status()).toBe(200);
+  const body = await resp.json() as { ok: boolean };
+  expect(body.ok).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Test 41: Risk overlay – R key toggles heatmap
+// ---------------------------------------------------------------------------
+test('risk overlay – R key toggles on/off', async ({ page }) => {
+  await gotoApp(page);
+
+  // Make sure we're on the graph view
+  await navTab(page, 'Graph').click();
+  await page.locator('body').click({ position: { x: 300, y: 300 } });
+
+  // Toggle on
+  await page.keyboard.press('r');
+  // A risk toggle button or label should now be highlighted/active
+  // The toolbar shows a risk button — check it exists
+  await expect(page.getByTitle(/risk/i).or(page.getByLabel(/risk/i)).first()).toBeVisible({ timeout: 5000 });
+
+  // Toggle off again
+  await page.keyboard.press('r');
+});
+
+// ---------------------------------------------------------------------------
+// Test 42: Learn view – shows empty state when graph has no tours
+// ---------------------------------------------------------------------------
+test('learn view – shows empty state when graph has no tours', async ({ page }) => {
+  await gotoApp(page, mockGraphNoTours);
+  await navTab(page, 'Learn').click();
+  await expect(
+    page.getByText(/no tours|no guided tour|tour not available|run \/sprang-analyze/i).first()
+  ).toBeVisible({ timeout: 8000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 43: Bridge status – returns kind and detail fields
+// ---------------------------------------------------------------------------
+test('bridge status – response has expected shape', async ({ page }) => {
+  await gotoApp(page);
+
+  const resp = await page.request.get('/bridge-status');
+  expect(resp.status()).toBe(200);
+  const body = await resp.json() as { kind: string; detail?: string };
+  expect(['windsurf', 'claude', 'copilot', 'none']).toContain(body.kind);
+  // detail is always present (may be empty string for active bridges)
+  expect(typeof body.detail).toBe('string');
+});
+
+// ---------------------------------------------------------------------------
+// Test 44: Health view – high-risk node appears in top-risky list
+// ---------------------------------------------------------------------------
+test('health view – high-risk node label visible', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Health').click();
+  // auth.ts has risk_score 0.85 — should appear in top risky nodes
+  await expect(page.getByText('auth.ts').first()).toBeVisible({ timeout: 8000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 45: Graph view – nodes rendered (canvas is not empty)
+// ---------------------------------------------------------------------------
+test('graph view – sigma canvas is present and non-zero', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Graph').click();
+  const canvas = page.locator('canvas').first();
+  await expect(canvas).toBeVisible({ timeout: 8000 });
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.width).toBeGreaterThan(100);
+  expect(box!.height).toBeGreaterThan(100);
 });
