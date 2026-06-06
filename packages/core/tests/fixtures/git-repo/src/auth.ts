@@ -119,3 +119,8 @@ export function removeRole(role: string): void {
 // session expiry check
 // role-based access
 // logout cleanup
+// v1.1 — basic auth
+// security: validate token
+// session expiry check
+// role-based access
+// logout cleanup

@@ -52,13 +52,15 @@ export class GraphLoader {
       const raw = await readFile(filePath, 'utf-8');
       const result = knowledgeGraphSchema.safeParse(JSON.parse(raw));
       if (!result.success) {
+        process.stderr.write(`[sprang] Graph validation failed: ${result.error.message}\n`);
         this.graphCache = null;
         this.lastMtime = 0;
         return;
       }
       this.graphCache = result.data as KnowledgeGraph;
       this.lastMtime = mtime;
-    } catch {
+    } catch (err) {
+      process.stderr.write(`[sprang] Graph load error: ${err instanceof Error ? err.message : String(err)}\n`);
       this.graphCache = null;
       this.lastMtime = 0;
     }

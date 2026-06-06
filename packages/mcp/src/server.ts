@@ -57,6 +57,11 @@ const TOOLS = [
           type: 'number',
           description: 'Maximum number of results to return (default 10)',
         },
+        mode: {
+          type: 'string',
+          enum: ['keyword', 'semantic'],
+          description: 'Search mode: "keyword" for TF-IDF text match (default), "semantic" for embedding-based similarity search.',
+        },
       },
       required: ['query'],
     },
@@ -218,6 +223,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         if (input['limit'] !== undefined) {
           queryInput.limit = input['limit'] as number;
+        }
+        if (input['mode'] !== undefined) {
+          queryInput.mode = input['mode'] as 'keyword' | 'semantic';
         }
         result = await sprangQuery(loader, queryInput);
         break;
