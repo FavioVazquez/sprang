@@ -325,6 +325,7 @@ irm https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.ps1 | iex
 - [Live watcher](#live-watcher)
 - [Development](#development)
 - [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -420,9 +421,34 @@ graph LR
 
 ## Prerequisites
 
-- **Node.js 20+** — `node --version`
-- **pnpm 10+** — `npm install -g pnpm` or `corepack enable && corepack prepare pnpm@latest`
-- **Git** — required for the `git-layer` agent to extract decision context
+### Required
+
+| Tool | Min version | Install | Why |
+|---|---|---|---|
+| **Node.js** | 20 | [nodejs.org](https://nodejs.org/) or `nvm install 20` | Runs the CLI, MCP server, and dashboard |
+| **pnpm** | 10 | `npm install -g pnpm` or `corepack enable && corepack prepare pnpm@latest` | Package manager (enforced in `package.json`) |
+| **Git** | 2.x | [git-scm.com](https://git-scm.com/) | `git-layer` agent reads commit history; scan works without it but decision context is unavailable |
+| **Python 3** | 3.8 | Pre-installed on macOS/Linux; [python.org](https://www.python.org/) on Windows | `merge.py` assembles chunk files into `knowledge-graph.json`; Windsurf hook `save-conversation.py` uses it too. No third-party packages — stdlib only. |
+
+Verify your environment:
+
+```bash
+node --version    # must be v20.x or higher
+pnpm --version    # must be 10.x or higher
+git --version     # any modern version
+python3 --version # 3.8 or higher (python3 on macOS/Linux, python on Windows)
+```
+
+### Platform-specific
+
+| Tool | Required for | Install |
+|---|---|---|
+| **GitHub CLI 2.90.0+** (`gh`) | `gh skill install` (Copilot) | [cli.github.com](https://cli.github.com/) |
+| **Playwright Chromium** | e2e tests only — not for using the platform | Auto-installed by `pnpm --filter @sprang/dashboard test:e2e` |
+
+### No API key needed
+
+Sprang does not call any AI API directly. The LLM is your agent (Claude Code, Windsurf / Cascade, or Copilot) — it reads the knowledge graph through MCP tools and applies its own intelligence. Phase 1 (static analysis) runs fully offline.
 
 ---
 
@@ -1162,6 +1188,191 @@ packages/cli/tests/
 ```
 
 </details>
+
+---
+
+## Troubleshooting
+
+### Installation
+
+**`pnpm: command not found`**
+pnpm is not installed. Install it:
+```bash
+npm install -g pnpm
+# or use corepack (bundled with Node.js 16.13+):
+corepack enable && corepack prepare pnpm@latest --activate
+```
+
+**`pnpm install` fails with engine compatibility error**
+Your Node.js version is too old. Sprang requires Node.js 20+:
+```bash
+node --version       # check current version
+nvm install 20       # install Node 20 via nvm
+nvm use 20
+```
+Or download from [nodejs.org](https://nodejs.org/).
+
+**`pnpm install` fails with `EACCES` permission error**
+pnpm's global store is in a directory your user can't write to:
+```bash
+pnpm config set store-dir ~/.pnpm-store
+pnpm install
+```
+
+**`pnpm build` fails with TypeScript errors**
+Make sure you're on the `main` branch and didn't mix up partial installs. Run clean:
+```bash
+pnpm clean          # removes all dist/ and tsbuildinfo files
+pnpm install
+pnpm build
+```
+
+---
+
+### CLI
+
+**`sprang: command not found` after build**
+The CLI binary isn't on your PATH. Link it:
+```bash
+cd packages/cli
+pnpm link --global
+# then add pnpm's global bin to your PATH:
+export PATH="$(pnpm root -g)/../bin:$PATH"
+# add that export to your ~/.zshrc or ~/.bashrc to persist it
+```
+Or call it directly without linking: `node packages/cli/dist/index.js <command>`
+
+**`sprang scan` finishes but no knowledge graph appears**
+Check whether the target directory is a git repo — `git-layer` requires it. The graph is still written, but without `decision_context`:
+```bash
+cd /your/project && git init   # if not already a git repo
+sprang scan .
+```
+Also check `.sprang/intermediate/` for agent error files (`<agent>-error.json`) that show which step failed.
+
+**`sprang scan` is stuck / Phase 2 never completes**
+Phase 2 runs as a detached background process. Check its progress:
+```bash
+cat .sprang/intermediate/phase2-progress.json
+# or check the log
+cat /tmp/sprang-phase2.log 2>/dev/null
+```
+Phase 2 requires `python3` to merge chunk files. Verify it's available: `python3 --version`
+
+**`python3: command not found` during scan**
+On Windows, Python may be `python` not `python3`. On macOS, install via Homebrew:
+```bash
+brew install python3
+# on Windows: winget install Python.Python.3.12
+# or download from https://www.python.org/
+```
+
+---
+
+### MCP tools
+
+**MCP tools not available in Claude Code**
+1. Check that `.mcp.json` exists at your project root: `ls .mcp.json`
+2. Verify the `args` path points to the built server: `node packages/mcp/dist/server.js` should start without error
+3. Restart Claude Code — MCP servers only connect on session start
+4. Check Claude Code logs: `Cmd/Ctrl+Shift+P` → *Open Logs*
+
+**MCP tools not available in Windsurf / Devin Desktop**
+1. Check `~/.codeium/windsurf/mcp_config.json` — the `sprang` entry must exist with the correct absolute path
+2. Reload the window: `Cmd/Ctrl+Shift+P` → *Reload Window*
+3. Open the MCP panel to see connection status and error output
+
+**`sprang_health` / `sprang_node` returns "graph not found"**
+The knowledge graph hasn't been built yet. Run the initial scan:
+```
+/sprang               # inside Claude Code (unnamespaced, manual install)
+/sprang:sprang        # inside Claude Code (plugin install)
+```
+Or from the terminal: `sprang scan /path/to/project`
+
+**`risk_score` is always 0 on every node**
+Phase 2 enrichment hasn't run yet — the graph is still at `phase: "skeleton"`. Check:
+```bash
+cat .sprang/knowledge-graph.json | python3 -c "import json,sys; g=json.load(sys.stdin); print(g.get('phase'), g.get('stats',{}).get('risk_summary'))"
+```
+If it prints `skeleton None`, trigger Phase 2:
+```bash
+sprang scan . --full
+```
+
+---
+
+### Dashboard
+
+**Dashboard blank / "no graph found"**
+`.sprang/knowledge-graph.json` doesn't exist yet. Build it first:
+```bash
+sprang scan .
+```
+Then restart the dashboard.
+
+**Dashboard port 7777 already in use**
+```bash
+sprang open . --port 7778    # use any free port
+# or kill whatever is on 7777:
+lsof -ti:7777 | xargs kill -9
+```
+
+**Dashboard opens but graph is empty (no nodes)**
+The knowledge graph may be corrupted or from a different project. Check its stats:
+```bash
+sprang status .
+```
+If the `node_count` is 0 or the path is wrong, run a fresh scan: `sprang scan . --full`
+
+**"Ask Agent" panel shows "no bridge detected"**
+The dashboard auto-detects the active agent bridge. For Claude Code, check that `claude` CLI is on PATH:
+```bash
+which claude && claude --version
+```
+For Copilot CLI: `which copilot`. For Windsurf: the `cascade-messaging` VS Code extension must be installed.
+
+---
+
+### Platform-specific
+
+**Windsurf / Devin Desktop: skills not showing up**
+Skills must be in `~/.windsurf/skills/<skill-name>/SKILL.md`. Verify:
+```bash
+ls ~/.windsurf/skills/sprang*/
+```
+If missing, re-run the installer: `./install.sh windsurf`
+
+**GitHub Copilot: `gh skill install` command not found**
+Your GitHub CLI is too old (needs 2.90.0+):
+```bash
+gh --version
+# upgrade:
+brew upgrade gh         # macOS
+winget upgrade GitHub.cli   # Windows
+```
+
+**GitHub Copilot: MCP tools not available**
+Copilot MCP tools only work in **Agent mode**. Switch to it in the chat panel model selector. Also verify `.vscode/mcp.json` exists in your project root.
+
+**Claude Code plugin: MCP server not starting after `pnpm build`**
+Find the exact plugin cache path and verify the binary exists:
+```bash
+ls ~/.claude/plugins/cache/sprang/sprang/
+# navigate to the version folder and check:
+ls <version-folder>/packages/mcp/dist/server.js
+# if missing, rebuild:
+cd <version-folder> && pnpm install && pnpm build
+```
+Then run `/reload-plugins` inside Claude Code.
+
+---
+
+### Still stuck?
+
+- Check `.sprang/intermediate/` for `*-error.json` files — each agent writes its failure reason there
+- Run `sprang status .` for a quick health snapshot (graph age, phase, node count)
+- Open an issue at [github.com/faviovazquez/sprang/issues](https://github.com/faviovazquez/sprang/issues) with the output of `sprang status .` and the error message
 
 ---
 

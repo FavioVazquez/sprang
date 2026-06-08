@@ -6,6 +6,9 @@
   "bin": {
     "sprang-mcp": "./dist/server.js"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "tsup src/server.ts --format esm --dts --sourcemap",
     "typecheck": "tsc --noEmit",
