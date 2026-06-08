@@ -675,9 +675,8 @@ test('POST /analyze returns started:true', async ({ page }) => {
 // ---------------------------------------------------------------------------
 test('health view shows grade badge', async ({ page }) => {
   await gotoApp(page);
-  // Navigate to health view
-  const healthBtn = page.locator('button', { hasText: 'Health' });
-  await healthBtn.click();
+  // Navigate to health view using the desktop nav tab helper
+  await navTab(page, 'Health').click();
   // Grade badge should be visible (A, B, C, D, or F)
   await expect(page.locator('text=/^[ABCDF]$/')).toBeVisible({ timeout: 5000 });
 });

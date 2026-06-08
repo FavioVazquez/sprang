@@ -56,3 +56,8 @@ packages/cascade-messaging/
 .cascade-trigger-session
 .cascade-trigger
 .cascade-session
+
+# Sprang transient runtime state (session-local, never committed)
+.sprang/cascade-response.json
+.sprang/claude-session.json
+.sprang/diff-overlay.json
