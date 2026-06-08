@@ -286,7 +286,7 @@ export interface Annotation {
 
 // ─── Dashboard-specific types ─────────────────────────────────────────────────
 
-export type Persona = 'non-technical' | 'junior' | 'experienced';
+export type Persona = 'non-technical' | 'junior' | 'senior' | 'experienced' | 'pm';
 export type ViewMode = 'structural' | 'domain' | 'knowledge';
 export type NodeCategory = 'code' | 'config' | 'docs' | 'infra' | 'data' | 'domain' | 'knowledge';
 export type Complexity = 'simple' | 'moderate' | 'complex';

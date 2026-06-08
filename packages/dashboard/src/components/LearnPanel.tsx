@@ -135,9 +135,13 @@ export function LearnPanel() {
   // Persona-adaptive content
   const personaHint =
     persona === 'non-technical'
-      ? '💡 High-level: focus on the purpose of this component in the overall system.'
+      ? '💡 Business view: focus on the purpose of this component in the overall system — ignore implementation details.'
+      : persona === 'pm'
+      ? '🗂 Product view: these are the domain and service nodes that map to business capabilities and feature areas.'
       : persona === 'junior'
-      ? '📖 Learning tip: pay attention to the language lesson below.'
+      ? '📖 Learning tip: pay attention to the language lesson below — it explains the pattern used here.'
+      : persona === 'senior' || persona === 'experienced'
+      ? '⚡ Senior view: introductory steps are skipped — focus on trade-offs, risk scores, and coupling.'
       : null;
 
   return (

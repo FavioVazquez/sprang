@@ -16,7 +16,7 @@
   <a href="#installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-606_passing-10B981?style=flat-square" alt="606 unit tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-608_passing-10B981?style=flat-square" alt="608 unit tests passing"/>
   <img src="https://img.shields.io/badge/e2e_tests-49_passing-10B981?style=flat-square" alt="49 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
@@ -297,7 +297,7 @@ sprang_health {}
 
 # "Walk me through the architecture"
 /sprang-onboard
-→ 8-step guided tour, persona-adaptive (junior / senior / PM)
+→ 8-step guided tour, persona-adaptive (non-technical / pm / junior / senior)
 ```
 
 ### Capabilities
@@ -599,7 +599,7 @@ Available in Windsurf / Cascade, Devin Desktop, and Claude Code:
 | `/sprang-knowledge [path] [--format obsidian\|logseq\|...] [--full]` | Build knowledge graph from markdown notes |
 | `/sprang-chat <question>` | Ask any question about the codebase |
 | `/sprang-explain <file>` | Deep-dive: what, why, who, risk, history for a file or function |
-| `/sprang-onboard` | Guided architecture tour — adapts to persona (junior / senior / PM) |
+| `/sprang-onboard` | Guided architecture tour — adapts to persona (non-technical / pm / junior / senior) |
 | `/sprang-diff [files...]` | Blast radius analysis — writes diff overlay for dashboard |
 | `/sprang-domain [name]` | Explore business domain architecture and flows |
 | `/sprang-why <file>` | Git history + rationale + team annotations for a file |
@@ -706,12 +706,25 @@ risk_score = clamp(
 | `sprang_diff_impact` | `{ files: string[] }` | BFS blast-radius, risk-ranked impact list |
 | `sprang_why` | `{ node_id }` | Decision context + git history + team annotation |
 | `sprang_health` | `{}` | Health grade (A–F), score (0–100), security summary, top-10 risk, smells, orphans, circular deps, run history |
-| `sprang_tour` | `{ tour_id?, persona? }` | Ordered pedagogical tour with language lessons per step |
+| `sprang_tour` | `{ tour_id?, persona? }` | Ordered pedagogical tour — persona: `junior` (all steps) / `senior` or `experienced` (skip intro) / `pm` (domain/service nodes) / `non-technical` (entry-points and domains only) |
 | `sprang_domain` | `{ domain_name? }` | Business domain flows and entry points |
 | `sprang_annotate` | `{ node_id, content, tags? }` | Write `.sprang/annotations/<id>.md` |
 | `sprang_respond` | `{ response, question? }` | Write response to `.sprang/cascade-response.json` for dashboard display |
 
 `sprang_query` accepts `mode: "semantic"` for cosine similarity search over TF-IDF embeddings.
+
+### Tour personas
+
+`sprang_tour` and `/sprang-onboard` support four audience personas. The dashboard **PersonaSelector** sets the active persona for the Learn view.
+
+| Persona | Alias | Audience | Tour filter |
+|---|---|---|---|
+| `junior` | — | Developer new to this codebase | All steps with language lessons |
+| `senior` | `experienced` | Experienced engineer | Skips the introductory step, focuses on coupling and risk |
+| `pm` | — | Product manager | Domain and service nodes only — business capability focus |
+| `non-technical` | — | Executive / business stakeholder | Entry-points and domain nodes only — no implementation details |
+
+**Default:** `junior` when no persona is specified.
 
 ### Health grade (v0.2.1)
 
@@ -837,7 +850,7 @@ SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard preview
 | ExportMenu | Export graph as JSON, Markdown, clipboard, or SVG |
 | FileExplorer | File tree with search; double-click opens CodeViewer |
 | CodeViewer | Prism syntax highlighting with line-range jump |
-| PersonaSelector | non-technical / junior / experienced |
+| PersonaSelector | Business (non-technical) / Product (pm) / Learn (junior) / Deep Dive (senior) |
 | KnowledgeInfo | Right sidebar for knowledge graphs: backlinks, frontmatter, tags |
 | ReadingPanel | Slide-up reading overlay for article nodes |
 | ThemePicker | Dark / Light / High-contrast (persisted to `localStorage`) |
@@ -935,7 +948,7 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 606 unit tests across core/dashboard/mcp/cli
+pnpm test              # 608 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
 pnpm --filter @sprang/dashboard test:e2e   # 49 Playwright e2e tests
@@ -947,7 +960,7 @@ pnpm --filter @sprang/dashboard test:e2e   # 49 Playwright e2e tests
 |---|---|---|---|
 | `@sprang/core` | Vitest | 431 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity |
 | `@sprang/dashboard` | Vitest | 85 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6), bridge detection (30) |
-| `@sprang/mcp` | Vitest | 63 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (38), sprang_respond (8), sprang_query enhancements (3) |
+| `@sprang/mcp` | Vitest | 65 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (40), sprang_respond (8), sprang_query enhancements (3) |
 | `@sprang/cli` | Vitest | 27 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12), `merge` command (9) |
 | **Total unit** | | **606** | |
 | `@sprang/dashboard` | Playwright | 49 | Full UI e2e — loading, nav, keyboard shortcuts, architecture tab, cascade bridge, health grade (A–F), risk overlay, analyze endpoint, security endpoints |
@@ -1019,7 +1032,7 @@ packages/mcp/tests/
 ├── sprang-node.test.ts          11 tests — sprang_node enrichment, sprang_annotate
 └── mcp-tools.test.ts            38 tests — 6 MCP tools (health, tour, query, diff_impact, domain, why):
     ├── sprang_health  (7)  — counts, risk summary, smells, orphan detection
-    ├── sprang_tour    (7)  — default/id, junior/senior/pm persona, languageLesson
+    ├── sprang_tour    (9)  — default/id, junior/senior/pm/non-technical/experienced persona, languageLesson
     ├── sprang_query   (9)  — label/summary match, empty, type filter, limit, mode:semantic
     ├── sprang_diff    (5)  — changed nodes, BFS blast radius, unknown files
     ├── sprang_domain  (4)  — list all, detail by name, unknown error

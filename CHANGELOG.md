@@ -78,7 +78,7 @@ Security scanning, health grading, run history, architecture diagrams, and on-de
 - All package versions bumped from `0.2.0` to `0.2.1`.
 - `sprang_health` MCP tool description updated to reflect extended output.
 - `sprang-health` command/skill/workflow: now leads with health grade, reports security findings, shows history trend.
-- Test counts: **606 unit tests** (431 core + 85 dashboard + 63 mcp + 27 cli), **49 e2e tests** — all passing.
+- Test counts: **608 unit tests** (431 core + 85 dashboard + 65 mcp + 27 cli), **49 e2e tests** — all passing.
 
 ---
 

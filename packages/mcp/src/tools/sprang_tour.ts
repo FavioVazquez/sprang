@@ -3,7 +3,7 @@ import type { Tour, TourStep, SprangNode, LanguageLesson } from '@sprang/core';
 
 export interface SprangTourInput {
   tour_id?: string;
-  persona?: 'junior' | 'senior' | 'pm';
+  persona?: 'junior' | 'senior' | 'experienced' | 'pm' | 'non-technical';
 }
 
 export interface TourStepWithNode {
@@ -41,26 +41,41 @@ export interface SprangTourListResult {
 
 function filterStepsForPersona(
   steps: TourStep[],
-  persona: 'junior' | 'senior' | 'pm',
+  persona: 'junior' | 'senior' | 'experienced' | 'pm' | 'non-technical',
   graph: { nodes: SprangNode[] }
 ): TourStep[] {
   const nodeMap = new Map<string, SprangNode>(graph.nodes.map((n) => [n.id, n]));
 
   if (persona === 'junior') {
+    // All steps with language lessons — most comprehensive
     return steps;
   }
 
-  if (persona === 'senior') {
-    // Skip the first introductory step (step index 0)
+  if (persona === 'senior' || persona === 'experienced') {
+    // Skip the first introductory step; experienced engineers don't need the basics
     return steps.slice(1);
   }
 
   if (persona === 'pm') {
-    // Filter to only domain/service nodes
+    // Filter to domain/service/flow nodes — business-process focused
     return steps.filter((step) => {
       const node = nodeMap.get(step.node_id ?? '');
       if (!node) return false;
       return node.type === 'domain' || node.type === 'service' || node.type === 'flow';
+    });
+  }
+
+  if (persona === 'non-technical') {
+    // Highest-level only: entry-points, domains, and services — no implementation details
+    return steps.filter((step) => {
+      const node = nodeMap.get(step.node_id ?? '');
+      if (!node) return false;
+      return (
+        node.type === 'domain' ||
+        node.type === 'service' ||
+        node.type === 'flow' ||
+        (node.type === 'file' && (node as SprangNode & { is_entry_point?: boolean }).is_entry_point)
+      );
     });
   }
 
@@ -80,7 +95,7 @@ export async function sprangTour(
     return { error: 'No tours available in this graph', code: 'NO_TOURS' };
   }
 
-  const persona = input.persona ?? 'junior';
+  const persona = (input.persona ?? 'junior') as 'junior' | 'senior' | 'experienced' | 'pm' | 'non-technical';
   const nodeMap = new Map<string, SprangNode>(graph.nodes.map((n) => [n.id, n]));
 
   let tour: Tour | undefined;

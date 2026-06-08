@@ -101,7 +101,7 @@ const TOOLS = [
   {
     name: 'sprang_tour',
     description:
-      'Return a guided architecture tour of the codebase. Supports different personas: junior (all steps), senior (skip intro), pm (domain/service nodes only).',
+      'Return a guided architecture tour of the codebase. Supports personas: junior (all steps + language lessons), senior/experienced (skip intro, technical focus), pm (domain/service nodes, business process focus), non-technical (entry-points and domains only, no code details).',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -111,9 +111,9 @@ const TOOLS = [
         },
         persona: {
           type: 'string',
-          enum: ['junior', 'senior', 'pm'],
+          enum: ['junior', 'senior', 'experienced', 'pm', 'non-technical'],
           description:
-            'Filter tour steps for a persona. junior=all, senior=skip intro, pm=domain/service only.',
+            'Filter tour steps by audience. junior=all steps, senior/experienced=skip intro, pm=domain/service only, non-technical=entry-points and domains only.',
         },
       },
       required: [],

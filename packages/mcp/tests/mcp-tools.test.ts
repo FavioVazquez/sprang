@@ -209,6 +209,18 @@ describe('sprang_tour', () => {
     expect(result.total_steps).toBe(0);
   });
 
+  it('skips first step for experienced persona (alias for senior)', async () => {
+    const { loader } = await setupGraph();
+    const result = await sprangTour(loader, { persona: 'experienced' }) as { total_steps: number };
+    expect(result.total_steps).toBe(1);
+  });
+
+  it('returns empty steps for non-technical persona (no entry-point/domain nodes in fixture)', async () => {
+    const { loader } = await setupGraph();
+    const result = await sprangTour(loader, { persona: 'non-technical' }) as { total_steps: number };
+    expect(result.total_steps).toBe(0);
+  });
+
   it('returns error for unknown tour_id', async () => {
     const { loader } = await setupGraph();
     const result = await sprangTour(loader, { tour_id: 'tour:nonexistent' });
