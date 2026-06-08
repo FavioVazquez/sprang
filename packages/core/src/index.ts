@@ -13,3 +13,8 @@ export * from './orchestrator/runner.js';
 export * from './watcher/watcher.js';
 export * from './utils/fs.js';
 export * from './utils/embedding-search.js';
+export { calcHealthGrade, gradeColor } from './utils/health-grade.js';
+export { appendSnapshot, loadHistory } from './utils/history.js';
+export { lcsLength, lcsSimilarity, structuralFingerprint } from './utils/similarity.js';
+export { generateMermaid } from './utils/mermaid.js';
+export type { HealthGrade, HistorySnapshot, SecurityWarning, SecurityCategory, DetectedPattern } from './schema/types.js';
