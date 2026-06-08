@@ -8,6 +8,8 @@ import {
   Sparkles,
   BookOpen,
   Layers,
+  Grid3x3,
+  LayoutGrid,
 } from 'lucide-react';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { Button } from './components/ui/Button';
@@ -17,6 +19,8 @@ import { HealthView } from './pages/HealthView';
 // Heavy views — lazy-loaded so React Flow + ELK only download when needed
 const DomainView = lazy(() => import('./pages/DomainView').then((m) => ({ default: m.DomainView })));
 const ArchitectureView = lazy(() => import('./pages/ArchitectureView').then((m) => ({ default: m.ArchitectureView })));
+const TreemapView = lazy(() => import('./pages/TreemapView').then((m) => ({ default: m.TreemapView })));
+const MatrixView = lazy(() => import('./pages/MatrixView').then((m) => ({ default: m.MatrixView })));
 import { LearnPanel } from './components/LearnPanel';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { WarningBanner } from './components/WarningBanner';
@@ -40,6 +44,8 @@ const NAV_ITEMS: Array<{
   { id: 'health', label: 'Health', icon: Activity },
   { id: 'domain', label: 'Domains', icon: Globe },
   { id: 'architecture', label: 'Architecture', icon: Layers },
+  { id: 'treemap', label: 'Treemap', icon: Grid3x3 },
+  { id: 'matrix', label: 'Matrix', icon: LayoutGrid },
   { id: 'learn', label: 'Learn', icon: BookOpen },
 ];
 
@@ -198,7 +204,11 @@ export default function App() {
           setCurrentView('domain'); break;
         case 'a': case '4':
           setCurrentView('architecture'); break;
-        case 'l': case '5':
+        case 't': case '5':
+          setCurrentView('treemap'); break;
+        case 'm': case '6':
+          setCurrentView('matrix'); break;
+        case 'l': case '7':
           setCurrentView('learn'); break;
         case 'r':
           setShowRiskOverlay((v) => !v); break;
@@ -304,10 +314,10 @@ export default function App() {
               <motion.div
                 key="graph"
                 className="flex-1 flex overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
                 <GraphView
                   graph={graph}
@@ -326,10 +336,10 @@ export default function App() {
               <motion.div
                 key="health"
                 className="flex-1 flex overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
                 <HealthView graph={graph} onNodeSelect={handleNodeSelect} history={history} />
               </motion.div>
@@ -339,10 +349,10 @@ export default function App() {
               <motion.div
                 key="domain"
                 className="flex-1 flex overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground">Loading…</div>}>
                   <DomainView graph={graph} onNodeSelect={handleNodeSelect} />
@@ -354,13 +364,43 @@ export default function App() {
               <motion.div
                 key="architecture"
                 className="flex-1 flex overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground">Loading…</div>}>
                   <ArchitectureView />
+                </Suspense>
+              </motion.div>
+            )}
+
+            {currentView === 'treemap' && (
+              <motion.div
+                key="treemap"
+                className="flex-1 flex overflow-hidden"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-surface-500">Loading…</div>}>
+                  <TreemapView graph={graph} onNodeSelect={handleNodeSelect} />
+                </Suspense>
+              </motion.div>
+            )}
+
+            {currentView === 'matrix' && (
+              <motion.div
+                key="matrix"
+                className="flex-1 flex overflow-hidden"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-surface-500">Loading…</div>}>
+                  <MatrixView graph={graph} onNodeSelect={handleNodeSelect} />
                 </Suspense>
               </motion.div>
             )}
@@ -369,10 +409,10 @@ export default function App() {
               <motion.div
                 key="learn"
                 className="flex-1 flex overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
                 <div className="flex-1 max-w-xl mx-auto w-full h-full overflow-hidden border-x border-surface-800">
                   <LearnPanel />

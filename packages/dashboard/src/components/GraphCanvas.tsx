@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Graph from 'graphology';
 import { Sigma } from 'sigma';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
@@ -74,6 +75,7 @@ export function GraphCanvas({
   const graphologyRef = useRef<Graph | null>(null);
   const showRiskRef = useRef(showRiskOverlay);
   const hoveredLayerRef = useRef(hoveredLayerId);
+  const [pulsePos, setPulsePos] = useState<{ x: number; y: number; size: number } | null>(null);
 
   // Build in-degree map
   const buildInDegreeMap = useCallback(() => {
@@ -307,6 +309,20 @@ export function GraphCanvas({
       });
     });
     renderer.refresh();
+
+    // Compute pulse ring position from graph coords
+    if (selectedNodeId && g.hasNode(selectedNodeId)) {
+      const attrs = g.getNodeAttributes(selectedNodeId);
+      try {
+        const vp = renderer.graphToViewport({ x: attrs.x as number, y: attrs.y as number });
+        const nodeSize = (attrs.size as number) ?? 8;
+        setPulsePos({ x: vp.x, y: vp.y, size: nodeSize });
+      } catch {
+        setPulsePos(null);
+      }
+    } else {
+      setPulsePos(null);
+    }
   }, [selectedNodeId]);
 
   return (
@@ -318,6 +334,29 @@ export function GraphCanvas({
         role="img"
         aria-label={`Knowledge graph: ${graph.nodes.length} nodes, ${graph.edges.length} edges. Click a node to inspect it.`}
       />
+
+      {/* Selected node pulse ring */}
+      <AnimatePresence>
+        {pulsePos && (
+          <motion.div
+            key={selectedNodeId}
+            style={{
+              position: 'absolute',
+              left: pulsePos.x - pulsePos.size * 2,
+              top: pulsePos.y - pulsePos.size * 2,
+              width: pulsePos.size * 4,
+              height: pulsePos.size * 4,
+              borderRadius: '50%',
+              border: '2px solid #d946ef',
+              pointerEvents: 'none',
+            }}
+            initial={{ scale: 0.5, opacity: 0.8 }}
+            animate={{ scale: [1, 1.6, 1], opacity: [0.8, 0.2, 0.6] }}
+            exit={{ scale: 0.5, opacity: 0 }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Zoom controls */}
       <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">

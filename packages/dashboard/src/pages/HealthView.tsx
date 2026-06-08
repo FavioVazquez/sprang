@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { AnimatedCount } from '../components/AnimatedCount';
 import {
   AlertTriangle,
   AlertCircle,
@@ -42,7 +44,7 @@ function StatCard({
   sub?: string;
 }) {
   return (
-    <div className="p-4 rounded-xl bg-surface-900 border border-surface-800 space-y-3">
+    <div className="p-4 rounded-xl bg-surface-900 border border-surface-800 space-y-3 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 transition-all duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <div className="flex items-center gap-2">
         <Icon className="w-4 h-4 text-surface-500" />
         <span className="text-xs text-surface-500 font-medium">
@@ -54,7 +56,7 @@ function StatCard({
           className="text-2xl font-bold tabular-nums"
           style={accent ? { color: accent } : undefined}
         >
-          {value}
+          {typeof value === 'number' ? <AnimatedCount value={value} /> : value}
         </p>
         {sub && <p className="text-xs text-surface-500 mt-0.5">{sub}</p>}
       </div>
@@ -109,6 +111,7 @@ function SortIcon({
 }
 
 export function HealthView({ graph, onNodeSelect, history = [] }: HealthViewProps) {
+  const shouldReduce = useReducedMotion();
   const [riskSort, setRiskSort] = useState<{ field: string; dir: SortDir }>({
     field: 'risk_score',
     dir: 'desc',
@@ -400,11 +403,14 @@ export function HealthView({ graph, onNodeSelect, history = [] }: HealthViewProp
                 </thead>
                 <tbody>
                   {smellStats.map((row, idx) => (
-                    <tr
+                    <motion.tr
                       key={row.category}
                       className={`border-b border-surface-800 last:border-0 ${
                         idx % 2 === 0 ? 'bg-surface-950' : 'bg-surface-900/40'
                       }`}
+                      initial={shouldReduce ? {} : { opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: shouldReduce ? 0 : Math.min(idx * 0.04, 0.4), duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                     >
                       <td className="px-4 py-3">
                         <Badge
@@ -438,7 +444,7 @@ export function HealthView({ graph, onNodeSelect, history = [] }: HealthViewProp
                       <td className="px-4 py-3 text-surface-400 hidden md:table-cell">
                         {row.description}
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
                 </tbody>
               </table>
@@ -495,12 +501,15 @@ export function HealthView({ graph, onNodeSelect, history = [] }: HealthViewProp
                 </thead>
                 <tbody>
                   {riskyNodes.map((node, idx) => (
-                    <tr
+                    <motion.tr
                       key={node.id}
                       className={`border-b border-surface-800 last:border-0 cursor-pointer transition-colors hover:bg-surface-800 ${
                         idx % 2 === 0 ? 'bg-surface-950' : 'bg-surface-900/40'
                       }`}
                       onClick={() => onNodeSelect(node.id)}
+                      initial={shouldReduce ? {} : { opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: shouldReduce ? 0 : Math.min(idx * 0.04, 0.4), duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                     >
                       <td className="px-4 py-3">
                         <p className="font-medium text-surface-200 truncate max-w-[200px]">
@@ -551,7 +560,7 @@ export function HealthView({ graph, onNodeSelect, history = [] }: HealthViewProp
                           )}
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
                 </tbody>
               </table>

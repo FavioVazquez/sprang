@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ReactFlow,
   Background,
@@ -385,7 +386,12 @@ export function ArchitectureView() {
         {positions === null ? (
           <LoadingLayout />
         ) : (
-          <div className="flex-1 min-h-0">
+          <motion.div
+            className="flex-1 min-h-0"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          >
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -410,7 +416,7 @@ export function ArchitectureView() {
                 maskColor="rgba(0,0,0,0.7)"
               />
             </ReactFlow>
-          </div>
+          </motion.div>
         )}
 
         {/* Layer detail panel */}
