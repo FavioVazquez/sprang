@@ -65,27 +65,38 @@ Run these two commands inside a Claude Code session:
 /plugin install sprang
 ```
 
-The first command registers the GitHub repo as a local marketplace source (reads `marketplace.json`). The second installs the plugin from it. Claude Code activates all slash commands, hooks, and rules from `.claude-plugin/`. Then build the MCP server to unlock all 9 tools:
+The first command registers the GitHub repo as a local marketplace source (reads `.claude-plugin/marketplace.json`). The second installs the plugin. Then build the MCP server binary to unlock all 9 tools:
 
 ```bash
-# In the installed plugin directory (typically ~/.claude/plugins/sprang/)
+# Find and build in the plugin cache (the exact version path may differ)
+cd "$(ls -d ~/.claude/plugins/cache/sprang/sprang/*/ | tail -1)"
 pnpm install && pnpm build
 ```
 
+Then run `/reload-plugins` inside Claude Code to activate the MCP server.
+
+> **Note on skill names:** Plugin skills are namespaced by plugin name. After installation, commands are invoked as `/sprang:sprang`, `/sprang:sprang-onboard`, `/sprang:sprang-analyze`, etc. If you want the shorter unnamespaced form (`/sprang`, `/sprang-onboard`), copy the standalone files into your project (see the manual install below).
+
 **What the plugin activates:**
 
-| File | What it does |
+| Component | What it does |
 |---|---|
-| `.claude-plugin/plugin.json` | Plugin manifest — name, version, metadata |
-| `.claude-plugin/marketplace.json` | Marketplace source — registers this repo as an installable plugin |
-| `.claude/commands/` | 11 slash commands (e.g. `/sprang`, `/sprang-onboard`) |
-| `.claude/rules/sprang-context.md` | Always-on: Claude checks risk score before editing any file |
-| `.claude/rules/sprang-highrisk.md` | Glob-triggered: blast radius analysis on every source file edit |
-| `.claude/rules/cascade-messaging.md` | Always-on: handles dashboard Ask Agent messages |
-| `.claude/hooks/session-start.sh` | Warns Claude on session open if graph is missing or stale |
-| `.claude/hooks/post-tool-use.sh` | Triggers incremental graph refresh in background after git commits |
-| `.mcp.json` | MCP server config — 9 tools once binary is built |
+| `skills/` | 11 slash commands (namespaced: `/sprang:sprang`, `/sprang:sprang-onboard`, …) |
+| `hooks/hooks.json` | Session start warns on stale graph; post-commit incremental refresh |
+| `.mcp.json` (via `plugin.json`) | 9 MCP tools — started automatically using `${CLAUDE_PLUGIN_ROOT}` path |
 | `CLAUDE.md` | Claude Code project instructions — read automatically on every session open |
+
+**Or manually copy into your project** (gives unnamespaced `/sprang`, `/sprang-onboard` commands):
+
+```bash
+SPRANG_DIR=~/.sprang/repo   # wherever install.sh cloned to, or your local clone
+cp "$SPRANG_DIR/.mcp.json" .
+cp "$SPRANG_DIR/CLAUDE.md" .
+cp "$SPRANG_DIR/AGENTS.md" .
+cp -r "$SPRANG_DIR/.claude" .
+```
+
+Then update `.mcp.json` → `args` to point to the absolute server path: `"$SPRANG_DIR/packages/mcp/dist/server.js"`.
 
 **What Claude does automatically** (once rules are active):
 
@@ -98,42 +109,52 @@ pnpm install && pnpm build
 To build the knowledge graph after install:
 
 ```
-/sprang           # build the knowledge graph
-/sprang-onboard   # guided architecture tour
+/sprang:sprang           # via plugin (namespaced)
+/sprang                  # via manual copy (unnamespaced)
+/sprang:sprang-onboard   # guided architecture tour (via plugin)
 ```
 
 ---
 
 ### GitHub Copilot
 
-**Via the plugin system (recommended)**
+**Via `gh skill install` (recommended, requires [GitHub CLI 2.90.0+](https://cli.github.com/))**
 
 ```bash
-copilot plugin install FavioVazquez/sprang
+gh skill install FavioVazquez/sprang
 ```
 
-This installs the skills and registers `.copilot-plugin/plugin.json` for Copilot's plugin discovery. Then build the MCP server:
+This installs Sprang's skills into `~/.copilot/skills/`, making them available across all your Copilot sessions. Then build the MCP server to enable the 9 tools:
 
 ```bash
-# In the installed plugin directory
-pnpm install && pnpm build
+# Clone (or update) and build — only needed once
+git clone https://github.com/FavioVazquez/sprang.git ~/.sprang/repo
+cd ~/.sprang/repo && pnpm install && pnpm build
 ```
 
-**Or clone manually:**
+Copy `.vscode/mcp.json` into your project and update the path, then open VS Code with Copilot in **Agent mode**:
 
 ```bash
-git clone https://github.com/FavioVazquez/sprang.git
-cd sprang && pnpm install && pnpm build
+mkdir -p .vscode
+cp ~/.sprang/repo/.vscode/mcp.json .vscode/mcp.json
+# Edit .vscode/mcp.json → set the absolute path to ~/.sprang/repo/packages/mcp/dist/server.js
 ```
 
-Open VS Code with Copilot, switch to **Agent mode** (the model selector in the chat panel), and `.vscode/mcp.json` auto-connects the MCP server.
+**Or clone manually (without gh skill):**
+
+```bash
+git clone https://github.com/FavioVazquez/sprang.git ~/.sprang/repo
+cd ~/.sprang/repo && pnpm install && pnpm build
+```
+
+Open VS Code with Copilot, switch to **Agent mode** (the model selector in the chat panel), and `.vscode/mcp.json` auto-connects the MCP server when placed in your project root.
 
 **What activates:**
 
 | File | What it does |
 |---|---|
-| `.copilot-plugin/plugin.json` | Plugin discovery metadata with `skills` paths |
-| `.vscode/mcp.json` | MCP server — auto-connects in Agent mode |
+| `~/.copilot/skills/sprang*/` | Skills installed globally — Copilot loads them in all sessions |
+| `.vscode/mcp.json` | MCP server — auto-connects in Agent mode (place in your project root) |
 | `.github/copilot-instructions.md` | Pre-edit checklist: check risk score before editing, blast radius after — auto-loaded by Copilot in every session |
 | `AGENTS.md` | Universal cross-platform instructions — both Windsurf/Devin Desktop and GitHub Copilot read this automatically |
 
@@ -279,8 +300,8 @@ irm https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.ps1 | iex
 | Flag | Skills target | Platform |
 |---|---|---|
 | `windsurf` | `~/.windsurf/skills/` | Windsurf AI / Devin Desktop |
-| `copilot` | `~/.copilot/skills/` | GitHub Copilot |
-| `claude` | project-local | Claude Code (via `.mcp.json` + plugin manifest) |
+| `copilot` | `~/.copilot/skills/` | GitHub Copilot (or use `gh skill install FavioVazquez/sprang`) |
+| `claude` | project-local | Claude Code (plugin marketplace or manual copy — see guide printed by installer) |
 
 ---
 

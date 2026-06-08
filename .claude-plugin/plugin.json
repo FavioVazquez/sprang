@@ -20,5 +20,14 @@
   ],
   "skills": [
     "./skills"
-  ]
+  ],
+  "mcpServers": {
+    "sprang": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/packages/mcp/dist/server.js"],
+      "env": {
+        "SPRANG_ROOT": "."
+      }
+    }
+  }
 }

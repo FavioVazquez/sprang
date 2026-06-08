@@ -197,14 +197,28 @@ unlink_skills() {
 
 install_claude() {
   printf '\n→ Claude Code installation\n'
-  printf '  Claude Code uses a project-local .mcp.json file.\n'
-  printf '  No global install is needed — Sprang is already configured per-project.\n\n'
-  printf '  To enable Sprang in a project:\n'
-  printf '  1. Copy .mcp.json and CLAUDE.md from the Sprang repo into your project root:\n'
-  printf '       cp %s/.mcp.json <your-project>/\n' "$REPO_DIR"
-  printf '       cp %s/CLAUDE.md <your-project>/\n' "$REPO_DIR"
-  printf '  2. In .mcp.json, set SPRANG_ROOT to the project root (default: ".")\n'
-  printf '  3. Build the knowledge graph: run /sprang inside Claude Code\n\n'
+  printf '  Claude Code uses project-local config files.\n'
+  printf '  No global install is needed — all config ships with Sprang.\n\n'
+
+  printf '  Option A — Plugin marketplace (recommended, gives namespaced commands /sprang:sprang-*):\n'
+  printf '    Inside a Claude Code session run:\n'
+  printf '      /plugin marketplace add FavioVazquez/sprang\n'
+  printf '      /plugin install sprang\n'
+  printf '    Then build the MCP server binary:\n'
+  printf '      cd "$(ls -d ~/.claude/plugins/cache/sprang/sprang/*/ | tail -1)"\n'
+  printf '      pnpm install && pnpm build\n'
+  printf '    Then run /reload-plugins inside Claude Code.\n\n'
+
+  printf '  Option B — Manual copy (gives unnamespaced /sprang, /sprang-onboard, etc.):\n'
+  printf '    Copy these into your project root:\n'
+  printf '      cp %s/.mcp.json          <your-project>/\n' "$REPO_DIR"
+  printf '      cp %s/CLAUDE.md          <your-project>/\n' "$REPO_DIR"
+  printf '      cp %s/AGENTS.md          <your-project>/\n' "$REPO_DIR"
+  printf '      cp -r %s/.claude/        <your-project>/.claude/\n' "$REPO_DIR"
+  printf '    Then in <your-project>/.mcp.json update args to the absolute server path:\n'
+  printf '      "args": ["%s/packages/mcp/dist/server.js"]\n' "$REPO_DIR"
+  printf '    Finally, open the project in Claude Code and run /sprang.\n\n'
+
   printf '  For full details: %s/CLAUDE.md\n' "$REPO_DIR"
 }
 

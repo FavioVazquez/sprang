@@ -190,15 +190,27 @@ function Unlink-Skills([string]$Target, [string]$Style) {
 function Install-Claude {
     Write-Host ''
     Write-Host '→ Claude Code installation'
-    Write-Host '  Claude Code uses a project-local .mcp.json file.'
-    Write-Host '  No global install is needed — Sprang is already configured per-project.'
+    Write-Host '  Claude Code uses project-local config files.'
+    Write-Host '  No global install is needed — all config ships with Sprang.'
     Write-Host ''
-    Write-Host '  To enable Sprang in a project:'
-    Write-Host "  1. Copy .mcp.json and CLAUDE.md from $RepoDir into your project root:"
-    Write-Host "       Copy-Item $RepoDir\.mcp.json <your-project>\"
-    Write-Host "       Copy-Item $RepoDir\CLAUDE.md <your-project>\"
-    Write-Host '  2. In .mcp.json, set SPRANG_ROOT to the project root (default: ".")'
-    Write-Host '  3. Build the knowledge graph: run /sprang inside Claude Code'
+    Write-Host '  Option A — Plugin marketplace (recommended, gives namespaced commands /sprang:sprang-*):'
+    Write-Host '    Inside a Claude Code session run:'
+    Write-Host '      /plugin marketplace add FavioVazquez/sprang'
+    Write-Host '      /plugin install sprang'
+    Write-Host '    Then build the MCP server binary (find the versioned cache folder):'
+    Write-Host '      cd "$env:USERPROFILE\.claude\plugins\cache\sprang\sprang\<version>"'
+    Write-Host '      pnpm install; pnpm build'
+    Write-Host '    Then run /reload-plugins inside Claude Code.'
+    Write-Host ''
+    Write-Host '  Option B — Manual copy (gives unnamespaced /sprang, /sprang-onboard, etc.):'
+    Write-Host '    Copy these into your project root:'
+    Write-Host "      Copy-Item '$RepoDir\.mcp.json'  <your-project>\"
+    Write-Host "      Copy-Item '$RepoDir\CLAUDE.md'  <your-project>\"
+    Write-Host "      Copy-Item '$RepoDir\AGENTS.md'  <your-project>\"
+    Write-Host "      Copy-Item -Recurse '$RepoDir\.claude'  <your-project>\.claude"
+    Write-Host "    Then in <your-project>\.mcp.json update args to the absolute server path:"
+    Write-Host "      `"args`": [`"$RepoDir\packages\mcp\dist\server.js`"]"
+    Write-Host '    Open the project in Claude Code and run /sprang.'
     Write-Host ''
     Write-Host "  For full details: $RepoDir\CLAUDE.md"
 }
