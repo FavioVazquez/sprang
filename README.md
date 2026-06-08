@@ -16,7 +16,7 @@
   <a href="#installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-608_passing-10B981?style=flat-square" alt="608 unit tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-613_passing-10B981?style=flat-square" alt="613 unit tests passing"/>
   <img src="https://img.shields.io/badge/e2e_tests-56_passing-10B981?style=flat-square" alt="56 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
@@ -314,7 +314,7 @@ irm https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.ps1 | iex
 - [Manual build](#manual-build)
 - [CLI usage](#cli-usage)
 - [Windsurf / Devin Desktop — detailed setup](#windsurf--devin-desktop--detailed-setup)
-- [Dashboard chat (cascade-messaging)](#dashboard-chat-cascade-messaging)
+- [Ask Agent (dashboard chat)](#ask-agent-dashboard-chat)
 - [Slash commands](#slash-commands)
 - [Two-phase pipeline](#two-phase-pipeline)
 - [The three differentiating agents](#the-three-differentiating-agents)
@@ -1007,7 +1007,7 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 608 unit tests across core/dashboard/mcp/cli
+pnpm test              # 613 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
 pnpm --filter @sprang/dashboard test:e2e   # 56 Playwright e2e tests
@@ -1017,11 +1017,11 @@ pnpm --filter @sprang/dashboard test:e2e   # 56 Playwright e2e tests
 
 | Package | Runner | Tests | What is tested |
 |---|---|---|---|
-| `@sprang/core` | Vitest | 431 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity |
+| `@sprang/core` | Vitest | 436 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity |
 | `@sprang/dashboard` | Vitest | 85 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6), bridge detection (30) |
 | `@sprang/mcp` | Vitest | 65 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (40), sprang_respond (8), sprang_query enhancements (3) |
 | `@sprang/cli` | Vitest | 27 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12), `merge` command (9) |
-| **Total unit** | | **606** | |
+| **Total unit** | | **613** | |
 | `@sprang/dashboard` | Playwright | 56 | Full UI e2e — loading, nav, keyboard shortcuts (all 1–5/g/h/d/a/l), architecture tab, cascade bridge, health grade (A–F), security findings, risk overlay, analyze endpoint, tour player, persona selector |
 
 <details>
