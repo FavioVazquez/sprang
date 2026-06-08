@@ -191,9 +191,9 @@ Report: `[Phase 3/5] Building topic clusters and layers...`
    - **Reflections**: journal entries, reviews, retrospectives
    - **How-to**: procedural notes, tutorials, recipes
 
-4. Write layers:
+4. Write layers — use the `final-layers.json` filename so merge.py can find it:
    ```bash
-   cat > "$SPRANG_ROOT/intermediate/knowledge-layers.json" << 'EOF'
+   cat > "$SPRANG_ROOT/intermediate/final-layers.json" << 'EOF'
    [
      {
        "id": "cluster:core-concepts",
@@ -222,20 +222,27 @@ Report: `[Phase 4/5] Building reading tour...`
    - Cover all major clusters
    - Each step explains WHY to read this note and what it connects to
 
-3. Write tour:
+3. Write tour — wrap steps in a Tour object and use `final-tours.json` so merge.py can find it:
    ```bash
-   cat > "$SPRANG_ROOT/intermediate/knowledge-tour.json" << 'EOF'
+   cat > "$SPRANG_ROOT/intermediate/final-tours.json" << 'EOF'
    [
      {
-       "id": "knowledge-tour-step-1",
-       "step_title": "<note title>",
-       "explanation": "<why read this first — what it sets up, what depends on it>",
-       "node_ids": ["article:<path>"],
-       "language_lesson": null
+       "id": "knowledge-tour",
+       "title": "Recommended Reading Order",
+       "description": "A guided path through this knowledge base from foundations to specifics",
+       "steps": [
+         {
+           "step_title": "<note title>",
+           "explanation": "<why read this first — what it sets up, what depends on it>",
+           "node_ids": ["article:<path>"]
+         }
+       ]
      }
    ]
    EOF
    ```
+
+   > ⚠️ The tour must be a Tour object array (with `id`, `title`, `description`, `steps`), not a flat step array.
 
 Report: `Phase 4 complete. <N>-step reading tour built.`
 
@@ -245,7 +252,7 @@ Report: `Phase 4 complete. <N>-step reading tour built.`
 
 Report: `[Phase 5/5] Assembling knowledge graph...`
 
-1. Load `knowledge-assembled.json`, `knowledge-layers.json`, `knowledge-tour.json`
+1. Load `knowledge-assembled.json`, `final-layers.json`, `final-tours.json`
 2. Assemble final graph with **`"kind": "knowledge"`**:
 
 ```json

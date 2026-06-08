@@ -10,7 +10,7 @@ Arguments: `[path] [--full] [--language <lang>] [--chunk <N>]`
 Produce `.sprang/knowledge-graph.json` for the project with full semantic enrichment.
 You are the analysis engine — read every file and write rich understanding into the graph.
 
-> **CRITICAL:** Complete ALL 7 phases in one run. Stopping early leaves the Architecture, Domains, and Learn tabs empty.
+> **CRITICAL:** Complete ALL 8 phases (Phase 0 through Phase 7) in one run. Stopping early leaves the Architecture, Domains, and Learn tabs empty.
 > **RESUME:** If graph already exists at `phase: complete`, jump to Phase 4 to re-run enrichment only.
 
 Follow the detailed instructions in `.windsurf/workflows/sprang-analyze.md`.

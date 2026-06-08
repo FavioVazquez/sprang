@@ -39,14 +39,14 @@ Pass a `$ARGUMENTS` to focus on a specific node, or leave empty to browse all an
    - Display side-by-side: **Team note** | **Current state** | **Git history**
 
 6. **Staleness detection** — for each annotated node:
-   - Call `sprang_node` to get `node.decision_context.last_changed`
-   - Compare to `annotated_at` from the annotation frontmatter
-   - If `last_changed` is **after** `annotated_at` → flag as ⚠️ **possibly stale**
+   - Call `sprang_node` to get `node.decision_context.last_changed` and `in_degree`/`out_degree`
+   - Use `last_changed` if present; if absent (most nodes won't have git history), fall back to `graph.stats.generated_at` as a "last analyzed" proxy
+   - If that date is **after** `annotated_at` → flag as ⚠️ **possibly stale**
    - If `node.risk_score` has increased significantly → flag as 🔴 **risk escalated**
 
    Report stale annotations:
-   > **Possibly stale annotations** (file changed after note was written):
-   > - `<node_label>` — annotated <date>, last changed <date> by <author>
+   > **Possibly stale annotations** (node changed or re-analyzed after note was written):
+   > - `<node_label>` — annotated <date>, last changed/analyzed <date>
 
 7. **Annotation stats:**
    - Total annotations: `<N>`

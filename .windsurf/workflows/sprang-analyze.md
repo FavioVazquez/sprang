@@ -7,7 +7,7 @@ description: Analyze a codebase to produce a rich semantic knowledge graph — f
 Produce a `.sprang/knowledge-graph.json` for the project with full semantic enrichment.
 Cascade IS the analysis engine — you read every file and write rich understanding into the graph.
 
-> **CRITICAL — DO NOT STOP EARLY:** This workflow has 7 phases. You MUST complete ALL phases in a single run. If you stop after Phase 3, the dashboard Architecture, Domains, and Learn tabs will be empty. Keep going until you see "Knowledge graph saved" at the end of Phase 7.
+> **CRITICAL — DO NOT STOP EARLY:** This workflow has 8 phases (Phase 0 through Phase 7). You MUST complete ALL phases in a single run. If you stop after Phase 3, the dashboard Architecture, Domains, and Learn tabs will be empty. Keep going until you see "Knowledge graph saved" at the end of Phase 7.
 
 > **⛔ NEVER write `.sprang/knowledge-graph.json` directly.** The ONLY way to produce the final graph is to run `merge.py` at the end of Phase 7. Writing the graph file yourself will produce a broken file that the dashboard cannot load. All intermediate data goes into `$SPRANG_ROOT/intermediate/` as chunk files.
 
