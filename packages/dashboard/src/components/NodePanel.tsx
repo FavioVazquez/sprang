@@ -437,7 +437,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
                     {neighbors.slice(0, 12).map((neighbor) => (
                       <div
                         key={neighbor.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-800 transition-colors"
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-800 hover:translate-x-0.5 transition-all duration-150 motion-reduce:transition-none motion-reduce:hover:translate-x-0"
                       >
                         <NodeIcon
                           type={neighbor.type}

@@ -631,7 +631,7 @@ export function HealthView({ graph, onNodeSelect, history = [] }: HealthViewProp
                 .map((node) => (
                   <div
                     key={node.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-surface-900 border border-surface-800 hover:border-surface-700 cursor-pointer transition-colors"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-surface-900 border border-surface-800 hover:border-surface-700 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 cursor-pointer transition-all duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                     onClick={() => onNodeSelect(node.id)}
                   >
                     <div className="flex-1 min-w-0">
@@ -685,7 +685,7 @@ export function HealthView({ graph, onNodeSelect, history = [] }: HealthViewProp
                 .map((node) => (
                   <div
                     key={node.id}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-surface-900 border border-surface-800 hover:border-red-900 cursor-pointer transition-colors"
+                    className="flex items-start gap-3 p-3 rounded-lg bg-surface-900 border border-surface-800 hover:border-red-900 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 cursor-pointer transition-all duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                     onClick={() => onNodeSelect(node.id)}
                   >
                     <Shield className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
