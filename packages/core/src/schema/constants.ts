@@ -102,6 +102,14 @@ export const DEFAULT_EXCLUDES = [
   // Playwright test artifacts
   '**/test-results/**',
   '**/playwright-report/**',
+  // Sprang bridge / runtime transient files
+  '**/.cascade-trigger-session',
+  '**/.cascade-bridge-active',
+  '**/cascade-response.json',
+  '**/claude-session.json',
+  '**/copilot-session.json',
+  '**/agent-conversation.md',
+  '**/diff-overlay.json',
 ];
 
 // Entry point patterns for tour-builder (TypeScript/JavaScript + multi-language)

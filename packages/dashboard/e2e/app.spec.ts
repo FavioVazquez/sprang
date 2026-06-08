@@ -813,6 +813,7 @@ test('health view shows grade badge', async ({ page }) => {
   await navTab(page, 'Health').click();
   // Grade badge should be visible (A, B, C, D, or F)
   await expect(page.locator('text=/^[ABCDF]$/')).toBeVisible({ timeout: 5000 });
+});
 
 // Test 41: File content API – rejects path traversal attack
 // ---------------------------------------------------------------------------

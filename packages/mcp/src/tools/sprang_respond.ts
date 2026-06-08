@@ -10,6 +10,7 @@ export interface SprangRespondResult {
   success: true;
   path: string;
   written_at: string;
+  timestamp: string;
 }
 
 /**
@@ -43,5 +44,6 @@ export async function sprangRespond(
     success: true,
     path: '.sprang/cascade-response.json',
     written_at: writtenAt,
+    timestamp: writtenAt,
   };
 }

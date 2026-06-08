@@ -701,13 +701,33 @@ risk_score = clamp(
 | `sprang_query` | `{ query, node_types?, limit?, mode? }` | Fuzzy or semantic-ranked nodes with summaries |
 | `sprang_diff_impact` | `{ files: string[] }` | BFS blast-radius, risk-ranked impact list |
 | `sprang_why` | `{ node_id }` | Decision context + git history + team annotation |
-| `sprang_health` | `{}` | Smell summary, top-10 risk, orphans, circular deps |
+| `sprang_health` | `{}` | Health grade (A–F), score (0–100), security summary, top-10 risk, smells, orphans, circular deps, run history |
 | `sprang_tour` | `{ tour_id?, persona? }` | Ordered pedagogical tour with language lessons per step |
 | `sprang_domain` | `{ domain_name? }` | Business domain flows and entry points |
 | `sprang_annotate` | `{ node_id, content, tags? }` | Write `.sprang/annotations/<id>.md` |
 | `sprang_respond` | `{ response, question? }` | Write response to `.sprang/cascade-response.json` for dashboard display |
 
 `sprang_query` accepts `mode: "semantic"` for cosine similarity search over TF-IDF embeddings.
+
+### Health grade (v0.2.1)
+
+`sprang_health` now returns a letter grade (A–F) computed from five deterministic penalty categories:
+
+| Penalty | Max | Trigger |
+|---|---|---|
+| `dead_code_penalty` | 20 pts | orphan nodes (isolated — no imports, not an entry point) |
+| `circular_penalty` | 20 pts | circular dependency chains |
+| `god_node_penalty` | 15 pts | god_node smells (out_degree > 20) |
+| `coupling_penalty` | 15 pts | over_connected smells (total_degree > 30) |
+| `security_penalty` | 20 pts | hardcoded secrets, SQL injection, XSS patterns, and 5 other regex categories |
+
+```
+health_score = 100 − Σ(penalties)   → A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, F < 60
+```
+
+`security_summary` groups findings by severity (high / medium / low) and by category (`hardcoded_secret`, `sql_injection`, `xss_risk`, `path_traversal`, `command_injection`, `weak_crypto`, `insecure_random`, `sensitive_data_exposure`). All 20 detection patterns are deterministic regex — no LLM calls.
+
+`history` returns the last 30 `sprang_health` snapshots from `.sprang/intermediate/health-history.jsonl` so you can track whether code quality is improving or degrading over time.
 
 ### Enriched `sprang_node` response
 
@@ -914,7 +934,7 @@ pnpm build             # build all packages
 pnpm test              # 606 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
-pnpm --filter @sprang/dashboard test:e2e   # 36 Playwright e2e tests
+pnpm --filter @sprang/dashboard test:e2e   # 49 Playwright e2e tests
 ```
 
 ### Test summary
@@ -926,7 +946,7 @@ pnpm --filter @sprang/dashboard test:e2e   # 36 Playwright e2e tests
 | `@sprang/mcp` | Vitest | 63 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (38), sprang_respond (8), sprang_query enhancements (3) |
 | `@sprang/cli` | Vitest | 27 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12), `merge` command (9) |
 | **Total unit** | | **606** | |
-| `@sprang/dashboard` | Playwright | 49 | Full UI e2e — loading, nav, keyboard shortcuts, architecture tab, cascade bridge, APIs, security endpoints, health grade |
+| `@sprang/dashboard` | Playwright | 49 | Full UI e2e — loading, nav, keyboard shortcuts, architecture tab, cascade bridge, health grade (A–F), risk overlay, analyze endpoint, security endpoints |
 
 <details>
 <summary>Full test structure</summary>
@@ -972,19 +992,23 @@ packages/dashboard/src/utils/
 └── elk-layout.test.ts            6 tests — ELK mock, coordinate pass-through, fallback
 
 packages/dashboard/e2e/
-└── app.spec.ts                  36 tests — Playwright, full UI coverage
+└── app.spec.ts                  49 tests — Playwright, full UI coverage
     ├── error state (no graph, retry button)
     ├── loaded state (all 5 nav tabs)
     ├── navigation (graph → health → domains → architecture → learn)
-    ├── keyboard shortcuts (Ctrl+K, h, g, d, a, l, ?, 1-5)
-    ├── health view (heading, god_node smell)
+    ├── keyboard shortcuts (Ctrl+K, h, g, d, a, l, ?, 1-5, r)
+    ├── health view (heading, god_node smell, health grade A–F badge)
     ├── domains view (domain label rendered)
     ├── search dialog (open, type, filter, close)
     ├── onboarding overlay (dismiss)
     ├── architecture view (empty state, layer count, card click, clear selection)
-    ├── cascade bridge (/cascade-ask POST validation + success, /cascade-response)
+    ├── cascade bridge (/cascade-ask POST validation + success, /cascade-response DELETE)
+    ├── bridge status (/bridge-status → kind + detail shape, Ask Agent panel)
     ├── graph APIs (/knowledge-graph.json, /diff-overlay.json, /file-content.json)
-    └── nav bar (logo + Architecture tab persistence)
+    ├── risk overlay (R key toggles on/off)
+    ├── analyze endpoint (/analyze POST trigger)
+    ├── sigma canvas (present and non-zero size)
+    └── nav bar (logo + all 5 tabs persistent)
 
 packages/mcp/tests/
 ├── graph-loader.test.ts          3 tests — load, null-on-missing, hot-reload
