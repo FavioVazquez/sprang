@@ -137,7 +137,7 @@ const TOOLS = [
   {
     name: 'sprang_health',
     description:
-      'Return a comprehensive health report: node/edge counts, risk summary, smell summary, top 10 risky nodes, orphan count, circular dependency count, nodes without tests.',
+      'Return a comprehensive health report: health grade (A–F), score (0–100), node/edge counts, risk summary, smell summary, security summary, top 10 risky nodes, orphan count, circular dependency count, nodes without tests, and run history (last 30 snapshots).',
     inputSchema: {
       type: 'object' as const,
       properties: {},

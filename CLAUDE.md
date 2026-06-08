@@ -57,7 +57,7 @@ If you copy Sprang into another project: set `SPRANG_ROOT` to the project root, 
 | `sprang_diff_impact` | `{ files: string[] }` | BFS blast radius before committing |
 | `sprang_tour` | `{ tour_id?, persona? }` | Guided walkthrough; persona: `"junior"` / `"senior"` / `"pm"` |
 | `sprang_domain` | `{ domain_name? }` | Business domain hierarchy |
-| `sprang_health` | `{}` | Smell summary, top-10 risky nodes, orphans, circular deps |
+| `sprang_health` | `{}` | Health grade (A–F), score, smell summary, security summary, top-10 risky nodes, orphans, circular deps, run history |
 | `sprang_why` | `{ node_id }` | Git history + decision context + annotation for a node |
 | `sprang_annotate` | `{ node_id, content, tags? }` | Write team annotation to `.sprang/annotations/<node>.md` |
 | `sprang_respond` | `{ response, question? }` | Dashboard bridge — writes answer to `.sprang/cascade-response.json` |
@@ -198,6 +198,28 @@ Keyboard shortcuts:
 - `Esc` — close panel / search
 
 The **Ask Agent** panel auto-detects the available bridge (Windsurf → Claude Code → Copilot CLI → none). When the Claude Code bridge is active, the Vite server spawns `claude -p` non-interactively and uses `--resume <session_id>` for conversation continuity. The session ID is persisted in `.sprang/claude-session.json`.
+
+---
+
+## CLI Commands
+
+Beyond the slash commands, the `sprang` CLI binary has these commands:
+
+```bash
+sprang scan [path] [--phase1-only] [--if-stale]   # build/refresh the graph
+sprang open [path] [--port 7777] [--no-browser]   # launch dashboard for any repo
+sprang diagram [path] [--output file]              # Mermaid architecture diagram
+sprang merge [path] [--intermediate dir]           # assemble graph from agent chunks
+sprang health [path]                               # print health report to terminal
+sprang query "text" [--semantic]                   # search the graph from CLI
+sprang watch [path]                                # incremental file watcher
+sprang status [path]                               # graph age / phase / node count
+sprang install-hooks [path]                        # install git post-commit hook
+```
+
+`sprang open` is the zero-friction entry point: point it at any folder that has been scanned and it serves the dashboard immediately without changing directories.
+
+`sprang diagram` reads `.sprang/knowledge-graph.json` and outputs a Mermaid `flowchart TD` — useful for architecture docs or PR descriptions.
 
 ---
 

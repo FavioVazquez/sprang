@@ -82,10 +82,23 @@ Use for: understanding business processes and which code owns each domain.
 ### `sprang_health`
 ```
 Input:  {}
-Output: { phase, total_nodes, total_edges, risk_summary, smell_summary, top_10_risky_nodes,
-          orphan_count, circular_dependency_count, nodes_without_tests }
+Output: {
+  phase, generated_at, total_nodes, total_edges,
+  health_grade: "A"|"B"|"C"|"D"|"F",
+  health_score: number,                  // 0–100
+  grade_color: string,                   // hex (#22c55e for A → #ef4444 for F)
+  grade_breakdown: { dead_code_penalty, circular_penalty, god_node_penalty,
+                     coupling_penalty, security_penalty },
+  risk_summary: { high, medium, low },
+  smell_summary: Partial<Record<SmellCategory, number>>,
+  security_summary: { total, by_severity: { high, medium, low },
+                      by_category: Partial<Record<SecurityCategory, number>> },
+  top_10_risky_nodes: TopRiskyNode[],
+  orphan_count, circular_dependency_count, nodes_without_tests,
+  history: HistorySnapshot[]             // last 30 run snapshots
+}
 ```
-Use for: structural health check, prioritizing refactoring targets.
+Use for: structural health check, letter grade at a glance, security audit, prioritizing refactoring targets.
 
 ### `sprang_why`
 ```

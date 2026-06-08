@@ -16,8 +16,8 @@
   <a href="#installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-555_passing-10B981?style=flat-square" alt="555 unit tests passing"/>
-  <img src="https://img.shields.io/badge/e2e_tests-36_passing-10B981?style=flat-square" alt="36 e2e tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-606_passing-10B981?style=flat-square" alt="606 unit tests passing"/>
+  <img src="https://img.shields.io/badge/e2e_tests-49_passing-10B981?style=flat-square" alt="49 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
 </p>
@@ -332,7 +332,7 @@ sprang_health {}
 ```
 packages/
 ├── core/       Pipeline: 9 agents, schema, watcher, graph store, fingerprinting, semantic search
-├── cli/        sprang scan | health | query | watch | status | install-hooks
+├── cli/        sprang scan | health | query | watch | status | install-hooks | merge | open | diagram
 ├── mcp/        stdio MCP server — 9 tools for all AI platforms
 └── dashboard/  React + Vite + Sigma.js — 5 views (Graph/Health/Domains/Architecture/Learn)
 ```
@@ -383,7 +383,7 @@ pnpm link --global
 cd ../..
 
 which sprang        # verify: should print $PNPM_HOME/sprang
-sprang --version    # 0.2.0
+sprang --version    # 0.2.1
 ```
 
 ```bash
@@ -421,6 +421,14 @@ sprang query "authentication" --semantic   # cosine similarity over TF-IDF embed
 
 # Watch for file changes and incrementally update the graph
 sprang watch
+
+# Open the dashboard pointed at any repo folder (no cd required)
+sprang open /path/to/any/project
+sprang open /path/to/any/project --port 8080
+
+# Generate a Mermaid architecture diagram from the graph
+sprang diagram
+sprang diagram --output architecture.md
 ```
 
 Output written to `.sprang/` in your project root:
@@ -903,7 +911,7 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 555 unit tests across core/dashboard/mcp/cli
+pnpm test              # 606 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
 pnpm --filter @sprang/dashboard test:e2e   # 36 Playwright e2e tests
@@ -913,12 +921,12 @@ pnpm --filter @sprang/dashboard test:e2e   # 36 Playwright e2e tests
 
 | Package | Runner | Tests | What is tested |
 |---|---|---|---|
-| `@sprang/core` | Vitest | 383 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree |
+| `@sprang/core` | Vitest | 431 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity |
 | `@sprang/dashboard` | Vitest | 85 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6), bridge detection (30) |
-| `@sprang/mcp` | Vitest | 60 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (38), sprang_respond (8) |
+| `@sprang/mcp` | Vitest | 63 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (38), sprang_respond (8), sprang_query enhancements (3) |
 | `@sprang/cli` | Vitest | 27 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12), `merge` command (9) |
-| **Total unit** | | **555** | |
-| `@sprang/dashboard` | Playwright | 36 | Full UI e2e — loading, nav, keyboard shortcuts, architecture tab, cascade bridge, APIs |
+| **Total unit** | | **606** | |
+| `@sprang/dashboard` | Playwright | 49 | Full UI e2e — loading, nav, keyboard shortcuts, architecture tab, cascade bridge, APIs, security endpoints, health grade |
 
 <details>
 <summary>Full test structure</summary>

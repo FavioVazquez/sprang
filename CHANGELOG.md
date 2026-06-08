@@ -6,9 +6,65 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.2.1] — 2026-06-06
+## [0.2.1] — 2026-06-08
 
-Correctness, security, and platform polish. No API surface changes.
+Security scanning, health grading, run history, architecture diagrams, and on-demand dashboard analysis — all deterministic, no API key required.
+
+### Added (new features)
+
+- **`SecurityScannerAgent`** — deterministic Phase 2 agent, zero LLM calls, zero API keys. Scans every file node against 20 regex patterns across 8 categories: `hardcoded_secret`, `sql_injection`, `xss_risk`, `unsafe_eval`, `unsafe_exec`, `unsafe_deserialization`, `path_traversal`, `weak_crypto`. Findings stored as `node.security_warnings[]` with category, severity, line number, matched pattern, and code snippet. High-severity findings boost `risk_score` by +0.15. Summary written to `graph.stats.security_summary`.
+- **Health letter grade (A–F)** — `calcHealthGrade()` in `@sprang/core` computes a 0–100 score from five deterministic penalty factors: dead code (orphan %), circular dependencies, god nodes, average coupling, and high-severity security findings. Maps to A (≥90) / B (≥80) / C (≥70) / D (≥60) / F (<60). `gradeColor()` returns the hex color for each grade (green → red).
+- **`sprang_health` MCP tool** — extended output: `health_grade`, `health_score`, `grade_color`, `grade_breakdown` (per-factor penalties), `security_summary`, and `history` (last 30 run snapshots). The grade and breakdown are computed live from the graph on every call.
+- **Run history** — `appendSnapshot()` / `loadHistory()` in `@sprang/core`. Every `sprang scan` run appends a `HistorySnapshot` to `.sprang/history.json` (max 50 entries, atomic write via temp-rename). Snapshots record: timestamp, git hash, phase, health score/grade, node/edge counts, risk summary, smell count, security count.
+- **Pattern detection** — `file-analyzer` now runs `detectPatterns()` on each file: identifies `singleton` (private constructor + static instance), `factory` (create*/make* functions), `observer` (addEventListener/subscribe/emit), `react_hook` (exported use* with hooks inside), `strategy` (implements *Strategy), `dependency_injection` (constructor with multiple typed params). Stored as `node.detected_patterns[]`.
+- **`name_duplicate` code smell** — `smell-detector` now calls `detectNameDuplicates()`: flags function or class names that appear in 3+ different files using LCS similarity. Adds `name_duplicate` entries to `smell_summary` and `structural_warnings`.
+- **LCS similarity utilities** — `lcsLength()`, `lcsSimilarity()`, `structuralFingerprint()` added to `@sprang/core`. O(m×n) time, O(min(m,n)) space with rolling-array optimization. `structuralFingerprint()` strips comments, normalizes string/number literals for structural comparison.
+- **Mermaid diagram generation** — `generateMermaid()` in `@sprang/core`. Reads layer assignments from the graph, counts cross-layer edges, outputs a `flowchart TD` Mermaid block. Falls back to top-20 file nodes when no layers exist.
+- **`sprang open [path] [--port 7777] [--no-browser]`** — new CLI command. Launches the dashboard (`vite preview`) pointed at any project folder without changing directories. Walks up the directory tree to find `packages/dashboard/dist`, sets `SPRANG_ROOT`, opens the browser after a 1.5s delay. Entry point for using Sprang on other people's repos.
+- **`sprang diagram [path] [--output file]`** — new CLI command. Reads `.sprang/knowledge-graph.json` and outputs a fenced Mermaid block to stdout or a file. Zero dependencies beyond the graph file — useful for architecture docs and PR descriptions.
+- **Dashboard: `HealthGrade` component** — animated A–F badge with spring entrance animation (framer-motion). Color-coded per grade (green → red). Shows score/100. Tooltip with full penalty breakdown.
+- **Dashboard: `Sparkline` component** — pure SVG area sparkline (no library). Gradient fill, stroke line, endpoint dot. Used for health score trend in the Health view.
+- **Dashboard: `HealthView` additions** — health grade badge + score sparkline in the heading, security issues section (severity grid + list of flagged nodes with category/line/snippet), detected patterns section (green checkmark badges per pattern type).
+- **Dashboard: `NodePanel` additions** — security warnings section (collapsible, severity-colored cards with category, line number, matched snippet), detected patterns section (green `CheckCircle` badges).
+- **Dashboard: on-demand analysis** — `POST /analyze` endpoint spawns `sprang scan --phase1-only` as a fire-and-forget background process. `GET /analyze-status` polls `.sprang/intermediate/phase2-progress.json`. `GET /health-history.json` serves `.sprang/history.json` (returns `[]` if missing). `ErrorScreen` gains an "Analyze this project" button wired to `POST /analyze`.
+- **27 new unit tests**: 15 for `health-grade` (grade boundaries, all 5 penalty factors with cap enforcement, `gradeColor`, score clamping) and 12 for `similarity` (`lcsLength`, `lcsSimilarity`, `structuralFingerprint`).
+- **4 new e2e tests** (tests 37–40): `/health-history.json` returns array, `/analyze-status` returns 204 when no progress file, `POST /analyze` returns `{ok:true, started:true}`, health view shows grade badge.
+
+### Fixed (correctness and platform polish from 2026-06-06 session)
+
+- **`sprang_query` — multi-word queries returned zero results.** Fixed: query tokenized on whitespace; each token matched independently against `label`, `id`, and `summary`. Scoring rewards full-phrase and label matches.
+- **`sprang_query` — node IDs (file paths) not searched.** Fixed: text scorer now checks `node.id.toLowerCase()` against both full phrase and each token.
+- **`sprang_node` / `sprang_why` / `sprang_annotate` — bare path lookups returned `NODE_NOT_FOUND`.** Fixed: `resolveNode` tries exact → `file:` prefix → strip prefix → suffix match.
+- **`sanitizeNodeId` — `basename()` caused monorepo annotation collisions.** Fixed: full path preserved; only path-unsafe characters replaced.
+- **`GraphPhase` — dead `'enriched'` value removed** from schema.
+- **`merge-subgraphs.ts` — layers, tours, and domains not merged.** Fixed: `mergeLayers`, `mergeTours`, `mergeDomains` helpers added.
+- **`graph-loader.ts` — Zod validation failures were silent.** Fixed: error written to `process.stderr` with the validation issue.
+- **`graph-loader.ts` — TOCTOU race in hot-reload.** Fixed: single `stat()` call, result reused.
+- **`ArchitectureView.tsx` — React hooks ordering violation.** Fixed: `useMemo` moved before its dependent `useEffect`.
+- **`AskCascadePanel.tsx` — Escape key did not close the panel.** Fixed.
+- **`claude` bridge — `--mcp-config` not passed explicitly.** Fixed: `--mcp-config <sprangRoot>/.mcp.json` added when file exists.
+- **`install.sh` — heredoc injection + regex grep.** Fixed: `printf '%s\n'` quoting + `grep -qF` literal match.
+- **`install.ps1` — unquoted paths + `mklink` fallback.** Fixed: proper quoting + `New-Item -ItemType SymbolicLink`.
+- **`merge.ts` — path containment not enforced.** Fixed: guard rejects paths outside `projectRoot`.
+- **`.devin/config.json` — hardcoded developer machine path.** Fixed: replaced with relative `packages/mcp/dist/server.js`.
+- **`.copilot-plugin/plugin.json` — wrong `skills` path.** Fixed: `"../.windsurf/skills/"`.
+- **All 11 `.windsurf/skills/*/SKILL.md` — missing trigger phrases in descriptions.** Fixed.
+- **`DEFAULT_EXCLUDES` — scanner indexed its own worktrees.** Fixed: `.claude/worktrees/**`, `test-results/**`, `playwright-report/**` added.
+- **CI manifest validation — `.devin/config.json` not checked.** Fixed.
+- **`sprang_why` — `phase_note` field** added when `decision_context` is absent.
+- **`.sprang/annotations/.gitkeep`** — tracks empty annotations dir in fresh clones.
+- **`.gitignore`** — transient runtime files now properly excluded: `cascade-response.json`, `claude-session.json`, `copilot-session.json`, `agent-conversation.md`, `.cascade-bridge-active`, `diff-overlay.json`, `packages/dashboard/.sprang/`.
+
+### Changed
+
+- All package versions bumped from `0.2.0` to `0.2.1`.
+- `sprang_health` MCP tool description updated to reflect extended output.
+- `sprang-health` command/skill/workflow: now leads with health grade, reports security findings, shows history trend.
+- Test counts: **606 unit tests** (431 core + 85 dashboard + 63 mcp + 27 cli), **49 e2e tests** — all passing.
+
+---
+
+## [0.2.0] — 2026-06-05
 
 ### Fixed
 
