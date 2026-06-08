@@ -18,6 +18,7 @@ const SMELL_LABELS: Record<SmellCategory, string> = {
   orphan_node: 'Orphan',
   low_cohesion: 'Low Cohesion',
   name_duplicate: 'Name Duplicate',
+  layer_violation: 'Layer Violation',
 };
 
 const SMELL_VARIANT: Record<SmellCategory, 'risk-high' | 'risk-medium' | 'info'> = {
@@ -30,6 +31,7 @@ const SMELL_VARIANT: Record<SmellCategory, 'risk-high' | 'risk-medium' | 'info'>
   orphan_node: 'info',
   low_cohesion: 'info',
   name_duplicate: 'risk-medium',
+  layer_violation: 'risk-high',
 };
 
 export function SmellBadge({ warning, compact = false }: SmellBadgeProps) {

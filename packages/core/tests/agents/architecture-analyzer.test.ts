@@ -206,4 +206,61 @@ describe('ArchitectureAnalyzerAgent', () => {
     expect(domainNode!.layer).toBe('domain');
     expect(utilNode!.layer).toBe('util');
   });
+
+  describe('layer violation detection', () => {
+    it('flags a lower layer importing from a higher layer', async () => {
+      // data (rank 3) imports from ui (rank 6) — an upward dependency = violation
+      const fileNodes: SprangNode[] = [
+        { id: 'file:src/data/repository.ts', type: 'file', label: 'repository.ts', location: { file: 'src/data/repository.ts' } },
+        { id: 'file:src/ui/Button.tsx', type: 'file', label: 'Button.tsx', location: { file: 'src/ui/Button.tsx' } },
+      ];
+      const edges: SprangEdge[] = [
+        { source: 'file:src/data/repository.ts', target: 'file:src/ui/Button.tsx', type: 'imports' },
+      ];
+      const archCtx: AgentContext = { ...baseCtx, graph: makeGraph(fileNodes, edges) };
+      const result = await new ArchitectureAnalyzerAgent().run(archCtx);
+
+      expect(result.success).toBe(true);
+      const dataNode = result.mutatedGraph.nodes.find((n) => n.id === 'file:src/data/repository.ts');
+      const warnings = dataNode!.structural_warnings ?? [];
+      const violation = warnings.find((w) => w.category === 'layer_violation');
+      expect(violation).toBeDefined();
+      expect(violation!.severity).toBe('high'); // rank gap 6-3 = 3 → high
+      expect(violation!.related_node_ids).toContain('file:src/ui/Button.tsx');
+    });
+
+    it('does NOT flag a higher layer importing from a lower layer', async () => {
+      // ui (rank 6) imports from data (rank 3) — correct downward flow, no violation
+      const fileNodes: SprangNode[] = [
+        { id: 'file:src/ui/Button.tsx', type: 'file', label: 'Button.tsx', location: { file: 'src/ui/Button.tsx' } },
+        { id: 'file:src/data/repository.ts', type: 'file', label: 'repository.ts', location: { file: 'src/data/repository.ts' } },
+      ];
+      const edges: SprangEdge[] = [
+        { source: 'file:src/ui/Button.tsx', target: 'file:src/data/repository.ts', type: 'imports' },
+      ];
+      const archCtx: AgentContext = { ...baseCtx, graph: makeGraph(fileNodes, edges) };
+      const result = await new ArchitectureAnalyzerAgent().run(archCtx);
+
+      const uiNode = result.mutatedGraph.nodes.find((n) => n.id === 'file:src/ui/Button.tsx');
+      const violations = (uiNode!.structural_warnings ?? []).filter((w) => w.category === 'layer_violation');
+      expect(violations.length).toBe(0);
+    });
+
+    it('exempts cross-cutting util/test layers from violation checks', async () => {
+      // util importing from ui — util is exempt, so no violation
+      const fileNodes: SprangNode[] = [
+        { id: 'file:src/utils/helper.ts', type: 'file', label: 'helper.ts', location: { file: 'src/utils/helper.ts' } },
+        { id: 'file:src/ui/Button.tsx', type: 'file', label: 'Button.tsx', location: { file: 'src/ui/Button.tsx' } },
+      ];
+      const edges: SprangEdge[] = [
+        { source: 'file:src/utils/helper.ts', target: 'file:src/ui/Button.tsx', type: 'imports' },
+      ];
+      const archCtx: AgentContext = { ...baseCtx, graph: makeGraph(fileNodes, edges) };
+      const result = await new ArchitectureAnalyzerAgent().run(archCtx);
+
+      const utilNode = result.mutatedGraph.nodes.find((n) => n.id === 'file:src/utils/helper.ts');
+      const violations = (utilNode!.structural_warnings ?? []).filter((w) => w.category === 'layer_violation');
+      expect(violations.length).toBe(0);
+    });
+  });
 });

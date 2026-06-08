@@ -5,7 +5,6 @@ import {
   Globe,
   Network,
   RefreshCw,
-  Terminal,
   Sparkles,
   BookOpen,
   Layers,
@@ -72,49 +71,6 @@ function LoadingScreen() {
               transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
             />
           ))}
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-function ErrorScreen({ onRetry, onAnalyze }: { onRetry: () => void; onAnalyze?: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-surface-950 flex items-center justify-center z-50">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="text-center space-y-5 max-w-sm px-6"
-      >
-        <div className="mx-auto w-14 h-14 rounded-2xl bg-surface-800 border border-surface-700 flex items-center justify-center">
-          <Terminal className="w-7 h-7 text-surface-500" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-base font-bold text-surface-200">
-            No knowledge graph found
-          </h2>
-          <p className="text-sm text-surface-500 leading-relaxed">
-            Run the sprang scanner in your project root to generate a knowledge graph.
-          </p>
-        </div>
-        <div className="px-4 py-3 rounded-xl bg-surface-900 border border-surface-800 text-left space-y-1">
-          <p className="text-[10px] text-surface-600 font-medium">
-            Run in your project root
-          </p>
-          <code className="text-sm text-surface-300 font-mono">sprang scan</code>
-        </div>
-        <div className="flex items-center gap-2 justify-center">
-          <Button variant="outline" size="sm" onClick={onRetry}>
-            <RefreshCw className="w-3.5 h-3.5" />
-            Retry
-          </Button>
-          {onAnalyze && (
-            <Button variant="default" size="sm" onClick={onAnalyze}>
-              <Sparkles className="w-3.5 h-3.5" />
-              Analyze this project
-            </Button>
-          )}
         </div>
       </motion.div>
     </div>
@@ -261,6 +217,7 @@ export default function App() {
   if (hasError || !graph) return (
     <LandingScreen
       onAnalyze={analyzeProject}
+      onRetry={() => void fetchGraph(false)}
       autoScan={autoScan}
       defaultPath={defaultPath}
     />

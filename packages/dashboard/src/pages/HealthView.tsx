@@ -72,6 +72,7 @@ const SMELL_DESCRIPTIONS: Record<SmellCategory, string> = {
   orphan_node: 'Node with no connections to the rest of the graph',
   low_cohesion: 'Node whose responsibilities are loosely related',
   name_duplicate: 'Same function/class name found in multiple files with similar logic',
+  layer_violation: 'A lower architectural layer imports from a higher one (dependencies should flow downward)',
 };
 
 const SMELL_SEVERITY: Record<SmellCategory, 'high' | 'medium' | 'low'> = {
@@ -84,6 +85,7 @@ const SMELL_SEVERITY: Record<SmellCategory, 'high' | 'medium' | 'low'> = {
   orphan_node: 'low',
   low_cohesion: 'low',
   name_duplicate: 'medium',
+  layer_violation: 'high',
 };
 
 const SEVERITY_ORDER = { high: 0, medium: 1, low: 2 };

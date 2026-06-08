@@ -10,6 +10,7 @@ export interface AnalyzeParams {
 
 interface Props {
   onAnalyze: (params: AnalyzeParams) => Promise<void>;
+  onRetry?: () => void;
   autoScan?: boolean;
   defaultPath?: string;
 }
@@ -47,7 +48,7 @@ function detectMode(value: string): InputMode {
   return 'local';
 }
 
-export function LandingScreen({ onAnalyze, autoScan = false, defaultPath = '' }: Props) {
+export function LandingScreen({ onAnalyze, onRetry, autoScan = false, defaultPath = '' }: Props) {
   const [input, setInput] = useState(defaultPath);
   const [mode, setMode] = useState<InputMode>('local');
   const [status, setStatus] = useState<Status>('idle');
@@ -283,16 +284,27 @@ export function LandingScreen({ onAnalyze, autoScan = false, defaultPath = '' }:
       </motion.div>
 
       {/* Footer note */}
-      <motion.p
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className="absolute bottom-8 text-[10px] text-surface-700 text-center"
+        className="absolute bottom-8 flex flex-col items-center gap-2"
       >
-        Phase 1 runs locally in under 60 seconds — no API key needed.
-        <br />
-        GitHub repos are cloned to a temp folder and never stored.
-      </motion.p>
+        <p className="text-[10px] text-surface-700 text-center">
+          Phase 1 runs locally in under 60 seconds — no API key needed.
+          <br />
+          GitHub repos are cloned to a temp folder and never stored.
+        </p>
+        {onRetry && !isLoading && (
+          <button
+            onClick={onRetry}
+            className="flex items-center gap-1 text-[10px] text-surface-600 hover:text-surface-400 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sprang-500 rounded px-1.5 py-0.5"
+          >
+            <RefreshCw className="w-2.5 h-2.5" />
+            Retry loading existing graph
+          </button>
+        )}
+      </motion.div>
     </div>
   );
 }

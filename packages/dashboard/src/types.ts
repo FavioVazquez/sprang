@@ -61,7 +61,8 @@ export type SmellCategory =
   | 'orphan_node'
   | 'circular_dependency'
   | 'over_connected'
-  | 'name_duplicate';
+  | 'name_duplicate'
+  | 'layer_violation';
 
 export interface StructuralWarning {
   category: SmellCategory;
@@ -107,6 +108,7 @@ export type DetectedPattern =
   | 'strategy'
   | 'decorator'
   | 'react_hook'
+  | 'context_provider'
   | 'event_emitter'
   | 'dependency_injection';
 

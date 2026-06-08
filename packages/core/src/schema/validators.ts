@@ -26,6 +26,7 @@ export const structuralWarningSchema = z.object({
   category: z.enum([
     'duplicate_logic', 'unclear_coupling', 'low_cohesion', 'god_node',
     'unstable_interface', 'orphan_node', 'circular_dependency', 'over_connected',
+    'name_duplicate', 'layer_violation',
   ]),
   severity: z.enum(['low', 'medium', 'high']),
   description: z.string(),

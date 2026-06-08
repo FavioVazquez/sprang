@@ -176,28 +176,47 @@ async function waitForAppLoaded(page: Page) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1: Error state (no knowledge-graph.json)
+// Test 1: Landing screen (no knowledge-graph.json)
 // ---------------------------------------------------------------------------
-test('error state – no knowledge-graph.json', async ({ page }) => {
+test('landing screen – no knowledge-graph.json', async ({ page }) => {
   await page.route('**/knowledge-graph.json', (route) =>
     route.fulfill({ status: 404, body: 'Not Found' }),
   );
 
   await page.goto('/');
 
+  // Landing screen shows the Sprang brand heading and an Analyze affordance
   await expect(
-    page.getByRole('heading', { name: 'No knowledge graph found' }),
+    page.getByRole('heading', { name: 'Sprang' }),
   ).toBeVisible({ timeout: 15000 });
 
-  await expect(page.getByText('sprang scan', { exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder('/path/to/your/project')).toBeVisible();
+  await expect(page.getByRole('button', { name: /analyze/i })).toBeVisible();
 
-  const retryButton = page.getByRole('button', { name: /retry/i });
+  // Retry affordance re-attempts loading the existing graph
+  const retryButton = page.getByRole('button', { name: /retry loading existing graph/i });
   await expect(retryButton).toBeVisible();
-
   await retryButton.click();
   await expect(
-    page.getByRole('heading', { name: 'No knowledge graph found' }),
+    page.getByRole('heading', { name: 'Sprang' }),
   ).toBeVisible({ timeout: 15000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 1b: Landing screen detects GitHub URL vs local path
+// ---------------------------------------------------------------------------
+test('landing screen – detects GitHub URL input', async ({ page }) => {
+  await page.route('**/knowledge-graph.json', (route) =>
+    route.fulfill({ status: 404, body: 'Not Found' }),
+  );
+
+  await page.goto('/');
+  const input = page.getByPlaceholder('/path/to/your/project');
+  await expect(input).toBeVisible({ timeout: 15000 });
+
+  // Typing a GitHub URL flips the mode badge to "GitHub"
+  await input.fill('github.com/faviovazquez/sprang');
+  await expect(page.getByText('GitHub', { exact: true })).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------
@@ -403,9 +422,9 @@ test('nav bar – logo persists across all view switches', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 15: Error state – retry button is functional
+// Test 15: Landing screen – retry button re-attempts graph load
 // ---------------------------------------------------------------------------
-test('error state – retry re-attempts graph load', async ({ page }) => {
+test('landing screen – retry re-attempts graph load', async ({ page }) => {
   let callCount = 0;
   await page.route('**/knowledge-graph.json', (route) => {
     callCount++;
@@ -414,14 +433,14 @@ test('error state – retry re-attempts graph load', async ({ page }) => {
 
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: 'No knowledge graph found' }),
+    page.getByRole('heading', { name: 'Sprang' }),
   ).toBeVisible({ timeout: 15000 });
 
   const before = callCount;
-  await page.getByRole('button', { name: /retry/i }).click();
+  await page.getByRole('button', { name: /retry loading existing graph/i }).click();
 
   await expect(
-    page.getByRole('heading', { name: 'No knowledge graph found' }),
+    page.getByRole('heading', { name: 'Sprang' }),
   ).toBeVisible({ timeout: 10000 });
   expect(callCount).toBeGreaterThan(before);
 });
