@@ -148,6 +148,18 @@ def main():
     now = datetime.now(timezone.utc).isoformat()
     project_name = meta.get("project_name") or os.path.basename(os.path.abspath(root))
 
+    # phase2_completed_at — use phase6-done.json timestamp if present (enrichment done)
+    phase2_completed_at = None
+    for marker in ["phase6-done.json", "phase5-done.json"]:
+        p = os.path.join(inter, marker)
+        if os.path.exists(p):
+            try:
+                phase2_completed_at = json.load(open(p)).get("timestamp")
+            except Exception:
+                pass
+            if phase2_completed_at:
+                break
+
     # ── Wrap flat tour steps into Tour object if needed ───────────────────────
     if tours and isinstance(tours[0], dict) and 'steps' not in tours[0]:
         entry = tours[0].get('node_ids', [None])[0] if tours else None
@@ -185,6 +197,7 @@ def main():
             "smell_summary": meta.get("smell_summary", {}),
             "generated_at": now,
             "gitCommitHash": git_hash,
+            **({"phase2_completed_at": phase2_completed_at} if phase2_completed_at else {}),
         },
         "nodes": nodes,
         "edges": edges,

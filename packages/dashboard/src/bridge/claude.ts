@@ -25,6 +25,7 @@ const ALLOWED_MCP_TOOLS = [
   'mcp__sprang__sprang_health',
   'mcp__sprang__sprang_why',
   'mcp__sprang__sprang_annotate',
+  'mcp__sprang__sprang_respond',
 ].join(',');
 
 interface ClaudeJsonOutput {

@@ -17,6 +17,9 @@ The file `.sprang/agent-conversation.md` in the workspace root is an **append-on
 
 ## When you receive a dashboard message:
 1. **Run `cat .sprang/agent-conversation.md 2>/dev/null || echo "(no history yet)"`** to read the full conversation history (the file is gitignored — `read_file` won't work)
-2. Answer the message fully, taking ALL prior exchanges into account
-3. Always call the `sprang_respond` MCP tool with your answer so it appears in the dashboard UI
+2. Answer the message fully using MCP tools (sprang_query, sprang_node, sprang_health, etc.) to ground your answer in the knowledge graph
+3. Always call `sprang_respond` with **both** fields so the dashboard shows the question alongside the answer:
+   ```
+   sprang_respond({ response: "<your full answer>", question: "<the user's original question>" })
+   ```
 4. This is a continuous conversation — every question builds on the full history in that file

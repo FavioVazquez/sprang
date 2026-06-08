@@ -1,33 +1,32 @@
 ---
 name: sprang-analyze
 description: Analyze a codebase to produce a rich semantic knowledge graph — file summaries, architecture layers, guided tour, domain map, risk scores. Use when the user says "/sprang-analyze", "analyze the codebase", "full analysis", or "run sprang-analyze".
+argument-hint: ["[path] [--full] [--language <lang>] [--chunk <N>]"]
 ---
 
-Analyze a codebase to produce a rich semantic knowledge graph — file summaries, architecture layers, guided tour, domain map, risk scores.
+Analyze the codebase and produce `.sprang/knowledge-graph.json` with full semantic enrichment.
+You (Cascade) are the analysis engine — read every file, write rich summaries, detect architecture, score risk.
 
-Arguments: `[path] [--full] [--language <lang>] [--chunk <N>]`
-
-Produce `.sprang/knowledge-graph.json` for the project with full semantic enrichment.
-You are the analysis engine — read every file and write rich understanding into the graph.
-
-> **CRITICAL:** Complete ALL 6 phases in one run. Do not stop after Phase 2 — Architecture and Learn tabs need Phases 3–6.
-> **RESUME:** If graph already exists at `phase: enriched`, skip Phases 0–2 and start at Phase 3.
+> **CRITICAL:** Complete ALL 7 phases in one run. Stopping early leaves the Architecture, Domains, and Learn tabs empty.
+> **RESUME:** If graph already exists at `phase: complete`, jump to Phase 4 to re-run enrichment only.
 
 Follow the detailed instructions in `.windsurf/workflows/sprang-analyze.md`.
 
 Key options:
 - `--full` — force complete rebuild even if graph exists
-- `--language <lang>` — output summaries in ISO language code (zh, ja, ko, es, fr, de, pt, ru)
+- `--language <lang>` — output summaries in a specific language (ISO code: zh, ja, ko, es, fr, de, pt, ru)
 - `--chunk <N>` — split output into chunks of N nodes
 
-Quick phases:
-1. **Pre-flight** — resolve project root, check `.sprangignore`, detect incremental vs full, collect README/manifest context
-2. **Scan** — enumerate files, detect languages/frameworks, build import map
-3. **Analyze files** — semantic batching (related files together), **max 10 files/batch, max 800 lines/batch**, always write results as chunk files (never inline JSON)
-4. **Detect architecture** — layer assignment (data/domain/api/ui/infra), dependency graph, cycle detection
-5. **Build tour** — 5-8 ordered pedagogical steps based on graph topology
-6. **Domain mapping** — cluster imports into business domain → flow → step hierarchy
-7. **Risk scoring** — blast radius, coupling, test gap, churn (0.0–1.0 per node)
-8. **Finalize** — run `PROJECT_ROOT="$PROJECT_ROOT" python3 skills/sprang-analyze/scripts/merge.py`. Python 3 stdlib only, no install needed. Do NOT write `knowledge-graph.json` manually. Then write `SPRANG_REPORT.md`.
+Phases (full details in `.windsurf/workflows/sprang-analyze.md`):
+1. **Pre-flight** — resolve project root, `.sprangignore`, incremental vs full, collect README/manifest context
+2. **Scan** — enumerate files, detect languages/frameworks, build import map → write `scan-result.json`
+3. **Analyze files** — semantic batching (related files together), max 10 files/batch, max 800 lines/batch → write `final-nodes-chunk-*.json`, `final-edges.json`, `assembled-graph.json`
+4. **Architecture layers** — assign every node to a layer → write **`final-layers.json`** directly (not `layers.json`)
+5. **Guided tour** — 5-8 BFS-ordered steps → write **`final-tours.json`** as a Tour object array (not a flat step array — must have `id`, `title`, `description`, `steps`)
+6. **Domain mapping** — cluster into business domains → write **`final-domains.json`** with domain/flow/step structure
+7. **Risk + smells** → write **`risk-scores.json`** as `{"<node-id>": {"risk_score": 0.0, "risk_factors": [], "structural_warnings": [], "decision_context": {...}}}` — merge.py applies all fields to nodes
+8. **Assemble** — run `PROJECT_ROOT="$PROJECT_ROOT" python3 .windsurf/skills/sprang-analyze/scripts/merge.py` (fallback: `skills/sprang-analyze/scripts/merge.py`). Then write `SPRANG_REPORT.md`.
 
-$ARGUMENTS
+> ⚠️ merge.py reads these exact filenames: `final-nodes-chunk-*.json`, `final-edges.json`, `final-layers.json`, `final-tours.json`, `final-domains.json`, `risk-scores.json`, `assembled-graph.json`. All must exist before running it.
+
+After completion: report files analyzed, nodes/edges, top risks, layers and domains found. Suggest `/sprang-chat` to ask questions, `/sprang-onboard` for guided tour, open dashboard with `pnpm --filter @sprang/dashboard dev`.
