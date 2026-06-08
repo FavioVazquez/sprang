@@ -17,7 +17,7 @@
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
   <img src="https://img.shields.io/badge/unit_tests-624_passing-10B981?style=flat-square" alt="624 unit tests passing"/>
-  <img src="https://img.shields.io/badge/e2e_tests-57_passing-10B981?style=flat-square" alt="57 e2e tests passing"/>
+  <img src="https://img.shields.io/badge/e2e_tests-64_passing-10B981?style=flat-square" alt="64 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
 </p>
@@ -1055,7 +1055,7 @@ pnpm build             # build all packages
 pnpm test              # 624 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
-pnpm --filter @sprang/dashboard test:e2e   # 57 Playwright e2e tests
+pnpm --filter @sprang/dashboard test:e2e   # 64 Playwright e2e tests
 ```
 
 ### Test summary
@@ -1067,7 +1067,7 @@ pnpm --filter @sprang/dashboard test:e2e   # 57 Playwright e2e tests
 | `@sprang/mcp` | Vitest | 65 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (40), sprang_respond (8), sprang_query enhancements (3) |
 | `@sprang/cli` | Vitest | 27 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12), `merge` command (9) |
 | **Total unit** | | **624** | |
-| `@sprang/dashboard` | Playwright | 57 | Full UI e2e — loading, landing screen (path/GitHub URL), nav, keyboard shortcuts (all 1–5/g/h/d/a/l), architecture tab, cascade bridge, health grade (A–F), security findings, risk overlay, analyze endpoint, tour player, persona selector |
+| `@sprang/dashboard` | Playwright | 64 | Full UI e2e — loading, landing screen (path/GitHub URL), nav, keyboard shortcuts (all 1–7/g/h/d/a/t/m/l), architecture tab, treemap/matrix tabs + empty states, cascade bridge, health grade (A–F), security findings, risk overlay, analyze endpoint, tour player, persona selector |
 
 <details>
 <summary>Full test structure</summary>
