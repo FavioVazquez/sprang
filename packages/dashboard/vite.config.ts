@@ -416,7 +416,31 @@ export default defineConfig({
       output: {
         manualChunks(id: string) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('sigma') || id.includes('graphology') || id.includes('d3-force')) {
+          // Isolate react-force-graph and its entire dependency stack in their own chunk.
+          // react-force-graph → 3d-force-graph → three.js + d3-force, creating circular deps
+          // with vendor (React) and vendor-graph (Sigma/D3). Isolating the whole stack
+          // prevents the circular that corrupts Sigma.js (EventEmitter undefined crash).
+          // Graph3DCanvas imports 3d-force-graph + react-kapsule directly (not react-force-graph).
+          // Isolate the entire 3D force-graph stack to keep it out of the eagerly-loaded
+          // vendor chunk (mixing it in creates circular chunk deps that crash Sigma.js init).
+          if (id.includes('3d-force-graph') || id.includes('three-forcegraph') ||
+              id.includes('three-render-objects') || id.includes('super-three') ||
+              id.includes('react-kapsule') || id.includes('kapsule') ||
+              id.includes('ngraph') || id.includes('d3-force-3d') ||
+              id.includes('d3-binarytree') || id.includes('d3-octree') ||
+              id.includes('accessor-fn') || id.includes('data-bind-mapper') ||
+              id.includes('tinycolor2') || id.includes('index-array-by') ||
+              id.includes('float-tooltip') || id.includes('jerrypick') ||
+              id.includes('canvas-color-tracker') || id.includes('@tweenjs') ||
+              id.includes('nipplejs') || id.includes('bezier-js') ||
+              id.includes('/three/') || id.includes('/three@') ||
+              id.includes('three.module') || id.includes('three.cjs')) {
+            return 'vendor-3d';
+          }
+          // Co-locate `events` (Node.js EventEmitter polyfill) with Sigma.js to avoid
+          // circular chunk initialization order that corrupts EventEmitter (undefined crash).
+          if (id.includes('sigma') || id.includes('graphology') || id.includes('d3-force') ||
+              id.includes('/events/') || id.includes('/events@')) {
             return 'vendor-graph';
           }
           if (id.includes('@xyflow') || id.includes('elkjs')) {

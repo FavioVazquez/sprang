@@ -1,5 +1,10 @@
 import type { KnowledgeGraph, SprangNode } from '../types';
-import { getRiskColor } from '../api/graphApi';
+
+function getRiskColor(score: number): string {
+  if (score >= 0.7) return '#ef4444';
+  if (score >= 0.4) return '#f59e0b';
+  return '#22c55e';
+}
 
 // ─── Force-graph 3D data format ───────────────────────────────────────────────
 

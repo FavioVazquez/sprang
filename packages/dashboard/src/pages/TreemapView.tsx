@@ -76,7 +76,9 @@ export function TreemapView({ graph, onNodeSelect }: TreemapViewProps) {
     return leaves;
   }, [hierarchyData, dims]);
 
-  const fileCount = layoutNodes.length;
+  // Only count actual file nodes (have nodeId); the d3 hierarchy root node with empty
+  // children: [] is treated as a leaf by d3 but has no nodeId.
+  const fileCount = layoutNodes.filter((n) => n.data.nodeId).length;
 
   const handleKeyZoom = useCallback((e: React.KeyboardEvent) => {
     if (e.key === '+' || e.key === '=') setZoom((z) => Math.min(z + 0.25, 3));

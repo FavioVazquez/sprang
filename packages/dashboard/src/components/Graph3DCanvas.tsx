@@ -1,7 +1,21 @@
-import React, { useRef, useEffect, useCallback } from 'react';
-import { ForceGraph3D } from 'react-force-graph';
+import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import fromKapsule from 'react-kapsule';
+import ForceGraph3DKapsule from '3d-force-graph';
 import type { KnowledgeGraph } from '../types';
 import { toForceGraphData, type FGNode } from '../utils/graphTransform';
+
+// Build a React wrapper for the 3D force-graph kapsule (same as react-force-graph does
+// internally, but without pulling in the 2D/VR/AR variants or aframe).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ForceGraph3D = fromKapsule(ForceGraph3DKapsule as any, {
+  methodNames: [
+    'emitParticle', 'd3Force', 'd3ReheatSimulation', 'stopAnimation', 'pauseAnimation',
+    'resumeAnimation', 'cameraPosition', 'zoomToFit', 'getGraphBbox',
+    'screen2GraphCoords', 'graph2ScreenCoords', 'postProcessingComposer',
+    'lights', 'scene', 'camera', 'renderer', 'controls', 'refresh',
+  ],
+  initPropNames: ['controlType', 'rendererConfig', 'extraRenderers'],
+}) as React.ComponentType<Record<string, unknown> & { ref?: React.MutableRefObject<FGRef> }>;
 
 interface Graph3DCanvasProps {
   graph: KnowledgeGraph;
@@ -21,9 +35,10 @@ export function Graph3DCanvas({
 }: Graph3DCanvasProps) {
   const fgRef = useRef<FGRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const reducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reducedMotion = useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  );
 
   const data = toForceGraphData(graph, showRiskOverlay);
 
@@ -41,7 +56,6 @@ export function Graph3DCanvas({
     const t = setTimeout(() => {
       fg.zoomToFit?.(400, 80);
       if (!reducedMotion) {
-        // Gentle auto-rotation
         let angle = 0;
         const id = setInterval(() => {
           angle += 0.003;
@@ -50,7 +64,6 @@ export function Graph3DCanvas({
             z: Math.cos(angle) * 400,
           });
         }, 16);
-        // Stop rotation when user interacts
         const stop = () => clearInterval(id);
         const el = containerRef.current;
         el?.addEventListener('mousedown', stop, { once: true });
@@ -89,14 +102,14 @@ export function Graph3DCanvas({
         graphData={data}
         nodeId="id"
         nodeLabel="label"
-        nodeColor={(node) => (node as FGNode).color}
-        nodeVal={(node) => (node as FGNode).val}
+        nodeColor={(node: FGNode) => node.color}
+        nodeVal={(node: FGNode) => node.val}
         linkColor={() => 'rgba(100,100,120,0.3)'}
         linkWidth={0.3}
         backgroundColor="#09090b"
         showNavInfo={false}
         enableNodeDrag
-        onNodeClick={(node) => handleNodeClick(node as FGNode)}
+        onNodeClick={(node: unknown) => handleNodeClick(node as FGNode)}
         nodeThreeObjectExtend={false}
       />
     </div>

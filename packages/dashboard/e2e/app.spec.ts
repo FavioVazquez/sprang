@@ -534,21 +534,69 @@ test('keyboard shortcut – l switches to learn view', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 22: Learn tab – keyboard shortcut '5' (was '4' pre-v0.2.0)
+// Test 22: Treemap tab – keyboard shortcut '5'
 // ---------------------------------------------------------------------------
-test('keyboard shortcut – 5 switches to learn view', async ({ page }) => {
+test('keyboard shortcut – 5 switches to treemap view', async ({ page }) => {
   await gotoApp(page);
 
   await page.locator('body').click({ position: { x: 200, y: 200 } });
   await page.keyboard.press('5');
 
+  await expect(navTab(page, 'Treemap')).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 22b: Treemap tab – keyboard shortcut 't'
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – t switches to treemap view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('t');
+
+  await expect(navTab(page, 'Treemap')).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 22c: Matrix tab – keyboard shortcut '6'
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 6 switches to matrix view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('6');
+
+  await expect(navTab(page, 'Matrix')).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 22d: Matrix tab – keyboard shortcut 'm'
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – m switches to matrix view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('m');
+
+  await expect(navTab(page, 'Matrix')).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 22e: Learn tab – keyboard shortcut '7' (moved from '5' in v0.2.1)
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 7 switches to learn view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('7');
+
   await expect(navTab(page, 'Learn')).toBeVisible({ timeout: 5000 });
 });
 
 // ---------------------------------------------------------------------------
-// Test 23: Keyboard shortcuts modal shows Architecture and updated Learn shortcuts
+// Test 23: Keyboard shortcuts modal shows all view shortcuts including new ones
 // ---------------------------------------------------------------------------
-test('keyboard shortcuts modal – shows A/4 for architecture and L/5 for learn', async ({ page }) => {
+test('keyboard shortcuts modal – shows A/4 for architecture, T/5 for treemap, L/7 for learn', async ({ page }) => {
   await gotoApp(page);
 
   await page.locator('body').click({ position: { x: 200, y: 200 } });
@@ -557,21 +605,74 @@ test('keyboard shortcuts modal – shows A/4 for architecture and L/5 for learn'
   const modal = page.getByText(/keyboard shortcuts/i).first();
   await expect(modal).toBeVisible({ timeout: 5000 });
 
-  // Architecture shortcut should be present
+  // All view shortcuts should be present
   await expect(page.getByText('Architecture view')).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText('Treemap view')).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText('Matrix view')).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText('Learn view')).toBeVisible({ timeout: 3000 });
 
   await page.keyboard.press('Escape');
 });
 
 // ---------------------------------------------------------------------------
-// Test 24: All 5 nav tabs are present and functional
+// Test 24: All 7 nav tabs are present and functional
 // ---------------------------------------------------------------------------
-test('nav – all 5 tabs (graph, health, domains, architecture, learn) are present', async ({ page }) => {
+test('nav – all 7 tabs (graph, health, domains, architecture, treemap, matrix, learn) are present', async ({ page }) => {
   await gotoApp(page);
 
-  for (const tab of ['Graph', 'Health', 'Domains', 'Architecture', 'Learn']) {
+  for (const tab of ['Graph', 'Health', 'Domains', 'Architecture', 'Treemap', 'Matrix', 'Learn']) {
     await expect(navTab(page, tab)).toBeVisible({ timeout: 5000 });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Test 24b: Treemap tab – visible in nav and clickable
+// ---------------------------------------------------------------------------
+test('treemap tab – visible in nav and clickable', async ({ page }) => {
+  await gotoApp(page);
+
+  const treemapTab = navTab(page, 'Treemap');
+  await expect(treemapTab).toBeVisible({ timeout: 5000 });
+  await treemapTab.click();
+
+  // Treemap view renders its toolbar heading
+  await expect(
+    page.getByText(/treemap/i).first(),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 24c: Matrix tab – visible in nav and clickable
+// ---------------------------------------------------------------------------
+test('matrix tab – visible in nav and clickable', async ({ page }) => {
+  await gotoApp(page);
+
+  const matrixTab = navTab(page, 'Matrix');
+  await expect(matrixTab).toBeVisible({ timeout: 5000 });
+  await matrixTab.click();
+
+  // Matrix view renders its toolbar heading
+  await expect(
+    page.getByText(/matrix/i).first(),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 24d: Treemap view – shows empty state when no file nodes
+// ---------------------------------------------------------------------------
+test('treemap view – shows empty state message when graph has no file nodes', async ({ page }) => {
+  const graphNoFiles: KnowledgeGraph = {
+    ...mockGraph,
+    nodes: mockGraph.nodes.map((n) => ({ ...n, type: 'function' as const })),
+  };
+  await gotoApp(page, graphNoFiles);
+
+  const treemapTab = navTab(page, 'Treemap');
+  await treemapTab.click();
+
+  await expect(
+    page.getByText(/no file nodes found|run analysis/i).first(),
+  ).toBeVisible({ timeout: 8000 });
 });
 
 // ---------------------------------------------------------------------------

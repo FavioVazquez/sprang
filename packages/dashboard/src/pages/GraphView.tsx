@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Search,
@@ -19,7 +19,9 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Tooltip } from '../components/ui/Tooltip';
 import { GraphCanvas } from '../components/GraphCanvas';
-import { Graph3DCanvas } from '../components/Graph3DCanvas';
+const Graph3DCanvas = lazy(() =>
+  import('../components/Graph3DCanvas').then((m) => ({ default: m.Graph3DCanvas })),
+);
 import { NodePanel } from '../components/NodePanel';
 import { RiskOverlay } from '../components/RiskOverlay';
 import { TourPlayer } from '../components/TourPlayer';
@@ -469,12 +471,14 @@ export function GraphView({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
               >
-                <Graph3DCanvas
-                  graph={graph}
-                  selectedNodeId={selectedNodeId}
-                  onNodeSelect={handleNodeSelect}
-                  showRiskOverlay={showRiskOverlay}
-                />
+                <Suspense fallback={<div className="absolute inset-0 bg-surface-950" />}>
+                  <Graph3DCanvas
+                    graph={graph}
+                    selectedNodeId={selectedNodeId}
+                    onNodeSelect={handleNodeSelect}
+                    showRiskOverlay={showRiskOverlay}
+                  />
+                </Suspense>
               </motion.div>
             ) : (
               <motion.div
