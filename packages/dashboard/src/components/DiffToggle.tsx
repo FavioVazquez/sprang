@@ -37,7 +37,7 @@ export function DiffToggle() {
       <button
         type="button"
         disabled
-        title="No diff-overlay.json found — run /sprang-diff in Cascade to generate one"
+        title="No diff-overlay.json found — run /sprang-diff in your AI agent to generate one"
         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs border border-surface-800 text-surface-700 cursor-not-allowed opacity-60"
       >
         <GitCompare className="w-3.5 h-3.5" />

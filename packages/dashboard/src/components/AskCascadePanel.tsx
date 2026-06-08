@@ -44,7 +44,7 @@ async function fetchBridgeStatus(): Promise<BridgeStatus> {
 
 async function postAsk(message: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch('/cascade-ask', {
+    const res = await fetch('/agent-ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message }),
@@ -61,7 +61,7 @@ async function postAsk(message: string): Promise<{ ok: boolean; error?: string }
 
 async function pollResponse(): Promise<CascadeResponse | null | 'unavailable'> {
   try {
-    const res = await fetch('/cascade-response');
+    const res = await fetch('/agent-response');
     if (res.status === 204) return null;
     if (res.status === 404) return 'unavailable';
     if (!res.ok) return null;
@@ -72,7 +72,7 @@ async function pollResponse(): Promise<CascadeResponse | null | 'unavailable'> {
 }
 
 async function clearResponse(): Promise<void> {
-  try { await fetch('/cascade-response', { method: 'DELETE' }); } catch { /* ignore */ }
+  try { await fetch('/agent-response', { method: 'DELETE' }); } catch { /* ignore */ }
 }
 
 export function AskAgentPanel() {
@@ -126,7 +126,7 @@ export function AskAgentPanel() {
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: 'error',
-          text: 'cascade-bridge not detected. Make sure it is installed and watching this workspace.',
+          text: 'Agent bridge not detected. Make sure the bridge is installed and this workspace is open.',
           ts: new Date().toISOString(),
         }]);
         return;
@@ -286,7 +286,7 @@ export function AskAgentPanel() {
                   <AlertCircle className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
                   <p className="text-[10px] text-amber-300 leading-relaxed">
                     {bridgeStatus?.kind === 'none'
-                      ? 'No agent bridge detected. Install the cascade-messaging Windsurf extension, or install the claude / copilot CLI.'
+                      ? 'No agent bridge detected. For Windsurf: install the cascade-messaging extension. For Claude Code: install the claude CLI. For Copilot: install the GitHub Copilot CLI.'
                       : `Bridge error (${BRIDGE_LABELS[bridgeStatus?.kind ?? 'none']}). Check that the agent is running and try again.`
                     }
                   </p>
@@ -306,7 +306,7 @@ export function AskAgentPanel() {
                       <p className="text-[10px] text-surface-700 mt-1">
                         {bridgeStatus
                           ? bridgeStatus.kind === 'none'
-                            ? 'No bridge detected. Install claude CLI, copilot CLI, or the cascade-messaging Windsurf extension.'
+                            ? 'No bridge detected. Install the claude CLI (Claude Code), copilot CLI (Copilot), or the cascade-messaging extension (Windsurf).'
                             : `Connected via ${BRIDGE_LABELS[bridgeStatus.kind]}.`
                           : 'Detecting agent bridge…'
                         }

@@ -599,7 +599,7 @@ The **Ask Agent** panel in the Sprang dashboard lets you ask questions about you
 
 | Priority | Agent | How it works |
 |---|---|---|
-| 1 | **Windsurf / Devin Desktop** | Writes to `.cascade-trigger-session` — the `cascade-messaging` VS Code extension forwards it to Cascade, which calls `sprang_respond` MCP tool to write the reply. Async (poll). |
+| 1 | **Windsurf / Devin Desktop** | Writes to `.cascade-trigger-session` — the `cascade-messaging` VS Code extension forwards it to the Windsurf AI, which calls `sprang_respond` MCP tool to write the reply. Async (poll). |
 | 2 | **Claude Code** (`claude` CLI) | Spawns `claude -p "<question>" --output-format json` non-interactively. Session ID persisted to `.sprang/claude-session.json` — resumes previous conversation via `--resume`. Sync. |
 | 3 | **GitHub Copilot CLI** (`copilot`) | Spawns `copilot --prompt "<question>" --output-format json` non-interactively. Uses `--resume=<session-id>` for session continuity once a session exists. Sync. |
 | — | **None** | Panel shows instructions to install one of the above. |
@@ -1057,7 +1057,7 @@ packages/dashboard/e2e/
     ├── search dialog (open, type, filter, close)
     ├── onboarding overlay (dismiss)
     ├── architecture view (empty state, layer count, card click, clear selection)
-    ├── cascade bridge (/cascade-ask POST validation + success, /cascade-response DELETE)
+    ├── agent bridge (/agent-ask POST validation + success, /agent-response DELETE)
     ├── bridge status (/bridge-status → kind + detail shape, Ask Agent panel)
     ├── graph APIs (/knowledge-graph.json, /diff-overlay.json, /file-content.json)
     ├── risk overlay (R key toggles on/off)

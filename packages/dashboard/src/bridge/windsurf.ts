@@ -1,8 +1,8 @@
 /**
  * Windsurf bridge — writes a message to .cascade-trigger-session so the
- * cascade-messaging VS Code extension picks it up and forwards it to Cascade.
- * Cascade then calls sprang_respond MCP tool → writes cascade-response.json.
- * The dashboard polls /cascade-response to display the reply.
+ * cascade-messaging VS Code extension picks it up and forwards it to the Windsurf AI.
+ * The AI then calls sprang_respond MCP tool → writes cascade-response.json.
+ * The dashboard polls /agent-response to display the reply.
  */
 
 import fs from 'node:fs';

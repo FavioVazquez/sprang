@@ -15,9 +15,8 @@ export interface SprangRespondResult {
 
 /**
  * Write a response to .sprang/cascade-response.json so the Sprang dashboard
- * can poll and display it. This is the return path for the cascade-bridge
- * integration: dashboard → /cascade-ask → .cascade-trigger → Cascade →
- * sprang_respond → .sprang/cascade-response.json → dashboard polls → displays.
+ * can poll and display it. This is the return path for the agent bridge:
+ * dashboard → /agent-ask → AI agent → sprang_respond → cascade-response.json → dashboard.
  */
 export async function sprangRespond(
   input: SprangRespondInput,

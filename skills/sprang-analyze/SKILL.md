@@ -5,7 +5,7 @@ argument-hint: ["[path] [--full] [--language <lang>] [--chunk <N>]"]
 ---
 
 Analyze the codebase and produce `.sprang/knowledge-graph.json` with full semantic enrichment.
-You (Cascade) are the analysis engine — read every file, write rich summaries, detect architecture, score risk.
+You are the analysis engine — read every file, write rich summaries, detect architecture, score risk.
 
 > **CRITICAL:** Complete ALL 8 phases (Phase 0 through Phase 7) in one run. Stopping early leaves the Architecture, Domains, and Learn tabs empty.
 > **RESUME:** If graph already exists at `phase: complete`, jump to Phase 4 to re-run enrichment only.

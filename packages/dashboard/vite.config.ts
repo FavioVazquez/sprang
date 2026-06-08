@@ -171,9 +171,9 @@ function attachSprangMiddlewares(server: ConnectServer) {
     res.end(JSON.stringify(status));
   });
 
-  // POST /cascade-ask  { "message": "..." }
+  // POST /agent-ask  { "message": "..." }
   // Routes to the appropriate agent bridge (windsurf / claude / copilot).
-  server.middlewares.use('/cascade-ask', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+  server.middlewares.use('/agent-ask', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
     if (req.method !== 'POST') { res.statusCode = 405; res.end(JSON.stringify({ error: 'POST only' })); return; }
@@ -218,7 +218,7 @@ function attachSprangMiddlewares(server: ConnectServer) {
 
         // Return 200 immediately — all bridges are fire-and-forget from the HTTP perspective.
         // Claude/Copilot spawn in the background and write cascade-response.json when done.
-        // The dashboard polls /cascade-response to pick up the result.
+        // The dashboard polls /agent-response to pick up the result.
         res.statusCode = 200;
         res.end(JSON.stringify({ ok: true, sent: userMessage, mode: bridge.kind === 'windsurf' ? 'async' : 'async' }));
 
@@ -236,9 +236,9 @@ function attachSprangMiddlewares(server: ConnectServer) {
     });
   });
 
-  // GET /cascade-response
+  // GET /agent-response
   // Polls for the response written by the sprang_respond MCP tool.
-  server.middlewares.use('/cascade-response', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+  server.middlewares.use('/agent-response', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'DELETE') {
       clearAgentSession(getSprangRoot());

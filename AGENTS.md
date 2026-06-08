@@ -33,7 +33,7 @@ This repository has Sprang installed. A knowledge graph is available at `.sprang
 
 ## MCP Tools Reference
 
-All 9 tools available to Cascade via the MCP server:
+All 9 tools available to your AI agent via the MCP server:
 
 ### `sprang_query`
 ```
@@ -116,7 +116,7 @@ Writes `.sprang/annotations/<sanitized-node-id>.md` with YAML frontmatter. Commi
 
 ---
 
-## For Cascade — Best Practices
+## For AI Agents — Best Practices
 
 **Before editing any file:**
 1. Call `sprang_node` with the file path to check `risk_score`, `structural_warnings`, `layer`, `in_degree`, and `has_annotation`
@@ -150,13 +150,13 @@ If no graph exists yet: run `/sprang` to build one.
 ## Dashboard Chat (Ask Agent)
 
 The Sprang dashboard has an **Ask Agent** panel that routes questions through whichever agent bridge is active:
-- **Windsurf / Devin Desktop** — writes `.cascade-trigger-session`; the `cascade-messaging` VS Code extension forwards to Cascade
+- **Windsurf / Devin Desktop** — writes `.cascade-trigger-session`; the `cascade-messaging` VS Code extension forwards it to the Windsurf AI, which calls `sprang_respond` to write the reply
 - **Claude Code** — spawns `claude -p` non-interactively with session continuity via `--resume`
 - **Copilot CLI** — spawns `copilot --prompt` non-interactively with session continuity via `--resume=<id>`
 
 Conversation history is maintained in `.sprang/agent-conversation.md` (gitignored — use `cat` to read it, not `read_file`).
 
-The rule `.devin/rules/cascade-messaging.md` (always_on) governs this — it tells Cascade to:
+The rule `.devin/rules/cascade-messaging.md` (always_on) governs this for Windsurf — it tells the agent to:
 1. Run `cat .sprang/agent-conversation.md 2>/dev/null || echo "(no history yet)"` before each message
 2. Answer the message fully
 3. Call `sprang_respond` MCP tool so the reply appears in the dashboard UI

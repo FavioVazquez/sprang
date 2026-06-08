@@ -12,8 +12,9 @@ export interface LLMOptions {
 /**
  * LLMClient is a simple interface for optional LLM enrichment.
  *
- * In production, Cascade IS the LLM — it reads the knowledge graph via MCP
- * tools and applies its own intelligence. This client is only used when an
+ * In production, your AI agent (Claude Code, Windsurf, Copilot) IS the LLM — it reads
+ * the knowledge graph via MCP tools and applies its own intelligence. This client is only
+ * used when an
  * explicit enrichment pass is requested with a custom implementation.
  *
  * The default NullLLMClient returns empty strings (graceful no-op).

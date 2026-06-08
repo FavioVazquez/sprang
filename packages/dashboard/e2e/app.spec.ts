@@ -3,7 +3,7 @@ import type { KnowledgeGraph } from '../src/types';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-// After each test run, remove session artifacts created by cascade-ask/bridge tests
+// After each test run, remove session artifacts created by agent-ask/bridge tests
 // so they don't leak into subsequent runs and cause false bridge detection.
 test.afterAll(async () => {
   const cwd = process.cwd(); // playwright runs from packages/dashboard/
@@ -556,26 +556,26 @@ test('nav – all 5 tabs (graph, health, domains, architecture, learn) are prese
 });
 
 // ---------------------------------------------------------------------------
-// Test 25: Cascade bridge – /cascade-response returns 204 when no file exists
+// Test 25: agent bridge – /agent-response returns 204 when no file exists
 // ---------------------------------------------------------------------------
-test('cascade bridge – GET /cascade-response returns 204 when no pending response', async ({
+test('agent bridge – GET /agent-response returns 204 when no pending response', async ({
   page,
 }) => {
   await gotoApp(page);
 
   // Use page.request to hit the Vite dev-server middleware directly
-  const response = await page.request.get('/cascade-response');
+  const response = await page.request.get('/agent-response');
   // 204 = no content (no response file exists yet), or 200 if a stale file exists
   expect([200, 204]).toContain(response.status());
 });
 
 // ---------------------------------------------------------------------------
-// Test 26: Cascade bridge – POST /cascade-ask validates empty message
+// Test 26: agent bridge – POST /agent-ask validates empty message
 // ---------------------------------------------------------------------------
-test('cascade bridge – POST /cascade-ask rejects empty message', async ({ page }) => {
+test('agent bridge – POST /agent-ask rejects empty message', async ({ page }) => {
   await gotoApp(page);
 
-  const response = await page.request.post('/cascade-ask', {
+  const response = await page.request.post('/agent-ask', {
     data: { message: '' },
     headers: { 'Content-Type': 'application/json' },
   });
@@ -586,14 +586,14 @@ test('cascade bridge – POST /cascade-ask rejects empty message', async ({ page
 });
 
 // ---------------------------------------------------------------------------
-// Test 27: Cascade bridge – POST /cascade-ask accepts valid message
+// Test 27: agent bridge – POST /agent-ask accepts valid message
 // ---------------------------------------------------------------------------
-test('cascade bridge – POST /cascade-ask accepts valid message', async ({ page }) => {
+test('agent bridge – POST /agent-ask accepts valid message', async ({ page }) => {
   await gotoApp(page);
 
   // All bridges now fire-and-forget — the endpoint returns 200 immediately and
-  // the dashboard polls /cascade-response. 503 = no bridge detected.
-  const response = await page.request.post('/cascade-ask', {
+  // the dashboard polls /agent-response. 503 = no bridge detected.
+  const response = await page.request.post('/agent-ask', {
     data: { message: 'What does auth.ts do?' },
     headers: { 'Content-Type': 'application/json' },
   });
@@ -772,9 +772,9 @@ test('Ask Agent panel – opens and displays bridge info', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 35: Ask Agent panel – /cascade-ask returns 503 when no bridge
+// Test 35: Ask Agent panel – /agent-ask returns 503 when no bridge
 // ---------------------------------------------------------------------------
-test('Ask Agent panel – /cascade-ask 503 when no agent bridge available', async ({ page }) => {
+test('Ask Agent panel – /agent-ask 503 when no agent bridge available', async ({ page }) => {
   await page.addInitScript(() => { localStorage.setItem('sprang:onboarded', 'true'); });
   await page.route('**/knowledge-graph.json', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockGraph) }),
@@ -783,7 +783,7 @@ test('Ask Agent panel – /cascade-ask 503 when no agent bridge available', asyn
   await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
 
   // All bridges now non-blocking — response is always fast (200 = bridge found, 503 = none).
-  const resp = await page.request.post('/cascade-ask', {
+  const resp = await page.request.post('/agent-ask', {
     data: { message: 'what does auth.ts do?' },
   });
   expect([200, 503]).toContain(resp.status());
@@ -884,12 +884,12 @@ test('file content API – rejects path not in analyzed graph', async ({ page })
 });
 
 // ---------------------------------------------------------------------------
-// Test 44: Cascade response – DELETE clears the session
+// Test 44: agent response – DELETE clears the session
 // ---------------------------------------------------------------------------
-test('cascade response – DELETE /cascade-response returns ok', async ({ page }) => {
+test('agent response – DELETE /agent-response returns ok', async ({ page }) => {
   await gotoApp(page);
 
-  const resp = await page.request.delete('/cascade-response');
+  const resp = await page.request.delete('/agent-response');
   expect(resp.status()).toBe(200);
   const body = await resp.json() as { ok: boolean };
   expect(body.ok).toBe(true);
