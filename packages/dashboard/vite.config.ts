@@ -339,6 +339,36 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  build: {
+    // @xyflow/react (React Flow) + ELK are inherently large (~1.5 MB combined).
+    // They're lazy-loaded — only downloaded when visiting Architecture/Domains views.
+    // The main bundle is ~142 KB; this limit silences the warning for the lazy chunk.
+    chunkSizeWarningLimit: 1600,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('sigma') || id.includes('graphology') || id.includes('d3-force')) {
+            return 'vendor-graph';
+          }
+          if (id.includes('@xyflow') || id.includes('elkjs')) {
+            return 'vendor-flow';
+          }
+          if (id.includes('framer-motion')) {
+            return 'vendor-motion';
+          }
+          if (id.includes('prism-react-renderer')) {
+            return 'vendor-prism';
+          }
+          if (id.includes('@radix-ui') || id.includes('cmdk') || id.includes('lucide-react') || id.includes('class-variance') || id.includes('clsx') || id.includes('tailwind-merge')) {
+            return 'vendor-ui';
+          }
+          // React and react-dom share internals — keep them together in the main vendor chunk
+          return 'vendor';
+        },
+      },
+    },
+  },
   server: {
     port: 7338,
     host: true,

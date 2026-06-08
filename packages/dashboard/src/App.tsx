@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
@@ -15,8 +15,9 @@ import { Button } from './components/ui/Button';
 import { Badge } from './components/ui/Badge';
 import { GraphView } from './pages/GraphView';
 import { HealthView } from './pages/HealthView';
-import { DomainView } from './pages/DomainView';
-import { ArchitectureView } from './pages/ArchitectureView';
+// Heavy views — lazy-loaded so React Flow + ELK only download when needed
+const DomainView = lazy(() => import('./pages/DomainView').then((m) => ({ default: m.DomainView })));
+const ArchitectureView = lazy(() => import('./pages/ArchitectureView').then((m) => ({ default: m.ArchitectureView })));
 import { LearnPanel } from './components/LearnPanel';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { WarningBanner } from './components/WarningBanner';
@@ -372,7 +373,9 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.12 }}
               >
-                <DomainView graph={graph} onNodeSelect={handleNodeSelect} />
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground">Loading…</div>}>
+                  <DomainView graph={graph} onNodeSelect={handleNodeSelect} />
+                </Suspense>
               </motion.div>
             )}
 
@@ -385,7 +388,9 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.12 }}
               >
-                <ArchitectureView />
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground">Loading…</div>}>
+                  <ArchitectureView />
+                </Suspense>
               </motion.div>
             )}
 
