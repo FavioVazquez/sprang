@@ -160,10 +160,13 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 5. Copy rules, workflows, skills, and hooks into the current project:
 
    Rules — tell Cascade/Devin to use Sprang automatically:
-     mkdir -p .devin/rules
+     mkdir -p .devin/rules .windsurf/rules
      cp ~/tools/sprang/.devin/rules/sprang-context.md .devin/rules/
      cp ~/tools/sprang/.devin/rules/sprang-highrisk.md .devin/rules/
      cp ~/tools/sprang/.devin/rules/cascade-messaging.md .devin/rules/
+     cp ~/tools/sprang/.windsurf/rules/sprang-context.md .windsurf/rules/
+     cp ~/tools/sprang/.windsurf/rules/sprang-highrisk.md .windsurf/rules/
+     cp ~/tools/sprang/.windsurf/rules/cascade-messaging.md .windsurf/rules/
 
    Hooks — enable persistent dashboard chat (conversation history):
      cp ~/tools/sprang/.devin/hooks.json .devin/hooks.json
@@ -493,10 +496,11 @@ For **Devin Desktop** — add to `.devin/config.json` in your project root inste
 ### 3 — Copy workflows, skills, and rules
 
 ```bash
-mkdir -p .windsurf/workflows .windsurf/skills .devin/rules
+mkdir -p .windsurf/workflows .windsurf/skills .windsurf/rules .devin/rules
 cp /path/to/sprang/.windsurf/workflows/*.md .windsurf/workflows/
 cp -r /path/to/sprang/.windsurf/skills/sprang* .windsurf/skills/
 cp /path/to/sprang/.devin/rules/*.md .devin/rules/
+cp /path/to/sprang/.windsurf/rules/*.md .windsurf/rules/
 ln -sf ../.windsurf/workflows .devin/workflows
 ln -sf ../.windsurf/skills .devin/skills
 ```
@@ -559,7 +563,7 @@ The **Ask Agent** panel in the Sprang dashboard lets you ask questions about you
 |---|---|---|
 | 1 | **Windsurf / Devin Desktop** | Writes to `.cascade-trigger-session` — the `cascade-messaging` VS Code extension forwards it to Cascade, which calls `sprang_respond` MCP tool to write the reply. Async (poll). |
 | 2 | **Claude Code** (`claude` CLI) | Spawns `claude -p "<question>" --output-format json` non-interactively. Session ID persisted to `.sprang/claude-session.json` — resumes previous conversation via `--resume`. Sync. |
-| 3 | **GitHub Copilot CLI** (`copilot`) | Spawns `copilot -p "<question>"` non-interactively. Uses `--resume=<session-id>` for session continuity once a session exists. Sync. |
+| 3 | **GitHub Copilot CLI** (`copilot`) | Spawns `copilot --prompt "<question>" --output-format json` non-interactively. Uses `--resume=<session-id>` for session continuity once a session exists. Sync. |
 | — | **None** | Panel shows instructions to install one of the above. |
 
 The active bridge is shown below the "Ask Agent" header (`via Claude Code`, `via Copilot CLI`, `via Windsurf`).
