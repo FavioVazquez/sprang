@@ -38,6 +38,21 @@ Your AI agent is the intelligence layer. Sprang is the data layer. Together they
 
 > **Note:** Windsurf AI and Devin Desktop are the same product — Windsurf was rebranded as Devin Desktop. All instructions, skills, and workflows are identical for both. Both names appear in this README.
 
+### Platform comparison
+
+| Feature | Claude Code | Windsurf / Devin Desktop | GitHub Copilot |
+|---|---|---|---|
+| 9 MCP tools | ✅ `.mcp.json` (project) | ✅ global or per-project | ✅ Agent mode only |
+| 11 slash commands | ✅ `.claude/commands/` | ✅ workflows + skills | ⚡ via skills |
+| Always-on rules | ✅ `.claude/rules/` | ✅ `.devin/` + `.windsurf/rules/` | ⚡ `copilot-instructions.md` |
+| Session hooks | ✅ stale graph warn + auto-refresh | — | — |
+| Dashboard Ask Agent | ✅ `claude -p` with `--resume` | ✅ via cascade-messaging extension | ✅ `copilot --prompt` CLI |
+| Conversation continuity | ✅ session ID in `.sprang/claude-session.json` | ✅ via `agent-conversation.md` | ✅ session ID in `.sprang/copilot-session.json` |
+
+**Recommended:** Claude Code or Windsurf/Devin Desktop for the fullest experience. GitHub Copilot works with MCP tools in Agent mode but does not have session hooks.
+
+---
+
 ### Claude Code
 
 **Via the plugin marketplace (recommended)**
@@ -63,9 +78,21 @@ pnpm install && pnpm build
 | `.claude-plugin/plugin.json` | Plugin manifest — name, version, metadata |
 | `.claude-plugin/marketplace.json` | Marketplace source — registers this repo as an installable plugin |
 | `.claude/commands/` | 11 slash commands (e.g. `/sprang`, `/sprang-onboard`) |
+| `.claude/rules/sprang-context.md` | Always-on: Claude checks risk score before editing any file |
+| `.claude/rules/sprang-highrisk.md` | Glob-triggered: blast radius analysis on every source file edit |
+| `.claude/rules/cascade-messaging.md` | Always-on: handles dashboard Ask Agent messages |
 | `.claude/hooks/session-start.sh` | Warns Claude on session open if graph is missing or stale |
-| `.claude/hooks/post-tool-use.sh` | Triggers incremental graph refresh after git commits |
+| `.claude/hooks/post-tool-use.sh` | Triggers incremental graph refresh in background after git commits |
 | `.mcp.json` | MCP server config — 9 tools once binary is built |
+| `AGENTS.md` | Universal cross-platform instructions — Claude Code reads this automatically |
+
+**What Claude does automatically** (once rules are active):
+
+- **Before editing any file** — calls `sprang_node` to check `risk_score` and `structural_warnings`
+- **On high-risk files (risk > 0.7)** — calls `sprang_why` to read decision context and team annotations before changing anything
+- **After every change** — calls `sprang_diff_impact` with changed files to assess blast radius
+- **On session open** — warns if the graph is missing or stale vs. current git HEAD
+- **After git commits** — silently triggers an incremental Phase 1 graph refresh in the background
 
 To build the knowledge graph after install:
 
@@ -106,9 +133,19 @@ Open VS Code with Copilot, switch to **Agent mode** (the model selector in the c
 |---|---|
 | `.copilot-plugin/plugin.json` | Plugin discovery metadata with `skills` paths |
 | `.vscode/mcp.json` | MCP server — auto-connects in Agent mode |
-| `.github/copilot-instructions.md` | Pre-edit checklist auto-loaded by Copilot |
+| `.github/copilot-instructions.md` | Pre-edit checklist: check risk score before editing, blast radius after — auto-loaded by Copilot in every session |
+| `AGENTS.md` | Universal cross-platform instructions at project root — Copilot reads this automatically |
 
 > MCP tools only work in Copilot **Agent mode** — not the default ask/edit modes.
+
+**What Copilot does automatically:**
+
+- **Every session** — reads `.github/copilot-instructions.md` and `AGENTS.md`; the pre-edit checklist reminds it to call `sprang_node` before editing and `sprang_diff_impact` after
+- **In Agent mode** — 9 MCP tools available directly; Copilot can call `sprang_health`, `sprang_why`, `sprang_diff_impact`, etc. without being asked
+
+**Dashboard Ask Agent** — the Sprang dashboard auto-detects the `copilot` CLI and can route questions through it non-interactively. Uses `--resume=<session_id>` for conversation continuity. Session stored in `.sprang/copilot-session.json`.
+
+> Copilot has a shallower integration than Claude Code or Windsurf — no session hooks that fire automatically, and MCP tools require Agent mode. The pre-edit instructions still meaningfully change how Copilot approaches edits in a Sprang-enabled project.
 
 ---
 
