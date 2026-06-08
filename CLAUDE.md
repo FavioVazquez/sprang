@@ -207,7 +207,7 @@ Beyond the slash commands, the `sprang` CLI binary has these commands:
 
 ```bash
 sprang scan [path] [--phase1-only] [--if-stale]   # build/refresh the graph
-sprang open [path] [--port 7777] [--no-browser]   # launch dashboard for any repo
+sprang open [path] [--port 7777] [--no-browser] [--auto-scan]   # launch dashboard for any repo
 sprang diagram [path] [--output file]              # Mermaid architecture diagram
 sprang merge [path] [--intermediate dir]           # assemble graph from agent chunks
 sprang health [path]                               # print health report to terminal
@@ -217,7 +217,7 @@ sprang status [path]                               # graph age / phase / node co
 sprang install-hooks [path]                        # install git post-commit hook
 ```
 
-`sprang open` is the zero-friction entry point: point it at any folder that has been scanned and it serves the dashboard immediately without changing directories.
+`sprang open` is the zero-friction entry point: point it at any folder and it serves the dashboard. If no graph exists yet, the dashboard shows a landing screen where you can type a local path or paste a GitHub URL — the server clones and scans automatically. Pass `--auto-scan` to skip the button click entirely.
 
 `sprang diagram` reads `.sprang/knowledge-graph.json` and outputs a Mermaid `flowchart TD` — useful for architecture docs or PR descriptions.
 

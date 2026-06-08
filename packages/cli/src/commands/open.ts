@@ -10,7 +10,8 @@ export function makeOpenCommand(): Command {
     .argument('[path]', 'Path to the project root to open', undefined)
     .option('--port <number>', 'Port for the dashboard server', '7777')
     .option('--no-browser', 'Do not open browser automatically')
-    .action(async (pathArg: string | undefined, options: { port: string; browser: boolean }) => {
+    .option('--auto-scan', 'Automatically start Phase 1 scan when the dashboard opens (no button click required)')
+    .action(async (pathArg: string | undefined, options: { port: string; browser: boolean; autoScan?: boolean }) => {
       const projectRoot = resolve(pathArg ?? process.cwd());
 
       if (!existsSync(projectRoot)) {
@@ -63,10 +64,15 @@ export function makeOpenCommand(): Command {
       if (options.browser) {
         // Give the server a moment to start, then open browser
         setTimeout(() => {
+          const params = new URLSearchParams();
+          if (options.autoScan) params.set('autoScan', '1');
+          params.set('path', projectRoot);
+          const qs = params.toString();
+          const url = `http://localhost:${options.port}${qs ? `?${qs}` : ''}`;
           const openCmd = process.platform === 'darwin' ? 'open'
             : process.platform === 'win32' ? 'start'
             : 'xdg-open';
-          spawn(openCmd, [`http://localhost:${options.port}`], { shell: process.platform === 'win32' });
+          spawn(openCmd, [url], { shell: process.platform === 'win32' });
         }, 1500);
       }
 

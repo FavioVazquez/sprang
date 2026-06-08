@@ -25,6 +25,7 @@ import { ThemePicker, useTheme } from './components/ThemePicker';
 import { OnboardingOverlay, useOnboarding } from './components/OnboardingOverlay';
 import { MobileBottomNav, type MobileView } from './components/MobileLayout';
 import { AskAgentPanel } from './components/AskCascadePanel';
+import { LandingScreen, type AnalyzeParams } from './components/LandingScreen';
 import { loadGraph } from './api/graphApi';
 import { useDashboardStore } from './store';
 import type { KnowledgeGraph, HistorySnapshot } from './types';
@@ -191,25 +192,29 @@ export default function App() {
     return () => clearInterval(id);
   }, [graph?.phase, fetchGraph]);
 
-  const analyzeProject = useCallback(async () => {
-    try {
-      const res = await fetch('/analyze', { method: 'POST' });
-      if (res.ok) {
-        // Start polling for the graph
-        setLoading(true);
-        setHasError(false);
-        const poll = setInterval(async () => {
-          const g = await loadGraph();
-          if (g) {
-            clearInterval(poll);
-            setGraph(g as KnowledgeGraph);
-            setLoading(false);
-          }
-        }, 2000);
-        // Stop polling after 2 minutes
-        setTimeout(() => clearInterval(poll), 120_000);
+  const analyzeProject = useCallback(async (params?: AnalyzeParams) => {
+    const res = await fetch('/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params ?? {}),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(body.error ?? `Server error ${res.status}`);
+    }
+    // Start polling for the graph
+    setLoading(true);
+    setHasError(false);
+    const poll = setInterval(async () => {
+      const g = await loadGraph();
+      if (g) {
+        clearInterval(poll);
+        setGraph(g as KnowledgeGraph);
+        setLoading(false);
       }
-    } catch { /* ignore */ }
+    }, 2000);
+    // Stop polling after 3 minutes (GitHub clone + scan can take longer)
+    setTimeout(() => clearInterval(poll), 180_000);
   }, [setGraph]);
 
   const handleNodeSelect = useCallback(
@@ -249,8 +254,17 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [selectedNodeId, selectNode]);
 
+  const autoScan = new URLSearchParams(window.location.search).get('autoScan') === '1';
+  const defaultPath = new URLSearchParams(window.location.search).get('path') ?? '';
+
   if (loading) return <LoadingScreen />;
-  if (hasError || !graph) return <ErrorScreen onRetry={fetchGraph} onAnalyze={analyzeProject} />;
+  if (hasError || !graph) return (
+    <LandingScreen
+      onAnalyze={analyzeProject}
+      autoScan={autoScan}
+      defaultPath={defaultPath}
+    />
+  );
 
   return (
     <TooltipProvider>

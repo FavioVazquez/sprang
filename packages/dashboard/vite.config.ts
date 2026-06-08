@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -13,8 +14,24 @@ const MAX_SOURCE_FILE_BYTES = 1024 * 1024; // 1 MB cap for source files
 let allowlistCache: Set<string> | null = null;
 let allowlistCacheMtime = 0;
 
+// Mutable project root — can be overridden at runtime via POST /analyze
+let currentRoot: string = process.env['SPRANG_ROOT'] ?? process.cwd();
+
 function getSprangRoot(): string {
-  return process.env['SPRANG_ROOT'] ?? process.cwd();
+  return currentRoot;
+}
+
+function parseGitHubUrl(input: string): { owner: string; repo: string } | null {
+  const cleaned = input.trim()
+    .replace(/^https?:\/\//, '')
+    .replace(/^github\.com\//, '')
+    .replace(/\.git$/, '')
+    .replace(/\/$/, '');
+  const parts = cleaned.split('/');
+  if (parts.length >= 2 && parts[0] && parts[1]) {
+    return { owner: parts[0], repo: parts[1] };
+  }
+  return null;
 }
 
 function resolveGraphFile(fileName: string): string | null {
@@ -262,24 +279,75 @@ function attachSprangMiddlewares(server: ConnectServer) {
     }
   });
 
-  // POST /analyze — spawn sprang scan --phase1-only in background
+  // POST /analyze — optional JSON body: { path?: string; githubUrl?: string }
+  // If body is empty, scans SPRANG_ROOT (existing behaviour).
+  // If path is given, updates currentRoot to that path then scans.
+  // If githubUrl is given, clones to /tmp/sprang-gh-<owner>-<repo>/ then scans.
   server.middlewares.use('/analyze', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.method !== 'POST') { res.statusCode = 405; res.end(JSON.stringify({ error: 'POST only' })); return; }
 
-    const sprangRoot = getSprangRoot();
-    res.statusCode = 200;
-    res.end(JSON.stringify({ ok: true, started: true, root: sprangRoot }));
+    let raw = '';
+    req.on('data', (chunk: Buffer) => { raw += chunk.toString(); });
+    req.on('end', () => {
+      let params: { path?: string; githubUrl?: string } = {};
+      try { if (raw.trim()) params = JSON.parse(raw) as typeof params; } catch { /* use defaults */ }
 
-    // Fire-and-forget: run Phase 1 scan in background
-    import('node:child_process').then(({ spawn }) => {
-      const child = spawn('npx', ['sprang', 'scan', '--phase1-only', sprangRoot], {
-        cwd: sprangRoot,
-        detached: true,
-        stdio: 'ignore',
-      });
-      child.unref();
-    }).catch(() => {/* ignore */});
+      // GitHub URL — clone then scan
+      if (params.githubUrl) {
+        const parsed = parseGitHubUrl(params.githubUrl);
+        if (!parsed) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'Invalid GitHub URL. Expected: github.com/owner/repo or owner/repo' }));
+          return;
+        }
+        const cloneDir = path.join(os.tmpdir(), `sprang-gh-${parsed.owner}-${parsed.repo}`);
+        currentRoot = cloneDir;
+        allowlistCache = null; // invalidate on root change
+        res.statusCode = 200;
+        res.end(JSON.stringify({ ok: true, started: true, mode: 'github', cloning: true, root: cloneDir, repo: `${parsed.owner}/${parsed.repo}` }));
+
+        import('node:child_process').then(({ spawn }) => {
+          // If already cloned, just pull; otherwise clone fresh
+          const cloneExists = fs.existsSync(path.join(cloneDir, '.git'));
+          const gitArgs = cloneExists
+            ? ['-C', cloneDir, 'pull', '--ff-only']
+            : ['clone', '--depth=1', `https://github.com/${parsed.owner}/${parsed.repo}`, cloneDir];
+          const gitChild = spawn('git', gitArgs, { stdio: 'ignore' });
+          gitChild.on('close', (code) => {
+            if (code !== 0) return;
+            const scanChild = spawn('npx', ['sprang', 'scan', '--phase1-only', cloneDir], {
+              cwd: cloneDir, detached: true, stdio: 'ignore',
+            });
+            scanChild.unref();
+          });
+        }).catch(() => {/* ignore */});
+        return;
+      }
+
+      // Local path — validate and update root
+      if (params.path) {
+        const resolved = path.resolve(params.path);
+        if (!fs.existsSync(resolved)) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: `Path not found: ${resolved}` }));
+          return;
+        }
+        currentRoot = resolved;
+        allowlistCache = null; // invalidate on root change
+      }
+
+      const sprangRoot = getSprangRoot();
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, started: true, mode: 'local', root: sprangRoot }));
+
+      import('node:child_process').then(({ spawn }) => {
+        const child = spawn('npx', ['sprang', 'scan', '--phase1-only', sprangRoot], {
+          cwd: sprangRoot, detached: true, stdio: 'ignore',
+        });
+        child.unref();
+      }).catch(() => {/* ignore */});
+    });
   });
 
   // GET /analyze-status — returns current analysis progress

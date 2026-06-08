@@ -510,9 +510,13 @@ sprang query "authentication" --semantic   # cosine similarity over TF-IDF embed
 # Watch for file changes and incrementally update the graph
 sprang watch
 
-# Open the dashboard pointed at any repo folder (no cd required)
+# Open the dashboard for any local folder — shows landing screen if no graph yet
 sprang open /path/to/any/project
 sprang open /path/to/any/project --port 8080
+# Auto-trigger Phase 1 scan without clicking the button
+sprang open /path/to/any/project --auto-scan
+# Or open standalone — dashboard landing lets you type a path or paste a GitHub URL
+sprang open
 
 # Generate a Mermaid architecture diagram from the graph
 sprang diagram
