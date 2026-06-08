@@ -599,7 +599,7 @@ The **Ask Agent** panel in the Sprang dashboard lets you ask questions about you
 
 | Priority | Agent | How it works |
 |---|---|---|
-| 1 | **Windsurf / Devin Desktop** | Writes to `.cascade-trigger-session` — the `cascade-messaging` VS Code extension forwards it to the Windsurf AI, which calls `sprang_respond` MCP tool to write the reply. Async (poll). |
+| 1 | **Windsurf / Devin Desktop** | Writes to `.cascade-trigger-session` — the `cascade-messaging` VS Code extension forwards it to Cascade (the Windsurf AI), which calls `sprang_respond` MCP tool to write the reply. Async (poll). |
 | 2 | **Claude Code** (`claude` CLI) | Spawns `claude -p "<question>" --output-format json` non-interactively. Session ID persisted to `.sprang/claude-session.json` — resumes previous conversation via `--resume`. Sync. |
 | 3 | **GitHub Copilot CLI** (`copilot`) | Spawns `copilot --prompt "<question>" --output-format json` non-interactively. Uses `--resume=<session-id>` for session continuity once a session exists. Sync. |
 | — | **None** | Panel shows instructions to install one of the above. |

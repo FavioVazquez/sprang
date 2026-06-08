@@ -67,10 +67,10 @@ Use for: blast radius analysis before committing or after `/sprang-diff`.
 
 ### `sprang_tour`
 ```
-Input:  { tour_id?: string, persona?: "junior" | "senior" | "pm" }
+Input:  { tour_id?: string, persona?: "junior" | "senior" | "experienced" | "pm" | "non-technical" }
 Output: { tour_id, title, steps: TourStep[] }
 ```
-Use for: onboarding, guided walkthroughs. Persona filters: junior=all, senior=skip intro, pm=domain/service only.
+Use for: onboarding, guided walkthroughs. Persona filters: `junior`=all steps, `senior`/`experienced`=skip intro, `pm`=domain/service nodes, `non-technical`=entry-points and domains only.
 
 ### `sprang_domain`
 ```
@@ -114,6 +114,13 @@ Output: { success: true, path: string, node_id, node_label }
 ```
 Writes `.sprang/annotations/<sanitized-node-id>.md` with YAML frontmatter. Commit these files.
 
+### `sprang_respond`
+```
+Input:  { response: string, question?: string }
+Output: { success: true, path: string, written_at: string }
+```
+Writes `.sprang/cascade-response.json` so the dashboard Ask Agent panel displays your reply. Call this at the end of every dashboard chat response.
+
 ---
 
 ## For AI Agents — Best Practices
@@ -150,13 +157,13 @@ If no graph exists yet: run `/sprang` to build one.
 ## Dashboard Chat (Ask Agent)
 
 The Sprang dashboard has an **Ask Agent** panel that routes questions through whichever agent bridge is active:
-- **Windsurf / Devin Desktop** — writes `.cascade-trigger-session`; the `cascade-messaging` VS Code extension forwards it to the Windsurf AI, which calls `sprang_respond` to write the reply
+- **Windsurf / Devin Desktop** — writes `.cascade-trigger-session`; the `cascade-messaging` VS Code extension forwards it to Cascade (the Windsurf AI), which calls `sprang_respond` to write the reply
 - **Claude Code** — spawns `claude -p` non-interactively with session continuity via `--resume`
 - **Copilot CLI** — spawns `copilot --prompt` non-interactively with session continuity via `--resume=<id>`
 
 Conversation history is maintained in `.sprang/agent-conversation.md` (gitignored — use `cat` to read it, not `read_file`).
 
-The rule `.devin/rules/cascade-messaging.md` (always_on) governs this for Windsurf — it tells the agent to:
+The rule `.devin/rules/cascade-messaging.md` (always_on) governs this for Windsurf — it tells Cascade to:
 1. Run `cat .sprang/agent-conversation.md 2>/dev/null || echo "(no history yet)"` before each message
 2. Answer the message fully
 3. Call `sprang_respond` MCP tool so the reply appears in the dashboard UI

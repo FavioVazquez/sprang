@@ -55,7 +55,7 @@ If you copy Sprang into another project: set `SPRANG_ROOT` to the project root, 
 | `sprang_query` | `{ query, node_types?, limit?, mode? }` | Find nodes by keyword; add `"mode": "semantic"` for embedding search |
 | `sprang_node` | `{ node_id }` | Full node + 1-hop neighbors, risk score, layer, annotation status |
 | `sprang_diff_impact` | `{ files: string[] }` | BFS blast radius before committing |
-| `sprang_tour` | `{ tour_id?, persona? }` | Guided walkthrough; persona: `"junior"` / `"senior"` / `"pm"` |
+| `sprang_tour` | `{ tour_id?, persona? }` | Guided walkthrough; persona: `"junior"` / `"senior"` / `"experienced"` / `"pm"` / `"non-technical"` |
 | `sprang_domain` | `{ domain_name? }` | Business domain hierarchy |
 | `sprang_health` | `{}` | Health grade (A–F), score, smell summary, security summary, top-10 risky nodes, orphans, circular deps, run history |
 | `sprang_why` | `{ node_id }` | Git history + decision context + annotation for a node |
@@ -97,7 +97,7 @@ Before modifying any file:
 
 For architecture questions: check `.sprang/SPRANG_REPORT.md` first.
 
-### `cascade-messaging.md` (always active)
+### `cascade-messaging.md` (always active) — Dashboard chat bridge
 
 When you receive a message prefixed with `[SPRANG DASHBOARD MESSAGE]` (from the dashboard Ask Agent panel):
 1. **Run `cat .sprang/agent-conversation.md 2>/dev/null || echo "(no history yet)"`** — reads full conversation history (file is gitignored; the Read tool is blocked, use Bash instead)
