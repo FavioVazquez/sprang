@@ -25,6 +25,20 @@ describe('extractImportsForLanguage – TypeScript/JavaScript', () => {
   it('returns empty array for no imports', () => {
     expect(extractImportsForLanguage('typescript', 'const x = 1;')).toEqual([]);
   });
+
+  it('extracts CommonJS require() calls', () => {
+    const src = `const { foo } = require('./lib/foo');\nconst bar = require('../bar');`;
+    const result = extractImportsForLanguage('javascript', src);
+    expect(result).toContain('./lib/foo');
+    expect(result).toContain('../bar');
+  });
+
+  it('extracts require() mixed with ESM imports', () => {
+    const src = `import { x } from './esm';\nconst y = require('./cjs');`;
+    const result = extractImportsForLanguage('typescript', src);
+    expect(result).toContain('./esm');
+    expect(result).toContain('./cjs');
+  });
 });
 
 describe('extractImportsForLanguage – Python', () => {

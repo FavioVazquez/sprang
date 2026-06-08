@@ -43,8 +43,20 @@ export function generateMermaid(graph: KnowledgeGraph): string {
 }
 
 function generateFlatMermaid(graph: KnowledgeGraph): string {
-  const fileNodes = graph.nodes.filter((n) => n.type === 'file').slice(0, 20);
+  const MAX_NODES = 30;
+  const allFileNodes = graph.nodes.filter((n) => n.type === 'file');
+
+  // Count connections to prioritize highly-connected files
+  const degree = new Map<string, number>();
+  for (const edge of graph.edges) {
+    if (edge.type !== 'imports' && edge.type !== 'depends_on') continue;
+    degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
+    degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
+  }
+  const sorted = allFileNodes.sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0));
+  const fileNodes = sorted.slice(0, MAX_NODES);
   const nodeIds = new Set(fileNodes.map((n) => n.id));
+
   const lines: string[] = ['flowchart TD'];
   for (const node of fileNodes) {
     const safeId = node.id.replace(/[^a-zA-Z0-9_]/g, '_');
