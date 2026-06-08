@@ -180,16 +180,21 @@ This writes `.sprang/diff-overlay.json` which the dashboard highlights in amber.
 
 Start the dashboard:
 ```bash
-pnpm --filter @sprang/dashboard dev
-# Opens at http://localhost:7338
+pnpm --filter @sprang/dashboard preview   # daily use (pre-built dist), http://localhost:7777
+pnpm --filter @sprang/dashboard dev        # hot-reload development, http://localhost:7338
+sprang open [path] [--auto-scan]           # point at any folder, no cd
 ```
 
+The dashboard is a polished React + Vite app (Sigma.js, framer-motion) with an OKLCH-tinted surface ramp, three themes (dark / light / high-contrast), Outfit + JetBrains Mono typography, spring-physics motion, and full `prefers-reduced-motion` support. Risk renders as an accessible heat scale.
+
+**Instant analysis (no agent needed):** if no graph exists, the dashboard shows a **landing screen** — type a local path or paste a GitHub URL (`github.com/owner/repo`) and the server runs Phase 1 (static, <60s; GitHub repos are cloned to a temp folder). `sprang open --auto-scan` triggers it without a click.
+
 Views:
-- **Graph** (`G` / `1`) — force-directed knowledge graph with risk heat overlay
-- **Health** (`H` / `2`) — smell table, top-10 risk nodes, orphan count
+- **Graph** (`G` / `1`) — force-directed knowledge graph with risk heat overlay; function call edges and import edges both rendered
+- **Health** (`H` / `2`) — letter grade A–F, smell table (incl. `layer_violation`), top-10 risk nodes, security findings, detected design patterns
 - **Domains** (`D` / `3`) — business domain hierarchy
 - **Architecture** (`A` / `4`) — layer card view (React Flow + ELK)
-- **Learn** (`L` / `5`) — guided tour player
+- **Learn** (`L` / `5`) — persona-adaptive guided tour player
 
 Keyboard shortcuts:
 - `Cmd/Ctrl K` — open node search

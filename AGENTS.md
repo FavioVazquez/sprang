@@ -154,6 +154,31 @@ If no graph exists yet: run `/sprang` to build one.
 
 ---
 
+## Dashboard
+
+Sprang ships a polished React + Vite dashboard (Sigma.js graph, framer-motion throughout) with a considered design system: OKLCH-tinted surface ramp, three themes (dark / light / high-contrast), Outfit + JetBrains Mono type pairing, spring-physics motion, and full `prefers-reduced-motion` support. Risk is rendered as an accessible heat scale, not a naive red/green.
+
+Start it:
+
+```bash
+pnpm --filter @sprang/dashboard preview   # serves pre-built dist (daily use), http://localhost:7777
+pnpm --filter @sprang/dashboard dev        # hot-reload for dashboard development, http://localhost:7338
+sprang open [path] [--auto-scan]           # point the dashboard at any folder without cd
+```
+
+**Views** (keyboard `1`–`5` / `g h d a l`):
+- **Graph** — force-directed knowledge graph; toggle the risk heat overlay with `R`
+- **Health** — letter grade A–F, smell table (incl. `layer_violation`), top-10 risk nodes, security findings, detected design patterns
+- **Domains** — business domain → flow → step hierarchy
+- **Architecture** — layer card view (React Flow + ELK)
+- **Learn** — persona-adaptive guided tour player
+
+**Instant analysis (no agent needed):** opening the dashboard on a project with no graph shows a **landing screen** — type a local path or paste a GitHub URL (`github.com/owner/repo`) and the server runs Phase 1 (static, <60s, clones the repo to a temp folder for GitHub URLs). `sprang open --auto-scan` skips the click. This is the zero-friction, point-and-analyze entry point; Phase 2 enrichment then layers in semantic summaries, decision context, and risk.
+
+**What Phase 1 surfaces deterministically (zero LLM, zero API key):** import graph, function-to-function call edges (`internalCalls` / `externalCalls` / `callerCount` per function), design patterns (singleton, factory, observer, strategy, decorator, react_hook, context_provider, event_emitter, dependency_injection), architecture layers, layer violations, code smells, security findings, and health grade.
+
+---
+
 ## Dashboard Chat (Ask Agent)
 
 The Sprang dashboard has an **Ask Agent** panel that routes questions through whichever agent bridge is active:

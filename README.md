@@ -16,8 +16,8 @@
   <a href="#installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-613_passing-10B981?style=flat-square" alt="613 unit tests passing"/>
-  <img src="https://img.shields.io/badge/e2e_tests-56_passing-10B981?style=flat-square" alt="56 e2e tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-624_passing-10B981?style=flat-square" alt="624 unit tests passing"/>
+  <img src="https://img.shields.io/badge/e2e_tests-57_passing-10B981?style=flat-square" alt="57 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
 </p>
@@ -365,8 +365,12 @@ sprang_health {}
 | Capability | How |
 |---|---|
 | **Git decision context** | `git-layer` — who changed each file, why, PR references, change frequency |
-| **Code smell detection** | `smell-detector` — 8 deterministic heuristics, zero LLM calls |
+| **Code smell detection** | `smell-detector` — deterministic heuristics, zero LLM calls |
+| **Function call graph** | `file-analyzer` — function-to-function `calls` edges, internal/external call counts, unused-function detection |
+| **Design pattern detection** | 9 patterns — singleton, factory, observer, strategy, decorator, react_hook, context_provider, event_emitter, dependency_injection |
+| **Layer violation detection** | `architecture-analyzer` — flags lower layers importing from higher ones (e.g. data → ui) |
 | **Risk scoring** | `risk-scorer` — blast radius × coupling × test gap × churn, 0.0–1.0 per node |
+| **Instant point-and-analyze** | Dashboard landing screen — type a local path or paste a GitHub URL, Phase 1 runs with no agent and no API key |
 | **Guided tours** | `tour-builder` — BFS-ordered pedagogical paths through the codebase |
 | **Domain map** | `domain-analyzer` — directory cohesion clustering into named business layers |
 | **Blast-radius diff** | `sprang_diff_impact` — BFS over the graph before any edit, risk-ranked |
@@ -904,6 +908,17 @@ SPRANG_ROOT=/path/to/your/project pnpm --filter @sprang/dashboard preview
 
 > **Open in your system browser, not the IDE's embedded browser.** Windsurf/Devin Desktop's embedded preview proxy (`127.0.0.1:4xxxx`) does not forward the custom middleware routes (`/knowledge-graph.json`, `/bridge-status`, etc.). Always open **http://127.0.0.1:7777** directly in Chrome or Firefox.
 
+### Instant analysis — point and go (no agent, no API key)
+
+Open the dashboard on a project that has not been scanned yet and you land on an analyze screen: type a local path or paste a GitHub URL and Phase 1 runs immediately — fully static, under 60 seconds, no agent and no API key. GitHub repos are shallow-cloned to a temp folder and never stored.
+
+```bash
+sprang open                            # standalone — type any path or paste a GitHub URL
+sprang open /path/to/project --auto-scan   # start Phase 1 the moment the browser opens
+```
+
+The single input auto-detects local path vs. GitHub URL (`github.com/owner/repo`, `owner/repo`, or the full URL) and shows a live `Local` / `GitHub` badge. This is the zero-friction entry point — Phase 2 enrichment (semantic summaries, decision context, risk) then layers in via your agent.
+
 ### Views
 
 | View | Key | Description |
@@ -1037,22 +1052,22 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 613 unit tests across core/dashboard/mcp/cli
+pnpm test              # 624 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
-pnpm --filter @sprang/dashboard test:e2e   # 56 Playwright e2e tests
+pnpm --filter @sprang/dashboard test:e2e   # 57 Playwright e2e tests
 ```
 
 ### Test summary
 
 | Package | Runner | Tests | What is tested |
 |---|---|---|---|
-| `@sprang/core` | Vitest | 436 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity |
+| `@sprang/core` | Vitest | 447 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity, call graph, layer violations |
 | `@sprang/dashboard` | Vitest | 85 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6), bridge detection (30) |
 | `@sprang/mcp` | Vitest | 65 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (40), sprang_respond (8), sprang_query enhancements (3) |
 | `@sprang/cli` | Vitest | 27 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12), `merge` command (9) |
-| **Total unit** | | **613** | |
-| `@sprang/dashboard` | Playwright | 56 | Full UI e2e — loading, nav, keyboard shortcuts (all 1–5/g/h/d/a/l), architecture tab, cascade bridge, health grade (A–F), security findings, risk overlay, analyze endpoint, tour player, persona selector |
+| **Total unit** | | **624** | |
+| `@sprang/dashboard` | Playwright | 57 | Full UI e2e — loading, landing screen (path/GitHub URL), nav, keyboard shortcuts (all 1–5/g/h/d/a/l), architecture tab, cascade bridge, health grade (A–F), security findings, risk overlay, analyze endpoint, tour player, persona selector |
 
 <details>
 <summary>Full test structure</summary>
