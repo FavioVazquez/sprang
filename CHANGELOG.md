@@ -29,6 +29,8 @@ Security scanning, health grading, run history, architecture diagrams, and on-de
 - **Dashboard: on-demand analysis** — `POST /analyze` endpoint spawns `sprang scan --phase1-only` as a fire-and-forget background process. `GET /analyze-status` polls `.sprang/intermediate/phase2-progress.json`. `GET /health-history.json` serves `.sprang/history.json` (returns `[]` if missing). `ErrorScreen` gains an "Analyze this project" button wired to `POST /analyze`.
 - **27 new unit tests**: 15 for `health-grade` (grade boundaries, all 5 penalty factors with cap enforcement, `gradeColor`, score clamping) and 12 for `similarity` (`lcsLength`, `lcsSimilarity`, `structuralFingerprint`).
 - **4 new e2e tests** (tests 37–40): `/health-history.json` returns array, `/analyze-status` returns 204 when no progress file, `POST /analyze` returns `{ok:true, started:true}`, health view shows grade badge.
+- **Complete persona system** — `sprang_tour` MCP tool now accepts all 5 personas: `junior` (all steps + language lessons), `senior` / `experienced` (skip intro, architectural focus), `pm` (domain and service nodes, business focus), `non-technical` (entry-points and domains only, no code details). `experienced` is an alias for `senior`. Dashboard `PersonaSelector` expanded to 4 options: Business / Product / Learn / Deep Dive. `LearnPanel` shows persona-specific hint text for all values. `/sprang-onboard` command documents all 4 personas with their MCP values across all 3 platforms. 2 new MCP tests (65 total).
+- **7 new e2e tests** (tests 50–56): keyboard shortcuts 1/2/3 (graph/health/domains), persona selector shows all 4 options, tour start button + step advance + exit, health view security findings section. 56 e2e tests total.
 
 ### Fixed (analysis pipeline and workflow correctness — 2026-06-08)
 
@@ -78,7 +80,7 @@ Security scanning, health grading, run history, architecture diagrams, and on-de
 - All package versions bumped from `0.2.0` to `0.2.1`.
 - `sprang_health` MCP tool description updated to reflect extended output.
 - `sprang-health` command/skill/workflow: now leads with health grade, reports security findings, shows history trend.
-- Test counts: **608 unit tests** (431 core + 85 dashboard + 65 mcp + 27 cli), **49 e2e tests** — all passing.
+- Test counts: **608 unit tests** (431 core + 85 dashboard + 65 mcp + 27 cli), **56 e2e tests** — all passing.
 
 ---
 

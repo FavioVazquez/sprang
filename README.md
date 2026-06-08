@@ -17,7 +17,7 @@
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
   <img src="https://img.shields.io/badge/unit_tests-608_passing-10B981?style=flat-square" alt="608 unit tests passing"/>
-  <img src="https://img.shields.io/badge/e2e_tests-49_passing-10B981?style=flat-square" alt="49 e2e tests passing"/>
+  <img src="https://img.shields.io/badge/e2e_tests-56_passing-10B981?style=flat-square" alt="56 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
 </p>
@@ -45,6 +45,7 @@ Your AI agent is the intelligence layer. Sprang is the data layer. Together they
 | 9 MCP tools | ✅ `.mcp.json` (project) | ✅ global or per-project | ✅ Agent mode only |
 | 11 slash commands | ✅ `.claude/commands/` | ✅ workflows + skills | ⚡ via skills |
 | Always-on rules | ✅ `.claude/rules/` | ✅ `.devin/` + `.windsurf/rules/` | ⚡ `copilot-instructions.md` |
+| Auto-loaded instructions | `CLAUDE.md` | `AGENTS.md` | `AGENTS.md` + `copilot-instructions.md` |
 | Session hooks | ✅ stale graph warn + auto-refresh | — | — |
 | Dashboard Ask Agent | ✅ `claude -p` with `--resume` | ✅ via cascade-messaging extension | ✅ `copilot --prompt` CLI |
 | Conversation continuity | ✅ session ID in `.sprang/claude-session.json` | ✅ via `agent-conversation.md` | ✅ session ID in `.sprang/copilot-session.json` |
@@ -84,7 +85,7 @@ pnpm install && pnpm build
 | `.claude/hooks/session-start.sh` | Warns Claude on session open if graph is missing or stale |
 | `.claude/hooks/post-tool-use.sh` | Triggers incremental graph refresh in background after git commits |
 | `.mcp.json` | MCP server config — 9 tools once binary is built |
-| `AGENTS.md` | Universal cross-platform instructions — Claude Code reads this automatically |
+| `CLAUDE.md` | Claude Code project instructions — read automatically on every session open |
 
 **What Claude does automatically** (once rules are active):
 
@@ -134,13 +135,13 @@ Open VS Code with Copilot, switch to **Agent mode** (the model selector in the c
 | `.copilot-plugin/plugin.json` | Plugin discovery metadata with `skills` paths |
 | `.vscode/mcp.json` | MCP server — auto-connects in Agent mode |
 | `.github/copilot-instructions.md` | Pre-edit checklist: check risk score before editing, blast radius after — auto-loaded by Copilot in every session |
-| `AGENTS.md` | Universal cross-platform instructions at project root — Copilot reads this automatically |
+| `AGENTS.md` | Universal cross-platform instructions — both Windsurf/Devin Desktop and GitHub Copilot read this automatically |
 
 > MCP tools only work in Copilot **Agent mode** — not the default ask/edit modes.
 
 **What Copilot does automatically:**
 
-- **Every session** — reads `.github/copilot-instructions.md` and `AGENTS.md`; the pre-edit checklist reminds it to call `sprang_node` before editing and `sprang_diff_impact` after
+- **Every session** — reads `AGENTS.md` and `.github/copilot-instructions.md`; the pre-edit checklist reminds it to call `sprang_node` before editing and `sprang_diff_impact` after
 - **In Agent mode** — 9 MCP tools available directly; Copilot can call `sprang_health`, `sprang_why`, `sprang_diff_impact`, etc. without being asked
 
 **Dashboard Ask Agent** — the Sprang dashboard auto-detects the `copilot` CLI and can route questions through it non-interactively. Uses `--resume=<session_id>` for conversation continuity. Session stored in `.sprang/copilot-session.json`.
@@ -988,7 +989,7 @@ pnpm build             # build all packages
 pnpm test              # 608 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
-pnpm --filter @sprang/dashboard test:e2e   # 49 Playwright e2e tests
+pnpm --filter @sprang/dashboard test:e2e   # 56 Playwright e2e tests
 ```
 
 ### Test summary
@@ -1000,7 +1001,7 @@ pnpm --filter @sprang/dashboard test:e2e   # 49 Playwright e2e tests
 | `@sprang/mcp` | Vitest | 65 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (40), sprang_respond (8), sprang_query enhancements (3) |
 | `@sprang/cli` | Vitest | 27 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12), `merge` command (9) |
 | **Total unit** | | **606** | |
-| `@sprang/dashboard` | Playwright | 49 | Full UI e2e — loading, nav, keyboard shortcuts, architecture tab, cascade bridge, health grade (A–F), risk overlay, analyze endpoint, security endpoints |
+| `@sprang/dashboard` | Playwright | 56 | Full UI e2e — loading, nav, keyboard shortcuts (all 1–5/g/h/d/a/l), architecture tab, cascade bridge, health grade (A–F), security findings, risk overlay, analyze endpoint, tour player, persona selector |
 
 <details>
 <summary>Full test structure</summary>
@@ -1046,12 +1047,12 @@ packages/dashboard/src/utils/
 └── elk-layout.test.ts            6 tests — ELK mock, coordinate pass-through, fallback
 
 packages/dashboard/e2e/
-└── app.spec.ts                  49 tests — Playwright, full UI coverage
+└── app.spec.ts                  56 tests — Playwright, full UI coverage
     ├── error state (no graph, retry button)
     ├── loaded state (all 5 nav tabs)
     ├── navigation (graph → health → domains → architecture → learn)
-    ├── keyboard shortcuts (Ctrl+K, h, g, d, a, l, ?, 1-5, r)
-    ├── health view (heading, god_node smell, health grade A–F badge)
+    ├── keyboard shortcuts (Ctrl+K, h, g, d, a, l, ?, 1-5, r — complete set)
+    ├── health view (heading, god_node smell, health grade A–F badge, security findings)
     ├── domains view (domain label rendered)
     ├── search dialog (open, type, filter, close)
     ├── onboarding overlay (dismiss)
@@ -1062,6 +1063,7 @@ packages/dashboard/e2e/
     ├── risk overlay (R key toggles on/off)
     ├── analyze endpoint (/analyze POST trigger)
     ├── sigma canvas (present and non-zero size)
+    ├── learn view (persona selector — all 4 options, tour start, step advance, exit)
     └── nav bar (logo + all 5 tabs persistent)
 
 packages/mcp/tests/

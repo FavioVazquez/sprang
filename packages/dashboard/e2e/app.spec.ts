@@ -109,6 +109,39 @@ const mockGraphNoLayers: KnowledgeGraph = {
   layers: [],
 };
 
+// Mock graph with security findings — exercises HealthView security section
+const mockGraphWithSecurity: KnowledgeGraph = {
+  ...mockGraph,
+  nodes: [
+    ...mockGraph.nodes,
+    {
+      id: 'file:src/db.ts',
+      label: 'db.ts',
+      type: 'file',
+      tags: [],
+      risk_score: 0.7,
+      security_warnings: [
+        {
+          category: 'sql_injection' as import('../src/types').SecurityCategory,
+          severity: 'high' as const,
+          line: 42,
+          pattern: 'sql-interpolation',
+          snippet: "db.query(`SELECT * FROM users WHERE id = '${userId}'`)",
+          description: 'String interpolation in SQL query',
+        },
+      ],
+    },
+  ],
+  stats: {
+    ...mockGraph.stats,
+    security_summary: {
+      total: 1,
+      by_severity: { high: 1, medium: 0, low: 0 },
+      by_category: { sql_injection: 1 },
+    },
+  },
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -929,5 +962,115 @@ test('graph view – sigma canvas is present and non-zero', async ({ page }) => 
   expect(box).not.toBeNull();
   expect(box!.width).toBeGreaterThan(100);
   expect(box!.height).toBeGreaterThan(100);
+});
 
+// ---------------------------------------------------------------------------
+// Test 50: Keyboard shortcut '1' switches to graph view
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 1 switches to graph view', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Health').click(); // start away from graph
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('1');
+  await expect(page.getByText('Test Project')).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 51: Keyboard shortcut '2' switches to health view
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 2 switches to health view', async ({ page }) => {
+  await gotoApp(page);
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('2');
+  await expect(
+    page.getByRole('heading', { name: 'Structural Health Report' }),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 52: Keyboard shortcut '3' switches to domains view
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 3 switches to domains view', async ({ page }) => {
+  await gotoApp(page);
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('3');
+  await expect(
+    page.getByText(/Authentication|Business Domain|Domain/i).first(),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 53: Learn view – persona selector shows all 4 personas
+// ---------------------------------------------------------------------------
+test('learn view – persona selector shows all 4 personas', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Learn').click();
+  // All four persona labels must be visible in the selector
+  await expect(page.getByRole('button', { name: /business/i }).first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole('button', { name: /product/i }).first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole('button', { name: /learn/i }).first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole('button', { name: /deep dive/i }).first()).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 54: Learn view – start tour button is clickable and shows first step
+// ---------------------------------------------------------------------------
+test('learn view – start tour button advances to first tour step', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Learn').click();
+
+  // Pre-tour state shows the tour title and start button
+  const startBtn = page.getByRole('button', { name: /start tour/i });
+  await expect(startBtn).toBeVisible({ timeout: 8000 });
+  await startBtn.click();
+
+  // After starting, first step title should be visible
+  await expect(page.getByText(/entry point|auth module/i).first()).toBeVisible({ timeout: 5000 });
+
+  // Step counter "1 / 2" is visible
+  await expect(page.getByText(/1\s*\/\s*2/).first()).toBeVisible({ timeout: 3000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 55: Learn view – tour step advance and exit
+// ---------------------------------------------------------------------------
+test('learn view – tour can advance to next step and exit', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Learn').click();
+
+  const startBtn = page.getByRole('button', { name: /start tour/i });
+  await expect(startBtn).toBeVisible({ timeout: 8000 });
+  await startBtn.click();
+
+  // Advance to step 2
+  const nextBtn = page.getByRole('button', { name: /next/i }).first();
+  await expect(nextBtn).toBeVisible({ timeout: 3000 });
+  await nextBtn.click();
+
+  // Step counter should now show 2 / 2
+  await expect(page.getByText(/2\s*\/\s*2/).first()).toBeVisible({ timeout: 3000 });
+
+  // Exit button dismisses the tour
+  const exitBtn = page.getByRole('button', { name: /exit tour/i });
+  await expect(exitBtn).toBeVisible({ timeout: 3000 });
+  await exitBtn.click();
+
+  // Back to pre-tour state — start button reappears
+  await expect(page.getByRole('button', { name: /start tour/i })).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 56: Health view – security section renders with findings
+// ---------------------------------------------------------------------------
+test('health view – security section shows findings when graph has security_warnings', async ({ page }) => {
+  await gotoApp(page, mockGraphWithSecurity);
+  await navTab(page, 'Health').click();
+  // The security section heading appears when stats.security_summary.total > 0
+  await expect(
+    page.getByText(/security issues/i).first(),
+  ).toBeVisible({ timeout: 8000 });
+  // The sql_injection finding from the mock should appear
+  await expect(
+    page.getByText(/sql.inject/i).first(),
+  ).toBeVisible({ timeout: 5000 });
 });
