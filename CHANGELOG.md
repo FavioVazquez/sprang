@@ -8,7 +8,29 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [0.2.1] — 2026-06-08
 
-Security scanning, health grading, run history, architecture diagrams, on-demand dashboard analysis, a point-and-analyze landing screen, and CodeFlow-parity static analysis (call graph, design patterns, layer violations) — all deterministic, no API key required.
+Security scanning, health grading, run history, architecture diagrams, on-demand dashboard analysis, a point-and-analyze landing screen, CodeFlow-parity static analysis (call graph, design patterns, layer violations), and three new visualization modes (3D graph, treemap, matrix) — all deterministic, no API key required.
+
+### Added (visualizations and animation — 2026-06-08)
+
+- **3D graph view** — new `Graph3DCanvas.tsx` component using `react-force-graph` (Three.js / WebGL). Node size proportional to `risk_score`; color follows the same OKLCH heat scale as the 2D risk overlay. Gentle auto-rotation on load (stops on first user interaction); respects `prefers-reduced-motion`. Selecting a node pans the camera to it. `GraphView` toolbar gains a `2D | 3D` pill toggle; state persisted in `graphViewMode` zustand slice.
+- **Treemap view** — new `TreemapView.tsx` page using `d3-hierarchy`. Files nested in their folder structure; tile area = lines of code; tile color = `risk_score` heat. Layer accent bars at the top of each tile. Labels and sub-labels (lines count) rendered when tile is large enough. Staggered entry animation via `motion.g`. Zoom controls. Added as tab 5 (`T` key shortcut).
+- **Matrix view** — new `MatrixView.tsx` page, pure SVG. File-to-file dependency adjacency matrix sorted by architectural layer rank (infrastructure → ui). Cell fill intensity = edge weight; hover highlights full row and column. Scroll-to-zoom (0.4–3×). Click a row to select that node. Added as tab 6 (`M` key shortcut).
+- **`graphTransform.ts`** — shared data adapter module: `toForceGraphData()` (KnowledgeGraph → react-force-graph nodes/links), `toHierarchyData()` (→ d3 hierarchy tree), `toMatrixData()` (→ sorted file list + edge cells, capped at 150 nodes).
+- **`AnimatedCount.tsx`** — spring number counter via `useSpring` + `useTransform`. Respects `useReducedMotion`. Used in `HealthView` stat cards (nodes, edges, orphan count, risk counts).
+- **View transitions upgraded** — all 7 tab views now animate with opacity + y-slide (`initial: y: 8 → animate: y: 0 → exit: y: -8`, duration 180ms) rather than bare opacity. `AnimatePresence mode="wait"` already in place.
+- **HealthView table row stagger** — smell and risky-nodes table rows animate in with a staggered fade+slide (`delay: index × 40ms`, capped at 400ms). Motion-reduce aware.
+- **FileExplorer expand/collapse** — folder children wrapped in `AnimatePresence` + `motion.div` with `height: 0 → auto` transition. Chevron icon rotates 90° via `motion.span`.
+- **LayerCardNode stagger** — architecture layer cards enter with `scale: 0.92 → 1, opacity: 0 → 1`, staggered by `colorIndex × 60ms`.
+- **ArchitectureView reveal** — React Flow canvas wraps in `motion.div` (scale + opacity) that fires when ELK layout resolves.
+- **GraphCanvas selected-node pulse ring** — `AnimatePresence` `motion.div` ring positioned over the Sigma canvas at the selected node's viewport coordinates; pulses `scale: [1, 1.6, 1]` on repeat.
+
+### Planned (deferred visualizations)
+
+- **Circular bundle view** — D3 hierarchical edge bundling; files on a circle, imports as bezier curves.
+- **Sankey flow diagram** — `d3-sankey`; import volume flowing between architectural layers.
+- **Hotspot heatmap** — scatter plot of `risk_score` vs `change_frequency` (requires git-layer Phase 2 data).
+- **Call-graph explorer** — function subgraph modal using `internalCalls`/`externalCalls` data.
+- **Timeline view** — per-file commit activity over 90 days (requires git-layer Phase 2 data).
 
 ### Added (new features)
 
