@@ -9,6 +9,7 @@ import type {
   FileAnalysis,
   FunctionRecord,
   ClassRecord,
+  DetectedPattern,
 } from '../schema/types.js';
 import { BaseAgent } from './base.js';
 import type { AgentContext, AgentResult } from './base.js';
@@ -89,6 +90,44 @@ function findClasses(source: string): Array<SymbolMatch & { exported: boolean }>
     });
   }
   return results;
+}
+
+function detectPatterns(source: string): DetectedPattern[] {
+  const patterns: DetectedPattern[] = [];
+
+  // Singleton: private constructor + static instance field
+  if (/private\s+(?:static\s+)?(?:readonly\s+)?instance\s*[:=]/i.test(source) ||
+      (/private\s+constructor\s*\(/.test(source) && /static\s+\w*instance\w*/i.test(source))) {
+    patterns.push('singleton');
+  }
+
+  // Factory: function/method named create* or make* returning an object type
+  if (/(?:function|static)\s+(?:create|make|build)\w*\s*\(/i.test(source)) {
+    patterns.push('factory');
+  }
+
+  // Observer/EventEmitter: subscribe/unsubscribe/emit patterns
+  if (/(?:addEventListener|\.on\(|\.subscribe\(|\.emit\(|EventEmitter)/i.test(source)) {
+    patterns.push('observer');
+  }
+
+  // React hook: exported function starting with use + hook usage
+  if (/export\s+(?:function|const)\s+use[A-Z]\w+/.test(source) &&
+      /use(?:State|Effect|Ref|Memo|Callback|Context|Reducer)\s*\(/.test(source)) {
+    patterns.push('react_hook');
+  }
+
+  // Strategy: interface/abstract class with multiple implementations
+  if (/(?:implements\s+\w+Strategy|interface\s+\w+Strategy)/i.test(source)) {
+    patterns.push('strategy');
+  }
+
+  // Dependency injection: constructor with multiple typed parameters (common DI pattern)
+  if (/constructor\s*\(\s*(?:private|readonly|public)\s+\w+\s*:\s*\w+[^)]*,\s*(?:private|readonly|public)/.test(source)) {
+    patterns.push('dependency_injection');
+  }
+
+  return [...new Set(patterns)];
 }
 
 /**
@@ -264,6 +303,15 @@ export class FileAnalyzerAgent extends BaseAgent {
             target: nodeId,
             type: 'contains',
           });
+        }
+
+        // Detect and attach patterns to the existing file node in graph
+        const filePatterns = detectPatterns(source);
+        if (filePatterns.length > 0) {
+          const existingFileNode = graph.nodes.find(n => n.id === fileNodeId);
+          if (existingFileNode) {
+            existingFileNode.detected_patterns = filePatterns;
+          }
         }
 
         // Write per-file analysis

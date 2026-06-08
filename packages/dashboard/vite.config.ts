@@ -261,6 +261,63 @@ function attachSprangMiddlewares(server: ConnectServer) {
       res.end();
     }
   });
+
+  // POST /analyze — spawn sprang scan --phase1-only in background
+  server.middlewares.use('/analyze', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.method !== 'POST') { res.statusCode = 405; res.end(JSON.stringify({ error: 'POST only' })); return; }
+
+    const sprangRoot = getSprangRoot();
+    res.statusCode = 200;
+    res.end(JSON.stringify({ ok: true, started: true, root: sprangRoot }));
+
+    // Fire-and-forget: run Phase 1 scan in background
+    import('node:child_process').then(({ spawn }) => {
+      const child = spawn('npx', ['sprang', 'scan', '--phase1-only', sprangRoot], {
+        cwd: sprangRoot,
+        detached: true,
+        stdio: 'ignore',
+      });
+      child.unref();
+    }).catch(() => {/* ignore */});
+  });
+
+  // GET /analyze-status — returns current analysis progress
+  server.middlewares.use('/analyze-status', (_req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+    res.setHeader('Content-Type', 'application/json');
+    const progressPath = path.join(getSprangRoot(), '.sprang', 'intermediate', 'phase2-progress.json');
+    if (fs.existsSync(progressPath)) {
+      try {
+        res.statusCode = 200;
+        res.end(fs.readFileSync(progressPath));
+      } catch {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: 'Failed to read progress' }));
+      }
+    } else {
+      res.statusCode = 204;
+      res.end();
+    }
+  });
+
+  // GET /health-history.json — serves .sprang/history.json
+  server.middlewares.use('/health-history.json', (_req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    const historyPath = path.join(getSprangRoot(), '.sprang', 'history.json');
+    if (fs.existsSync(historyPath)) {
+      try {
+        res.statusCode = 200;
+        res.end(fs.readFileSync(historyPath));
+      } catch {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: 'Failed to read history' }));
+      }
+    } else {
+      res.statusCode = 200;
+      res.end('[]');
+    }
+  });
 }
 
 // Serve knowledge-graph.json, file-content.json, and diff-overlay.json

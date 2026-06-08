@@ -7,6 +7,8 @@ import { makeWatchCommand } from './commands/watch.js';
 import { makeStatusCommand } from './commands/status.js';
 import { makeInstallHooksCommand } from './commands/install-hooks.js';
 import { makeMergeCommand } from './commands/merge.js';
+import { makeOpenCommand } from './commands/open.js';
+import { makeDiagramCommand } from './commands/diagram.js';
 
 const program = new Command();
 
@@ -22,5 +24,7 @@ program.addCommand(makeQueryCommand());
 program.addCommand(makeWatchCommand());
 program.addCommand(makeStatusCommand());
 program.addCommand(makeInstallHooksCommand());
+program.addCommand(makeOpenCommand());
+program.addCommand(makeDiagramCommand());
 
 program.parse(process.argv);

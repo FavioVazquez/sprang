@@ -26,7 +26,7 @@ import { MobileBottomNav, type MobileView } from './components/MobileLayout';
 import { AskAgentPanel } from './components/AskCascadePanel';
 import { loadGraph } from './api/graphApi';
 import { useDashboardStore } from './store';
-import type { KnowledgeGraph } from './types';
+import type { KnowledgeGraph, HistorySnapshot } from './types';
 
 type View = MobileView;
 
@@ -76,7 +76,7 @@ function LoadingScreen() {
   );
 }
 
-function ErrorScreen({ onRetry }: { onRetry: () => void }) {
+function ErrorScreen({ onRetry, onAnalyze }: { onRetry: () => void; onAnalyze?: () => void }) {
   return (
     <div className="fixed inset-0 bg-surface-950 flex items-center justify-center z-50">
       <motion.div
@@ -102,10 +102,18 @@ function ErrorScreen({ onRetry }: { onRetry: () => void }) {
           </p>
           <code className="text-sm text-surface-300 font-mono">sprang scan</code>
         </div>
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          <RefreshCw className="w-3.5 h-3.5" />
-          Retry
-        </Button>
+        <div className="flex items-center gap-2 justify-center">
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            <RefreshCw className="w-3.5 h-3.5" />
+            Retry
+          </Button>
+          {onAnalyze && (
+            <Button variant="default" size="sm" onClick={onAnalyze}>
+              <Sparkles className="w-3.5 h-3.5" />
+              Analyze this project
+            </Button>
+          )}
+        </div>
       </motion.div>
     </div>
   );
@@ -118,6 +126,7 @@ export default function App() {
   const [showRiskOverlay, setShowRiskOverlay] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [schemaWarnings, setSchemaWarnings] = useState<string[]>([]);
+  const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [theme, setTheme] = useTheme();
   const [showOnboarding, dismissOnboarding] = useOnboarding();
 
@@ -137,6 +146,14 @@ export default function App() {
           warns.push(`stats.node_count (${(g as KnowledgeGraph).stats.node_count}) differs from actual node count (${(g as KnowledgeGraph).nodes.length})`);
         }
         setSchemaWarnings(warns);
+        // Load health history
+        try {
+          const histRes = await fetch('/health-history.json');
+          if (histRes.ok) {
+            const hist = await histRes.json() as HistorySnapshot[];
+            setHistory(Array.isArray(hist) ? hist : []);
+          }
+        } catch { /* history is optional */ }
       } else {
         if (!silent) setHasError(true);
       }
@@ -172,6 +189,27 @@ export default function App() {
     }, 5000);
     return () => clearInterval(id);
   }, [graph?.phase, fetchGraph]);
+
+  const analyzeProject = useCallback(async () => {
+    try {
+      const res = await fetch('/analyze', { method: 'POST' });
+      if (res.ok) {
+        // Start polling for the graph
+        setLoading(true);
+        setHasError(false);
+        const poll = setInterval(async () => {
+          const g = await loadGraph();
+          if (g) {
+            clearInterval(poll);
+            setGraph(g as KnowledgeGraph);
+            setLoading(false);
+          }
+        }, 2000);
+        // Stop polling after 2 minutes
+        setTimeout(() => clearInterval(poll), 120_000);
+      }
+    } catch { /* ignore */ }
+  }, [setGraph]);
 
   const handleNodeSelect = useCallback(
     (nodeId: string) => {
@@ -211,7 +249,7 @@ export default function App() {
   }, [selectedNodeId, selectNode]);
 
   if (loading) return <LoadingScreen />;
-  if (hasError || !graph) return <ErrorScreen onRetry={fetchGraph} />;
+  if (hasError || !graph) return <ErrorScreen onRetry={fetchGraph} onAnalyze={analyzeProject} />;
 
   return (
     <TooltipProvider>
@@ -321,7 +359,7 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.12 }}
               >
-                <HealthView graph={graph} onNodeSelect={handleNodeSelect} />
+                <HealthView graph={graph} onNodeSelect={handleNodeSelect} history={history} />
               </motion.div>
             )}
 

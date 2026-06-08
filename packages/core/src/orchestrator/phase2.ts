@@ -24,6 +24,10 @@ async function loadRiskScorer() {
   const { RiskScorerAgent } = await import('../agents/risk-scorer.js');
   return new RiskScorerAgent();
 }
+async function loadSecurityScanner() {
+  const { SecurityScannerAgent } = await import('../agents/security-scanner.js');
+  return new SecurityScannerAgent();
+}
 
 export interface Phase2Progress {
   phase: 'phase2';

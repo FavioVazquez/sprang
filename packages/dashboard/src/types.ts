@@ -60,7 +60,8 @@ export type SmellCategory =
   | 'unstable_interface'
   | 'orphan_node'
   | 'circular_dependency'
-  | 'over_connected';
+  | 'over_connected'
+  | 'name_duplicate';
 
 export interface StructuralWarning {
   category: SmellCategory;
@@ -79,6 +80,60 @@ export type RiskFactor =
   | 'single_author'
   | 'recent_churn'
   | 'has_structural_warnings';
+
+export type SecurityCategory =
+  | 'hardcoded_secret'
+  | 'sql_injection'
+  | 'xss_risk'
+  | 'unsafe_eval'
+  | 'unsafe_exec'
+  | 'unsafe_deserialization'
+  | 'path_traversal'
+  | 'weak_crypto';
+
+export interface SecurityWarning {
+  category: SecurityCategory;
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+  line?: number;
+  pattern: string;  // the regex/pattern that matched
+  snippet?: string; // code context (max 80 chars)
+}
+
+export type DetectedPattern =
+  | 'singleton'
+  | 'factory'
+  | 'observer'
+  | 'strategy'
+  | 'decorator'
+  | 'react_hook'
+  | 'event_emitter'
+  | 'dependency_injection';
+
+export interface HistorySnapshot {
+  timestamp: string;         // ISO-8601
+  gitHash?: string;          // HEAD at time of analysis
+  phase: GraphPhase;
+  health_score: number;      // 0-100
+  health_grade: string;      // 'A'|'B'|'C'|'D'|'F'
+  total_nodes: number;
+  total_edges: number;
+  risk_summary: { high: number; medium: number; low: number };
+  smell_count: number;
+  security_count: number;
+}
+
+export interface HealthGrade {
+  score: number;    // 0-100
+  grade: string;   // 'A'|'B'|'C'|'D'|'F'
+  breakdown: {
+    dead_code_penalty: number;
+    circular_penalty: number;
+    god_node_penalty: number;
+    coupling_penalty: number;
+    security_penalty: number;
+  };
+}
 
 export interface NodeLocation {
   file: string;
@@ -121,6 +176,8 @@ export interface SprangNode {
   structural_warnings?: StructuralWarning[];
   risk_score?: number;
   risk_factors?: RiskFactor[];
+  security_warnings?: SecurityWarning[];
+  detected_patterns?: DetectedPattern[];
   annotations?: string[];
 }
 
@@ -192,6 +249,7 @@ export interface GraphStats {
   generated_at: string;
   phase2_completed_at?: string;
   gitCommitHash?: string;
+  security_summary?: { total: number; by_severity: { high: number; medium: number; low: number }; by_category: Partial<Record<SecurityCategory, number>> };
 }
 
 export type GraphPhase = 'skeleton' | 'complete';

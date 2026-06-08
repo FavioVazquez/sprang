@@ -773,7 +773,48 @@ test('nav bar – Architecture tab visible across all view switches', async ({ p
 });
 
 // ---------------------------------------------------------------------------
-// Test 37: File content API – rejects path traversal attack
+// Test 37: GET /health-history.json returns array
+// ---------------------------------------------------------------------------
+test('GET /health-history.json returns array', async ({ page }) => {
+  const res = await page.request.get('/health-history.json');
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  expect(Array.isArray(body)).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Test 38: GET /analyze-status returns 204 when no progress file
+// ---------------------------------------------------------------------------
+test('GET /analyze-status returns 204 when no progress file', async ({ page }) => {
+  const res = await page.request.get('/analyze-status');
+  expect([200, 204]).toContain(res.status());
+});
+
+// ---------------------------------------------------------------------------
+// Test 39: POST /analyze returns started:true
+// ---------------------------------------------------------------------------
+test('POST /analyze returns started:true', async ({ page }) => {
+  const res = await page.request.post('/analyze', {
+    data: {},
+    headers: { 'Content-Type': 'application/json' },
+  });
+  expect(res.status()).toBe(200);
+  const body = await res.json() as { ok: boolean; started: boolean };
+  expect(body.ok).toBe(true);
+  expect(body.started).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Test 40: Health view shows grade badge
+// ---------------------------------------------------------------------------
+test('health view shows grade badge', async ({ page }) => {
+  await gotoApp(page);
+  // Navigate to health view using the desktop nav tab helper
+  await navTab(page, 'Health').click();
+  // Grade badge should be visible (A, B, C, D, or F)
+  await expect(page.locator('text=/^[ABCDF]$/')).toBeVisible({ timeout: 5000 });
+
+// Test 41: File content API – rejects path traversal attack
 // ---------------------------------------------------------------------------
 test('file content API – rejects path traversal (../)', async ({ page }) => {
   await gotoApp(page);
@@ -786,7 +827,7 @@ test('file content API – rejects path traversal (../)', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 38: File content API – rejects absolute path
+// Test 42: File content API – rejects absolute path
 // ---------------------------------------------------------------------------
 test('file content API – rejects absolute path', async ({ page }) => {
   await gotoApp(page);
@@ -798,7 +839,7 @@ test('file content API – rejects absolute path', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 39: File content API – rejects path not in graph allowlist
+// Test 43: File content API – rejects path not in graph allowlist
 // ---------------------------------------------------------------------------
 test('file content API – rejects path not in analyzed graph', async ({ page }) => {
   await gotoApp(page);
@@ -809,7 +850,7 @@ test('file content API – rejects path not in analyzed graph', async ({ page })
 });
 
 // ---------------------------------------------------------------------------
-// Test 40: Cascade response – DELETE clears the session
+// Test 44: Cascade response – DELETE clears the session
 // ---------------------------------------------------------------------------
 test('cascade response – DELETE /cascade-response returns ok', async ({ page }) => {
   await gotoApp(page);
@@ -821,7 +862,7 @@ test('cascade response – DELETE /cascade-response returns ok', async ({ page }
 });
 
 // ---------------------------------------------------------------------------
-// Test 41: Risk overlay – R key toggles heatmap
+// Test 45: Risk overlay – R key toggles heatmap
 // ---------------------------------------------------------------------------
 test('risk overlay – R key toggles on/off', async ({ page }) => {
   await gotoApp(page);
@@ -841,7 +882,7 @@ test('risk overlay – R key toggles on/off', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 42: Learn view – shows empty state when graph has no tours
+// Test 46: Learn view – shows empty state when graph has no tours
 // ---------------------------------------------------------------------------
 test('learn view – shows empty state when graph has no tours', async ({ page }) => {
   await gotoApp(page, mockGraphNoTours);
@@ -852,7 +893,7 @@ test('learn view – shows empty state when graph has no tours', async ({ page }
 });
 
 // ---------------------------------------------------------------------------
-// Test 43: Bridge status – returns kind and detail fields
+// Test 47: Bridge status – returns kind and detail fields
 // ---------------------------------------------------------------------------
 test('bridge status – response has expected shape', async ({ page }) => {
   await gotoApp(page);
@@ -866,7 +907,7 @@ test('bridge status – response has expected shape', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 44: Health view – high-risk node appears in top-risky list
+// Test 48: Health view – high-risk node appears in top-risky list
 // ---------------------------------------------------------------------------
 test('health view – high-risk node label visible', async ({ page }) => {
   await gotoApp(page);
@@ -876,7 +917,7 @@ test('health view – high-risk node label visible', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 45: Graph view – nodes rendered (canvas is not empty)
+// Test 49: Graph view – nodes rendered (canvas is not empty)
 // ---------------------------------------------------------------------------
 test('graph view – sigma canvas is present and non-zero', async ({ page }) => {
   await gotoApp(page);
@@ -887,4 +928,5 @@ test('graph view – sigma canvas is present and non-zero', async ({ page }) => 
   expect(box).not.toBeNull();
   expect(box!.width).toBeGreaterThan(100);
   expect(box!.height).toBeGreaterThan(100);
+
 });
