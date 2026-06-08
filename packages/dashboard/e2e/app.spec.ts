@@ -637,3 +637,47 @@ test('nav bar – Architecture tab visible across all view switches', async ({ p
     await expect(navTab(page, 'Architecture')).toBeVisible({ timeout: 5000 });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Test 33: GET /health-history.json returns array
+// ---------------------------------------------------------------------------
+test('GET /health-history.json returns array', async ({ page }) => {
+  const res = await page.request.get('/health-history.json');
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  expect(Array.isArray(body)).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Test 34: GET /analyze-status returns 204 when no progress file
+// ---------------------------------------------------------------------------
+test('GET /analyze-status returns 204 when no progress file', async ({ page }) => {
+  const res = await page.request.get('/analyze-status');
+  expect([200, 204]).toContain(res.status());
+});
+
+// ---------------------------------------------------------------------------
+// Test 35: POST /analyze returns started:true
+// ---------------------------------------------------------------------------
+test('POST /analyze returns started:true', async ({ page }) => {
+  const res = await page.request.post('/analyze', {
+    data: {},
+    headers: { 'Content-Type': 'application/json' },
+  });
+  expect(res.status()).toBe(200);
+  const body = await res.json() as { ok: boolean; started: boolean };
+  expect(body.ok).toBe(true);
+  expect(body.started).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Test 36: Health view shows grade badge
+// ---------------------------------------------------------------------------
+test('health view shows grade badge', async ({ page }) => {
+  await gotoApp(page);
+  // Navigate to health view
+  const healthBtn = page.locator('button', { hasText: 'Health' });
+  await healthBtn.click();
+  // Grade badge should be visible (A, B, C, D, or F)
+  await expect(page.locator('text=/^[ABCDF]$/')).toBeVisible({ timeout: 5000 });
+});
