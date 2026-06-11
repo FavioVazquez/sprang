@@ -10,6 +10,22 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 Security scanning, health grading, run history, architecture diagrams, on-demand dashboard analysis, a point-and-analyze landing screen, CodeFlow-parity static analysis (call graph, design patterns, layer violations), and three new visualization modes (3D graph, treemap, matrix) — all deterministic, no API key required.
 
+### Fixed (installer and agentic install — 2026-06-11)
+
+- **`install.sh` and `install.ps1` next-steps output** — after linking skills for `windsurf` or `copilot`, the scripts now print a complete "Next steps" guide: exact MCP config JSON to write (with the resolved `REPO_DIR` path already filled in), rules/hooks/workflows copy commands, and a link to the full docs. Previously the scripts printed "Run /sprang now" which was misleading — the MCP server and project rules still needed to be set up.
+- **Agentic install prompt (Windsurf / Devin Desktop)** — step 5 now writes `.devin/config.json` with the actual absolute `SPRANG_DIR` path instead of copying the Sprang repo's template. The template uses a relative `packages/mcp/dist/server.js` path that only resolves from inside the Sprang repository; copying it verbatim into a user's project would silently fail to connect the MCP server in Devin Desktop.
+- **`copilot-instructions.md` setup section** — replaced the ambiguous `pnpm build` instruction (which, if run inside a user's project, would build the user's project rather than the Sprang MCP server) with a clear `cd <path-to-sprang-repo> && pnpm install && pnpm build` with an explanatory note.
+
+### Added (documentation — 2026-06-11)
+
+- **"The Leap" section** — Kierkegaard's *det qualitative Spring* concept explained near the top of the README: why incremental tools (grep, LSP, LLM context windows) can't answer "what breaks before it breaks?", and how Sprang's persistent graph infrastructure fills that gap.
+- **"Not just codebases" callout** — knowledge-base use case (Obsidian, Logseq, Dendron, Foam, plain markdown) promoted near the top alongside the codebase use case.
+- **"What existing tools don't do" comparison table** — explicit comparison against grep/LSP, LLM context, and Sourcegraph across 9 dimensions (why code exists, blast radius, risk score, persistence, MCP access, offline support, knowledge bases, team annotations).
+- **"Workflows in practice" section** — 5 real-world scenarios with full command sequences: Day 1 at a new company, before refactoring a module, PM domain review, reviewing a risky PR, and exploring an Obsidian vault.
+- **Supported languages row** in the capabilities table: TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby, PHP, C, C++, C# plus Markdown.
+- **Attributions section** — proper credits for Understand Anything (Egonex AI / Lum1104) and CodeFlow (braedonsaunders), replacing the closing footnote.
+- **7-view count corrected** throughout README, AGENTS.md, CLAUDE.md — all references to "5 views" updated to "7 views" (Graph/Health/Domains/Architecture/Treemap/Matrix/Learn); keyboard shortcuts table updated to include Treemap (`t`/`5`), Matrix (`m`/`6`), and fix Learn to `l`/`7`.
+
 ### Added (platform verification — 2026-06-11)
 
 Real end-to-end validation that the Windsurf/Devin Desktop and GitHub Copilot integrations work, not just that their code paths are mocked correctly. **38 new tests** (654 unit / 72 e2e totals).

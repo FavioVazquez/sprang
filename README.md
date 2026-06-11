@@ -256,10 +256,24 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 
    Hooks — enable persistent dashboard chat (conversation history):
      cp ~/tools/sprang/.devin/hooks.json .devin/hooks.json
-     cp ~/tools/sprang/.devin/config.json .devin/config.json
      mkdir -p .windsurf/hooks
      cp ~/tools/sprang/.windsurf/hooks.json .windsurf/hooks.json
      cp ~/tools/sprang/.windsurf/hooks/save-conversation.py .windsurf/hooks/save-conversation.py
+
+   Devin Desktop MCP config — write .devin/config.json using the ACTUAL resolved SPRANG_DIR path
+   from step 4 (do NOT copy the repo template — it has a relative path that won't resolve):
+     cat > .devin/config.json << 'DEVIN_EOF'
+     {
+       "mcpServers": {
+         "sprang": {
+           "command": "node",
+           "args": ["SPRANG_DIR/packages/mcp/dist/server.js"],
+           "env": { "SPRANG_ROOT": "${workspaceFolder}" }
+         }
+       }
+     }
+     DEVIN_EOF
+   Replace SPRANG_DIR in that file with the real absolute path (e.g. /home/yourname/tools/sprang).
 
    Workflows — all /sprang-* slash commands for Windsurf / Cascade:
      mkdir -p .windsurf/workflows

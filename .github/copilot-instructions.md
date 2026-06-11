@@ -33,11 +33,15 @@ Before modifying any file:
 
 ## Setup
 
-Build the MCP server first: `pnpm build`
-
 The MCP server is configured in `.vscode/mcp.json`. Copilot picks it up in agent mode automatically.
 
-To build or refresh the graph: run `npx sprang scan .` then ask Copilot to analyze the codebase.
+The server binary must be built from the Sprang repository before first use:
+```bash
+cd <path-to-sprang-repo>   # e.g. ~/.sprang/repo or ~/tools/sprang
+pnpm install && pnpm build
+```
+
+To build or refresh the knowledge graph: run `sprang scan .` (or `npx sprang scan .` if the CLI is not on your PATH).
 
 ## Dashboard Ask Agent
 

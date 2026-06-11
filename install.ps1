@@ -248,6 +248,48 @@ if ($plat.Style -eq 'claude') {
 } else {
     Write-Host "→ Linking skills into $($plat.Target)"
     Link-Skills $plat.Target $plat.Style
-    Write-Host "`n✓ Sprang installed for $Platform."
-    Write-Host "  Run /sprang inside $Platform to build the knowledge graph."
+    Write-Host "`n✓ Skills linked for $Platform.`n"
+    switch ($Platform) {
+        'windsurf' {
+            Write-Host 'Next steps to complete the Windsurf / Devin Desktop setup:'
+            Write-Host ''
+            Write-Host '  1. Add the MCP server to %USERPROFILE%\.codeium\windsurf\mcp_config.json:'
+            Write-Host '     {'
+            Write-Host '       "mcpServers": { "sprang": {'
+            Write-Host "         `"command`": `"node`","
+            Write-Host "         `"args`": [`"$RepoDir\packages\mcp\dist\server.js`"],"
+            Write-Host '         "env": { "SPRANG_ROOT": "C:\path\to\your\project" }'
+            Write-Host '       }}'
+            Write-Host '     }'
+            Write-Host ''
+            Write-Host '  2. Copy rules + hooks into your project root:'
+            Write-Host "     Copy-Item -Recurse '$RepoDir\.windsurf\rules\*' .windsurf\rules\"
+            Write-Host "     Copy-Item -Recurse '$RepoDir\.devin\rules\*' .devin\rules\"
+            Write-Host "     Copy-Item '$RepoDir\.windsurf\hooks.json' .windsurf\"
+            Write-Host "     Copy-Item '$RepoDir\.windsurf\hooks\save-conversation.py' .windsurf\hooks\"
+            Write-Host "     Copy-Item -Recurse '$RepoDir\.windsurf\workflows\*' .windsurf\workflows\"
+            Write-Host "     Copy-Item -Recurse '$RepoDir\.windsurf\skills\sprang*' .windsurf\skills\"
+            Write-Host ''
+            Write-Host '  3. Reload the Windsurf window (Ctrl+Shift+P → Reload Window)'
+            Write-Host '  4. Run: sprang scan C:\path\to\your\project --phase1-only'
+            Write-Host ''
+            Write-Host '  Full docs: https://github.com/faviovazquez/sprang#windsurf--devin-desktop--agentic-install'
+        }
+        'copilot' {
+            Write-Host 'Next steps to complete the GitHub Copilot setup:'
+            Write-Host ''
+            Write-Host '  1. Copy .vscode\mcp.json into your project root:'
+            Write-Host "     Copy-Item '$RepoDir\.vscode\mcp.json' .vscode\mcp.json"
+            Write-Host "     Then edit .vscode\mcp.json → update args to: [`"$RepoDir\packages\mcp\dist\server.js`"]"
+            Write-Host ''
+            Write-Host '  2. Copy copilot-instructions.md into your project:'
+            Write-Host "     Copy-Item '$RepoDir\.github\copilot-instructions.md' .github\"
+            Write-Host ''
+            Write-Host '  3. Open VS Code, switch Copilot to Agent mode (model selector in chat panel)'
+            Write-Host '  4. Run: sprang scan C:\path\to\your\project --phase1-only'
+            Write-Host ''
+            Write-Host '  Note: MCP tools only work in Copilot Agent mode (not default ask/edit modes).'
+            Write-Host '  Full docs: https://github.com/faviovazquez/sprang#github-copilot'
+        }
+    }
 }
