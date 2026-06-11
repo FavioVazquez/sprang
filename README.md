@@ -1567,13 +1567,13 @@ Then run `/reload-plugins` inside Claude Code.
 
 ## Attributions
 
-The name **Sprang** comes from the Danish word for *leap* — Kierkegaard's *det qualitative Spring*, the discontinuous jump that transforms accumulated facts into a new quality of understanding. The git-layer, smell-detector, risk-scorer, and three-platform agent integration are original work.
+The name **Sprang** comes from the Danish word for *leap* — Kierkegaard's *det qualitative Spring*, the discontinuous jump that transforms quantity of understanding into a new quality of it. The git-layer, smell-detector, risk-scorer, and three-platform agent integration are original work.
 
 Sprang was built in the tradition of the open-source codebase comprehension space. Two projects were particularly influential:
 
-- **[Understand Anything](https://github.com/Egonex-AI/Understand-Anything)** (Egonex AI, originally by Lum1104) — pioneered the multi-agent pipeline approach to knowledge graph construction from codebases and markdown vaults, and the persona-adaptive guided tour concept. A landmark contribution to the space.
+- **[Understand Anything](https://github.com/Egonex-AI/Understand-Anything)** (Egonex AI / Lum1104) — pioneered the multi-agent pipeline approach to knowledge graph construction from codebases and markdown vaults, and the persona-adaptive guided tour concept. A landmark contribution to the space.
 
-- **[CodeFlow](https://github.com/braedonsaunders/codeflow)** — demonstrated that blast-radius visualization, health-grade scoring, and pattern detection could be delivered with zero setup in a browser-first tool. Its approachable "paste a URL, see the architecture" model informed Sprang's instant Phase 1 analysis and `sprang open` entry point.
+- **[CodeFlow](https://github.com/braedonsaunders/codeflow)** — demonstrated that blast-radius visualization and health-grade scoring could be delivered with zero setup in a browser-first tool. Its approachable "paste a URL, see the architecture" model informed Sprang's instant Phase 1 analysis and `sprang open` entry point.
 
 ---
 
