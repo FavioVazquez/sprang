@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Mock Claude Code CLI for bridge e2e tests (playwright.bridge.config.ts).
+# Mimics the real contract used by src/bridge/claude.ts:
+#   claude --version                  -> version string, exit 0 (bridge detection)
+#   claude -p <prompt> --output-format json ... -> JSON result line on stdout
+# Appends every non-version invocation's argv to $MOCK_CLAUDE_LOG so tests can
+# assert flags like --resume / --allowedTools were passed.
+
+if [ "$1" = "--version" ]; then
+  echo "1.0.0 (mock-claude)"
+  exit 0
+fi
+
+log="${MOCK_CLAUDE_LOG:-/tmp/mock-claude-args.log}"
+{
+  echo "---CALL---"
+  printf '%s\n' "$@"
+} >> "$log"
+
+echo '{"type":"result","result":"Mock Claude answer: the knowledge graph looks healthy","session_id":"mock-claude-session-1"}'

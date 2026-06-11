@@ -16,8 +16,8 @@
   <a href="#installation"><img src="https://img.shields.io/badge/pnpm-install-orange?style=flat-square&logo=pnpm" alt="pnpm install"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-624_passing-10B981?style=flat-square" alt="624 unit tests passing"/>
-  <img src="https://img.shields.io/badge/e2e_tests-64_passing-10B981?style=flat-square" alt="64 e2e tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-654_passing-10B981?style=flat-square" alt="654 unit tests passing"/>
+  <img src="https://img.shields.io/badge/e2e_tests-72_passing-10B981?style=flat-square" alt="72 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
 </p>
@@ -1052,10 +1052,11 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 624 unit tests across core/dashboard/mcp/cli
+pnpm test              # 654 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
-pnpm --filter @sprang/dashboard test:e2e   # 64 Playwright e2e tests
+pnpm --filter @sprang/dashboard test:e2e          # 64 Playwright UI e2e tests
+pnpm --filter @sprang/dashboard test:e2e:bridge   # 8 platform-bridge e2e tests (mock claude/copilot CLIs)
 ```
 
 ### Test summary
@@ -1065,9 +1066,10 @@ pnpm --filter @sprang/dashboard test:e2e   # 64 Playwright e2e tests
 | `@sprang/core` | Vitest | 447 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity, call graph, layer violations |
 | `@sprang/dashboard` | Vitest | 85 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6), bridge detection (30) |
 | `@sprang/mcp` | Vitest | 65 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (40), sprang_respond (8), sprang_query enhancements (3) |
-| `@sprang/cli` | Vitest | 27 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12), `merge` command (9) |
-| **Total unit** | | **624** | |
+| `@sprang/cli` | Vitest | 57 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12), `merge` command (9), platform parity — manifests/skills/rules/hooks across Claude Code, Windsurf/Devin, Copilot (22), Windsurf `save-conversation.py` hook real execution (8) |
+| **Total unit** | | **654** | |
 | `@sprang/dashboard` | Playwright | 64 | Full UI e2e — loading, landing screen (path/GitHub URL), nav, keyboard shortcuts (all 1–7/g/h/d/a/t/m/l), architecture tab, treemap/matrix tabs + empty states, cascade bridge, health grade (A–F), security findings, risk overlay, analyze endpoint, tour player, persona selector |
+| `@sprang/dashboard` | Playwright (bridge) | 8 | Platform bridge e2e with mock `claude`/`copilot` CLIs on PATH — real spawn → parse → session persist → response file for all 3 bridges: detection priority (windsurf marker > claude > copilot), `--resume` session continuity, `--allowedTools` MCP allowlist, Windsurf `.cascade-trigger-session` protocol, session clearing |
 
 <details>
 <summary>Full test structure</summary>
@@ -1144,14 +1146,40 @@ packages/mcp/tests/
     └── sprang_why     (6)  — label/summary, decision_context, graceful no-context
 
 packages/cli/tests/
-├── scan-if-stale.test.ts         3 tests — hash-match skip, hash-mismatch scan, missing graph
-├── install-hooks.test.ts         3 tests — fresh creation, append-to-existing, duplicate guard
-└── hooks-scripts.test.ts        12 tests — session-start.sh and post-tool-use.sh via bash:
-    ├── session-start.sh (5): no-graph warning, fresh silence, stale hash display,
-    │                         missing-gitCommitHash silence, non-git-repo silence
-    └── post-tool-use.sh (7): non-git-command silence, no-graph silence, no-CLI silence,
-                               empty-input silence, merge detection, cherry-pick detection,
-                               no trigger on git status/log/diff/push
+├── commands/
+│   ├── scan-if-stale.test.ts     3 tests — hash-match skip, hash-mismatch scan, missing graph
+│   ├── install-hooks.test.ts     3 tests — fresh creation, append-to-existing, duplicate guard
+│   └── merge.test.ts             9 tests — chunk assembly, dict-as-array normalization, envelope backfill
+├── hooks-scripts.test.ts        12 tests — session-start.sh and post-tool-use.sh via bash:
+│   ├── session-start.sh (5): no-graph warning, fresh silence, stale hash display,
+│   │                         missing-gitCommitHash silence, non-git-repo silence
+│   └── post-tool-use.sh (7): non-git-command silence, no-graph silence, no-CLI silence,
+│                              empty-input silence, merge detection, cherry-pick detection,
+│                              no trigger on git status/log/diff/push
+├── platform-parity.test.ts      22 tests — cross-platform integration invariants:
+│   ├── manifests (10): all 6 JSON manifests parse, plugin versions match, skills paths
+│   │                   resolve, MCP server dist referenced by .devin/.mcp/.vscode configs
+│   ├── skills parity (4): same 11 skills in skills/ and .windsurf/skills/, frontmatter
+│   │                      name+description, Windsurf trigger phrases, merge.py present
+│   ├── workflows/commands (2): 11 .windsurf/workflows + 11 .claude/commands match skills
+│   ├── rules parity (2): 3 rules byte-identical .windsurf ↔ .devin, names in .claude/rules
+│   ├── hooks wiring (2): both hooks.json wire save-conversation.py; .claude/settings.json
+│   │                     SessionStart/PostToolUse scripts exist and are executable
+│   └── copilot extras (2): copilot-instructions.md lists all 9 MCP tools, .vsix artifact
+└── windsurf-hook.test.ts         8 tests — save-conversation.py real execution via python3:
+                                  happy path, last-exchange-only, multi-response join, append,
+                                  missing transcript, malformed stdin, no workspace root,
+                                  user input without response
+
+packages/dashboard/e2e/
+├── app.spec.ts                  64 tests — full UI e2e (chromium)
+└── bridge.spec.ts                8 tests — platform bridges with mock claude/copilot CLIs:
+    ├── claude (3): detection, spawn contract (-p/--output-format/--allowedTools incl.
+    │               sprang_respond), JSON parse, session persist, --resume continuity
+    ├── windsurf (1): marker-file priority over claude CLI, async mode,
+    │                 .cascade-trigger-session protocol prefix, atomic write
+    └── copilot (4): priority fall-through, JSONL parse, session persist,
+                     --resume=<id> continuity, DELETE clears session
 ```
 
 </details>

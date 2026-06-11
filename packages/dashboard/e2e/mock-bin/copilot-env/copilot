@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Mock GitHub Copilot CLI for bridge e2e tests (playwright.bridge.config.ts).
+# Mimics the real contract used by src/bridge/copilot.ts (verified against
+# copilot CLI v1.0.59): JSONL output, session_id on its own line,
+# assistant text under message.content.
+
+if [ "$1" = "--version" ]; then
+  echo "1.0.59 (mock-copilot)"
+  exit 0
+fi
+
+log="${MOCK_COPILOT_LOG:-/tmp/mock-copilot-args.log}"
+{
+  echo "---CALL---"
+  printf '%s\n' "$@"
+} >> "$log"
+
+echo '{"session_id":"mock-copilot-session-1"}'
+echo '{"message":{"content":"Mock Copilot answer: all systems nominal"}}'

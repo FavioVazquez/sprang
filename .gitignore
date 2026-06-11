@@ -39,6 +39,8 @@ test-results/
 playwright-report/
 packages/dashboard/test-results/
 packages/dashboard/playwright-report/
+packages/dashboard/e2e/.bridge-root-claude/
+packages/dashboard/e2e/.bridge-root-copilot/
 
 # Development tool artifacts (never commit)
 .claude/worktrees/

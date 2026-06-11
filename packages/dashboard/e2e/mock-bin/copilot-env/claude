@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Failing `claude` shim — shadows any real claude CLI on PATH so bridge
+# detection (windsurf -> claude -> copilot) falls through to the copilot
+# mock in this directory. execFileSync('claude', ['--version']) throws on
+# non-zero exit, which detect.ts treats as "claude not available".
+exit 1

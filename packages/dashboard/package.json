@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright install chromium && playwright test"
+    "test:e2e": "playwright install chromium && playwright test",
+    "test:e2e:bridge": "playwright test --config playwright.bridge.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.4",

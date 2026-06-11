@@ -96,3 +96,6 @@ jobs:
 
       - name: Run e2e tests
         run: pnpm --filter @sprang/dashboard exec playwright test
+
+      - name: Run platform bridge e2e tests (mock claude/copilot CLIs)
+        run: pnpm --filter @sprang/dashboard exec playwright test --config playwright.bridge.config.ts
