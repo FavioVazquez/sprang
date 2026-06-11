@@ -24,13 +24,40 @@
 
 ---
 
-Sprang is a knowledge graph platform for [Windsurf](https://windsurf.com) (Cascade / Devin Desktop), [Claude Code](https://claude.ai/code), and [GitHub Copilot](https://github.com/features/copilot) that creates **total codebase comprehension** — not just symbol search, but *why* code exists, *who* changed it, *what* it risks, and *how* it all fits together.
+Sprang is a knowledge graph platform for [Windsurf](https://windsurf.com) (Cascade / Devin Desktop), [Claude Code](https://claude.ai/code), and [GitHub Copilot](https://github.com/features/copilot) that creates **total comprehension** of codebases, knowledge bases, and document vaults — not just symbol search, but *why* code exists, *who* changed it, *what* it risks, and *how* it all fits together.
 
-Your AI agent is the intelligence layer. Sprang is the data layer. Together they answer **"what will break if I change this file?"** in a single tool call.
+Your AI agent is the intelligence layer. Sprang is the memory. Together they answer **"what will break if I change this file?"** in a single tool call — and **"how does this codebase actually work?"** for anyone who just joined the team.
 
 > *"The System knows everything about being, but nothing about existence."*  
 > Kierkegaard's critique of Hegel applies equally to symbol indexers and grep tools.  
 > Sprang bridges the gap: from static facts to living, contextual understanding.
+
+---
+
+## The Leap
+
+*Det qualitative Spring* — the qualitative leap — is Kierkegaard's name for a discontinuous jump in understanding: the kind that cannot be reached by incremental steps, no matter how many you take.
+
+Symbol search finds **where** things are. Documentation says what they were meant to do. An LLM can explain individual files brilliantly — and still lose the plot at file 50, forget the conversation from yesterday, and have no way to answer the question that matters most: *what breaks if I change this, before I break it?*
+
+These answers require different infrastructure — one that understands the codebase **before** your agent starts working, persists that understanding across sessions, and makes the hard questions answerable in a single tool call:
+
+- *Why does this file exist?* → `sprang_why` reads git history, PR references, and team annotations
+- *What breaks if I change it?* → `sprang_diff_impact` runs BFS over the full dependency graph
+- *How risky is it?* → `sprang_health` surfaces blast radius × coupling × test gap × churn, scored 0–1
+- *What does this codebase actually do?* → `/sprang-onboard` gives a persona-adaptive guided tour
+
+The leap becomes repeatable. The graph persists. The context accumulates.
+
+---
+
+### Not just codebases
+
+The same infrastructure works for knowledge bases: Obsidian vaults, Logseq databases, Dendron workspaces, Foam wikis, Zettelkasten archives, or any folder of markdown. Notes become nodes. Links become edges. Topic clusters emerge. The same Ask Agent panel, the same force-directed graph, the same guided reading order — just pointed at your notes instead of your code.
+
+```bash
+/sprang-knowledge /path/to/your/obsidian-vault
+```
 
 ---
 
@@ -307,8 +334,10 @@ irm https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.ps1 | iex
 
 ## Contents
 
+- [The Leap](#the-leap)
 - [Installation](#installation)
 - [What Sprang does](#what-sprang-does)
+- [Workflows in practice](#workflows-in-practice)
 - [Platform architecture](#platform-architecture)
 - [Prerequisites](#prerequisites)
 - [Manual build](#manual-build)
@@ -325,6 +354,7 @@ irm https://raw.githubusercontent.com/FavioVazquez/sprang/main/install.ps1 | iex
 - [Live watcher](#live-watcher)
 - [Development](#development)
 - [Configuration](#configuration)
+- [Attributions](#attributions)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -384,7 +414,115 @@ sprang_health {}
 | **Language lessons** | 12 programming pattern detectors attached to tour steps and graph nodes |
 | **Semantic search** | Cosine similarity + TF-IDF fallback — `sprang_query mode:"semantic"` |
 | **Auto-update hooks** | `sprang install-hooks` or native Claude Code hooks — incremental refresh after every commit |
+| **12 languages** | TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby, PHP, C, C++, C# — plus Markdown for knowledge graphs |
 | **Live dashboard** | Sigma.js force-directed graph, risk heatmap, diff overlay, BFS pathfinder, tour player |
+
+### What existing tools don't do
+
+| | Sprang | Grep / LSP | LLM context | Sourcegraph |
+|---|---|---|---|---|
+| Locate code | ✅ | ✅ | ✅ | ✅ |
+| WHY this file exists | ✅ git history + annotations | — | sometimes | — |
+| Blast radius before an edit | ✅ BFS in one call | — | approximate | — |
+| Risk score per node | ✅ deterministic formula | — | subjective | — |
+| Persistent across sessions | ✅ graph on disk | ✅ files | ❌ ephemeral | ✅ |
+| Agent-readable (MCP) | ✅ 9 tools | — | via context | partial |
+| Works offline, no API key | ✅ Phase 1 | ✅ | ❌ | ❌ |
+| Knowledge bases (Obsidian etc.) | ✅ | — | — | — |
+| Team annotations committed to repo | ✅ | — | — | ✅ (notebooks) |
+
+The key insight: **your AI agent is already excellent at reasoning — it just needs the right data**. Sprang provides that data layer so the agent doesn't have to reconstruct it from scratch on every conversation.
+
+---
+
+## Workflows in practice
+
+### Day 1 at a new company
+
+```bash
+# Build the skeleton in 60 seconds — no API key needed
+sprang scan . --phase1-only
+
+# Open the dashboard
+sprang open .
+
+# Ask for a guided architecture tour
+/sprang-onboard
+# → 8-step tour, adapts to your role (junior / senior / PM / non-technical)
+
+# Find the highest-risk areas before you touch anything
+/sprang-health
+# → health grade B, top risks: auth.ts (0.82), api-gateway.ts (0.71)
+# → circular dependency: services/cache.ts ↔ services/session.ts
+```
+
+### Before refactoring a module
+
+```bash
+# Check what depends on the file you want to change
+sprang_diff_impact { files: ["src/payments/processor.ts"] }
+# → 18 impacted nodes. High risk: checkout.ts (0.88), invoice.ts (0.79)
+
+# Read the git history before touching anything
+sprang_why { node_id: "src/payments/processor.ts" }
+# → 31 commits, PR #892 "stripe 3DS — do not simplify retry logic"
+#    12 changes in 90 days, 2 primary authors
+
+# Ask why it's built the way it is
+/sprang-chat "Why is the retry logic in processor.ts so complex?"
+# → "PR #892 added Stripe 3DS authentication. The retry loop handles partial auth states
+#    that Stripe returns mid-payment. Simplifying it would break 3DS flows."
+```
+
+### PM review — "what does the checkout service do?"
+
+```bash
+# Explore the business domain without reading code
+/sprang-domain checkout
+# → Domain: Checkout
+#   Flows: product_selection → cart_management → payment_processing → confirmation
+#   Entry points: CartService, CheckoutController, PaymentGateway
+
+# Non-technical persona tour
+/sprang-onboard
+# → "Selecting non-technical mode..."
+#   Step 1: What Checkout does in plain English
+#   Step 2: The 4 flows that make up a transaction
+#   Step 3: What the team considers risky (and why)
+```
+
+### Reviewing a risky PR
+
+```bash
+# See what the PR touches and how risky those files are
+/sprang-diff src/auth/session.ts src/auth/jwt.ts
+# → diff-overlay written → open dashboard → amber nodes show impact zone
+
+sprang_diff_impact { files: ["src/auth/session.ts", "src/auth/jwt.ts"] }
+# → 22 impacted nodes. session.ts risk: 0.87 → review carefully
+#   Downstream: api-gateway.ts, user-service.ts, admin-panel.ts
+
+sprang_why { node_id: "src/auth/session.ts" }
+# → 14 changes in 90 days, 4 authors, PR #321 "enterprise SSO session timeout"
+#    Note: changes here broke SSO twice before (see annotation)
+```
+
+### Exploring an Obsidian vault
+
+```bash
+/sprang-knowledge /path/to/your/vault
+# → 847 notes, 2,341 connections, 12 topic clusters
+
+sprang open /path/to/vault
+# → Force-directed graph of all your notes
+# → Color by topic cluster
+# → Click any note to see backlinks, frontmatter, tags
+# → ReadingPanel: scroll the full article in the sidebar
+
+# Find conceptual neighbors you didn't know were connected
+sprang query "regularization techniques" --semantic
+# → L2 weight decay, dropout, batch normalization, early stopping, data augmentation
+```
 
 ---
 
@@ -401,7 +539,7 @@ packages/
 ├── core/       Pipeline: 9 agents, schema, watcher, graph store, fingerprinting, semantic search
 ├── cli/        sprang scan | health | query | watch | status | install-hooks | merge | open | diagram
 ├── mcp/        stdio MCP server — 9 tools for all AI platforms
-└── dashboard/  React + Vite + Sigma.js — 5 views (Graph/Health/Domains/Architecture/Learn)
+└── dashboard/  React + Vite + Sigma.js — 7 views (Graph/Health/Domains/Architecture/Treemap/Matrix/Learn)
 ```
 
 ```mermaid
@@ -927,7 +1065,9 @@ The single input auto-detects local path vs. GitHub URL (`github.com/owner/repo`
 | **Health** | `h` / `2` | Smell breakdown, top-10 risky nodes, circular deps, orphan count |
 | **Domains** | `d` / `3` | Business domain explorer — list view + React Flow layout toggle |
 | **Architecture** | `a` / `4` | React Flow + ELK layer map — one card per layer, weighted cross-layer edge count |
-| **Learn** | `l` / `5` | Persona-adaptive guided tour with language lessons per step |
+| **Treemap** | `t` / `5` | D3 treemap — file/folder hierarchy sized by lines, colored by risk score |
+| **Matrix** | `m` / `6` | Adjacency matrix — file-to-file dependency grid, sorted by layer rank |
+| **Learn** | `l` / `7` | Persona-adaptive guided tour with language lessons per step |
 
 ### Keyboard shortcuts
 
@@ -939,7 +1079,9 @@ The single input auto-detects local path vs. GitHub URL (`github.com/owner/repo`
 | `h` / `2` | Health view |
 | `d` / `3` | Domains view |
 | `a` / `4` | Architecture view |
-| `l` / `5` | Learn view |
+| `t` / `5` | Treemap view |
+| `m` / `6` | Matrix view |
+| `l` / `7` | Learn view |
 | `r` | Toggle risk overlay |
 | `?` | Keyboard shortcuts help |
 
@@ -1115,11 +1257,11 @@ packages/dashboard/src/utils/
 └── elk-layout.test.ts            6 tests — ELK mock, coordinate pass-through, fallback
 
 packages/dashboard/e2e/
-└── app.spec.ts                  56 tests — Playwright, full UI coverage
+└── app.spec.ts                  64 tests — Playwright, full UI coverage
     ├── error state (no graph, retry button)
-    ├── loaded state (all 5 nav tabs)
-    ├── navigation (graph → health → domains → architecture → learn)
-    ├── keyboard shortcuts (Ctrl+K, h, g, d, a, l, ?, 1-5, r — complete set)
+    ├── loaded state (all 7 nav tabs)
+    ├── navigation (graph → health → domains → architecture → treemap → matrix → learn)
+    ├── keyboard shortcuts (Ctrl+K, h, g, d, a, t, m, l, ?, 1-7, r — complete set)
     ├── health view (heading, god_node smell, health grade A–F badge, security findings)
     ├── domains view (domain label rendered)
     ├── search dialog (open, type, filter, close)
@@ -1132,7 +1274,7 @@ packages/dashboard/e2e/
     ├── analyze endpoint (/analyze POST trigger)
     ├── sigma canvas (present and non-zero size)
     ├── learn view (persona selector — all 4 options, tour start, step advance, exit)
-    └── nav bar (logo + all 5 tabs persistent)
+    └── nav bar (logo + all 7 tabs persistent)
 
 packages/mcp/tests/
 ├── graph-loader.test.ts          3 tests — load, null-on-missing, hot-reload
@@ -1423,10 +1565,18 @@ Then run `/reload-plugins` inside Claude Code.
 
 ---
 
-## License
+## Attributions
 
-MIT
+The name **Sprang** comes from the Danish word for *leap* — Kierkegaard's *det qualitative Spring*, the discontinuous jump that transforms accumulated facts into a new quality of understanding. The git-layer, smell-detector, risk-scorer, and three-platform agent integration are original work.
+
+Sprang was built in the tradition of the open-source codebase comprehension space. Two projects were particularly influential:
+
+- **[Understand Anything](https://github.com/Egonex-AI/Understand-Anything)** (Egonex AI, originally by Lum1104) — pioneered the multi-agent pipeline approach to knowledge graph construction from codebases and markdown vaults, and the persona-adaptive guided tour concept. A landmark contribution to the space.
+
+- **[CodeFlow](https://github.com/braedonsaunders/codeflow)** — demonstrated that blast-radius visualization, health-grade scoring, and pattern detection could be delivered with zero setup in a browser-first tool. Its approachable "paste a URL, see the architecture" model informed Sprang's instant Phase 1 analysis and `sprang open` entry point.
 
 ---
 
-*The name Sprang comes from Kierkegaard's concept of the* qualitative spring *— the leap that cannot be reached by gradual accumulation alone, but only by a discontinuous jump in understanding. The git-layer, smell-detector, risk-scorer agents and the Windsurf / Devin Desktop integration are original work. Sprang was inspired by the open-source codebase comprehension space, particularly the work in [Understand-Anything](https://github.com/Lum1104/Understand-Anything).*
+## License
+
+MIT

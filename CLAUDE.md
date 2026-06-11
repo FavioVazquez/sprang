@@ -194,7 +194,9 @@ Views:
 - **Health** (`H` / `2`) — letter grade A–F, smell table (incl. `layer_violation`), top-10 risk nodes, security findings, detected design patterns
 - **Domains** (`D` / `3`) — business domain hierarchy
 - **Architecture** (`A` / `4`) — layer card view (React Flow + ELK)
-- **Learn** (`L` / `5`) — persona-adaptive guided tour player
+- **Treemap** (`T` / `5`) — D3 file/folder hierarchy sized by lines, colored by risk score
+- **Matrix** (`M` / `6`) — file-to-file adjacency matrix sorted by layer rank
+- **Learn** (`L` / `7`) — persona-adaptive guided tour player
 
 Keyboard shortcuts:
 - `Cmd/Ctrl K` — open node search
@@ -295,7 +297,7 @@ pnpm --filter @sprang/cli test
 /sprang-onboard
 ```
 
-This runs an adaptive guided tour based on your persona (junior/senior/PM). Also open the dashboard **Learn** tab (`L` / `5`) for a visual walkthrough.
+This runs an adaptive guided tour based on your persona (junior/senior/PM). Also open the dashboard **Learn** tab (`L` / `7`) for a visual walkthrough.
 
 ---
 

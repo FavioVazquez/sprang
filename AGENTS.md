@@ -166,11 +166,13 @@ pnpm --filter @sprang/dashboard dev        # hot-reload for dashboard developmen
 sprang open [path] [--auto-scan]           # point the dashboard at any folder without cd
 ```
 
-**Views** (keyboard `1`–`5` / `g h d a l`):
+**Views** (keyboard `1`–`7` / `g h d a t m l`):
 - **Graph** — force-directed knowledge graph; toggle the risk heat overlay with `R`
 - **Health** — letter grade A–F, smell table (incl. `layer_violation`), top-10 risk nodes, security findings, detected design patterns
 - **Domains** — business domain → flow → step hierarchy
 - **Architecture** — layer card view (React Flow + ELK)
+- **Treemap** — D3 file/folder hierarchy sized by lines, colored by risk score
+- **Matrix** — file-to-file adjacency matrix sorted by layer rank
 - **Learn** — persona-adaptive guided tour player
 
 **Instant analysis (no agent needed):** opening the dashboard on a project with no graph shows a **landing screen** — type a local path or paste a GitHub URL (`github.com/owner/repo`) and the server runs Phase 1 (static, <60s, clones the repo to a temp folder for GitHub URLs). `sprang open --auto-scan` skips the click. This is the zero-friction, point-and-analyze entry point; Phase 2 enrichment then layers in semantic summaries, decision context, and risk.
