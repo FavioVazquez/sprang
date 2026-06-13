@@ -10,6 +10,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 Security scanning, health grading, run history, architecture diagrams, on-demand dashboard analysis, a point-and-analyze landing screen, CodeFlow-parity static analysis (call graph, design patterns, layer violations), and three new visualization modes (3D graph, treemap, matrix) — all deterministic, no API key required.
 
+### Fixed (dashboard UX — 2026-06-13)
+
+- **No way back to the landing screen after a graph loaded.** Once a graph was analyzed there was no UI to start a fresh analysis of another project. Added a **"New analysis"** button to the dashboard nav (a `forceLanding` state re-shows `LandingScreen` even with a graph loaded); it clears automatically when the new graph finishes, and the landing screen's "retry/back" returns to the existing graph.
+- **3D graph view churned erratically and was hard to interact with.** Two bugs: (1) `toForceGraphData()` was recomputed on every render, handing `react-kapsule` a new `graphData` object each time, which re-ingested nodes and **re-heated the d3 physics simulation continuously** — now memoized on `[graph, showRiskOverlay]`. (2) The auto-rotation `setInterval` cleanup was returned from inside the `setTimeout` callback (so it never ran), leaking intervals that fought the user's camera, and it only stopped on `mousedown` (not zoom). Now the timer/listeners are cleaned up from the effect itself and rotation stops on any `pointerdown`/`touchstart`/`wheel` interaction.
+
 ### Fixed (CLI, Phase 2 fork, and landing-screen scan — 2026-06-13)
 
 - **`sprang --version` printed a stale hardcoded `0.1.0`.** `packages/cli/src/index.ts` hardcoded `.version('0.1.0')` while the package is at `0.2.1`. Now reads the version from `package.json` at runtime (`../package.json` relative to `dist/index.js`) so it tracks the published version automatically and never drifts.

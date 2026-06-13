@@ -40,7 +40,14 @@ export function Graph3DCanvas({
     [],
   );
 
-  const data = toForceGraphData(graph, showRiskOverlay);
+  // Memoize so the graphData object identity is stable across re-renders.
+  // Recomputing it every render hands react-kapsule a new graphData each time,
+  // which re-ingests the nodes and re-heats the d3 physics simulation — making
+  // the whole graph and camera churn erratically.
+  const data = useMemo(
+    () => toForceGraphData(graph, showRiskOverlay),
+    [graph, showRiskOverlay],
+  );
 
   const handleNodeClick = useCallback(
     (node: FGNode) => {
@@ -49,33 +56,47 @@ export function Graph3DCanvas({
     [onNodeSelect],
   );
 
-  // After mount, zoom to fit and optionally start rotation
+  // After mount: zoom to fit, then optionally auto-rotate until the user
+  // interacts. All timers/listeners are cleaned up from the effect itself so
+  // nothing leaks across re-renders (previously the interval cleanup was
+  // returned from the setTimeout callback and never ran, leaking intervals
+  // that fought with the user's camera control).
   useEffect(() => {
     const fg = fgRef.current;
     if (!fg) return;
-    const t = setTimeout(() => {
+    const el = containerRef.current;
+
+    let rotId: ReturnType<typeof setInterval> | null = null;
+    const stopRotation = () => {
+      if (rotId) { clearInterval(rotId); rotId = null; }
+    };
+
+    const fitTimer = setTimeout(() => {
       fg.zoomToFit?.(400, 80);
       if (!reducedMotion) {
         let angle = 0;
-        const id = setInterval(() => {
+        rotId = setInterval(() => {
           angle += 0.003;
           fg.cameraPosition?.({
             x: Math.sin(angle) * 400,
             z: Math.cos(angle) * 400,
           });
-        }, 16);
-        const stop = () => clearInterval(id);
-        const el = containerRef.current;
-        el?.addEventListener('mousedown', stop, { once: true });
-        el?.addEventListener('touchstart', stop, { once: true });
-        return () => {
-          clearInterval(id);
-          el?.removeEventListener('mousedown', stop);
-          el?.removeEventListener('touchstart', stop);
-        };
+        }, 30);
       }
     }, 500);
-    return () => clearTimeout(t);
+
+    // Any camera interaction (orbit drag, touch, or zoom) cancels auto-rotation.
+    el?.addEventListener('pointerdown', stopRotation);
+    el?.addEventListener('touchstart', stopRotation, { passive: true });
+    el?.addEventListener('wheel', stopRotation, { passive: true });
+
+    return () => {
+      clearTimeout(fitTimer);
+      stopRotation();
+      el?.removeEventListener('pointerdown', stopRotation);
+      el?.removeEventListener('touchstart', stopRotation);
+      el?.removeEventListener('wheel', stopRotation);
+    };
   }, [reducedMotion]);
 
   // Focus selected node

@@ -10,6 +10,7 @@ import {
   Layers,
   Grid3x3,
   LayoutGrid,
+  Plus,
 } from 'lucide-react';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { Badge } from './components/ui/Badge';
@@ -92,6 +93,9 @@ export default function App() {
   const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [theme, setTheme] = useTheme();
   const [showOnboarding, dismissOnboarding] = useOnboarding();
+  // When true, show the landing screen even though a graph is loaded
+  // (lets the user start a fresh analysis of another project).
+  const [forceLanding, setForceLanding] = useState(false);
 
   const { graph, setGraph, selectedNodeId, navigateToNode, selectNode, startTour, stopTour } =
     useDashboardStore();
@@ -172,6 +176,7 @@ export default function App() {
         clearInterval(poll);
         setGraph(g as KnowledgeGraph);
         setLoading(false);
+        setForceLanding(false);
       }
     }, 2000);
     // Stop polling after 3 minutes (GitHub clone + scan can take longer)
@@ -223,10 +228,10 @@ export default function App() {
   const defaultPath = new URLSearchParams(window.location.search).get('path') ?? '';
 
   if (loading) return <LoadingScreen />;
-  if (hasError || !graph) return (
+  if (forceLanding || hasError || !graph) return (
     <LandingScreen
       onAnalyze={analyzeProject}
-      onRetry={() => void fetchGraph(false)}
+      onRetry={() => { setForceLanding(false); void fetchGraph(false); }}
       autoScan={autoScan}
       defaultPath={defaultPath}
     />
@@ -303,6 +308,15 @@ export default function App() {
             title="Refresh"
           >
             <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={() => { selectNode(null); setForceLanding(true); }}
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-colors"
+            title="Analyze another project"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">New analysis</span>
           </button>
         </nav>
 
