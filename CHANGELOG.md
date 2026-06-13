@@ -74,6 +74,10 @@ Real end-to-end validation that the Windsurf/Devin Desktop and GitHub Copilot in
 - **ArchitectureView reveal** — React Flow canvas wraps in `motion.div` (scale + opacity) that fires when ELK layout resolves.
 - **GraphCanvas selected-node pulse ring** — `AnimatePresence` `motion.div` ring positioned over the Sigma canvas at the selected node's viewport coordinates; pulses `scale: [1, 1.6, 1]` on repeat.
 
+### Planned (pre-publish)
+
+- **Standalone dashboard server for published installs.** The dashboard's runtime routes (`/analyze`, `/knowledge-graph.json`, `/cascade-*`, `/bridge-status`, etc.) currently live in `vite.config.ts` preview middleware, which depends on Vite + dev dependencies being present (fine in the monorepo, but a published npm package won't ship them). Before publishing to npm, `sprang open` should serve these routes from a lightweight bundled HTTP server instead of `vite preview`, so instant analysis works for end-users who installed via `npm i -g sprang` / `npx sprang`.
+
 ### Planned (deferred)
 
 - **Intra-layer dependency-depth ordering** — order nodes *within* an architecture layer by longest dependency path. A `computeLayerDepths` stub existed but was a no-op (computed depths were never applied) and was removed in the 2026-06-13 lint cleanup; reintroduce only with an actual consumer (e.g. Architecture view sub-sorting).
