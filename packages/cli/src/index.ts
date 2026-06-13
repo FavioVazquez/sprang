@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { Command } from 'commander';
 import { makeScanCommand } from './commands/scan.js';
 import { makeHealthCommand } from './commands/health.js';
@@ -10,12 +13,17 @@ import { makeMergeCommand } from './commands/merge.js';
 import { makeOpenCommand } from './commands/open.js';
 import { makeDiagramCommand } from './commands/diagram.js';
 
+// Read version from package.json so it never drifts from the published version.
+const pkg = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../package.json'), 'utf8'),
+) as { version: string };
+
 const program = new Command();
 
 program
   .name('sprang')
   .description('The qualitative leap — Sprang knowledge graph CLI')
-  .version('0.1.0');
+  .version(pkg.version);
 
 program.addCommand(makeScanCommand());
 program.addCommand(makeMergeCommand());
