@@ -29,6 +29,10 @@ export default defineConfig({
     {
       command:
         'rm -rf e2e/.bridge-root-claude && mkdir -p e2e/.bridge-root-claude/.sprang && ' +
+        // Unset WINDSURF_CASCADE_TERMINAL_KIND so bridge detection is deterministic
+        // even when this suite is run from inside Windsurf/Devin Desktop (the var
+        // leaks into spawned processes and would force detection to `windsurf`).
+        'env -u WINDSURF_CASCADE_TERMINAL_KIND ' +
         'SPRANG_ROOT="$PWD/e2e/.bridge-root-claude" ' +
         'MOCK_CLAUDE_LOG="$PWD/e2e/.bridge-root-claude/mock-claude-args.log" ' +
         'PATH="$PWD/e2e/mock-bin/claude-env:$PATH" ' +
@@ -40,6 +44,7 @@ export default defineConfig({
     {
       command:
         'rm -rf e2e/.bridge-root-copilot && mkdir -p e2e/.bridge-root-copilot/.sprang && ' +
+        'env -u WINDSURF_CASCADE_TERMINAL_KIND ' +
         'SPRANG_ROOT="$PWD/e2e/.bridge-root-copilot" ' +
         'MOCK_COPILOT_LOG="$PWD/e2e/.bridge-root-copilot/mock-copilot-args.log" ' +
         'PATH="$PWD/e2e/mock-bin/copilot-env:$PATH" ' +

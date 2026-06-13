@@ -10,6 +10,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 Security scanning, health grading, run history, architecture diagrams, on-demand dashboard analysis, a point-and-analyze landing screen, CodeFlow-parity static analysis (call graph, design patterns, layer violations), and three new visualization modes (3D graph, treemap, matrix) — all deterministic, no API key required.
 
+### Fixed (test harness — 2026-06-13)
+
+- **Bridge e2e suite leaked the host's `WINDSURF_CASCADE_TERMINAL_KIND`.** `playwright.bridge.config.ts` boots two preview servers with mock `claude`/`copilot` CLIs on `PATH` and asserts that `detectBridge` resolves to `claude` / `copilot`. When the suite was run from inside Windsurf / Devin Desktop, the inherited `WINDSURF_CASCADE_TERMINAL_KIND` env var forced detection to `windsurf`, failing the claude/copilot assertions. (CI was unaffected — GitHub runners don't set the var — so this only bit local validation.) Fixed by prefixing both spawned servers with `env -u WINDSURF_CASCADE_TERMINAL_KIND`, making bridge detection deterministic regardless of where the suite runs. All 8 bridge tests now pass locally and in CI (72 e2e total).
+
 ### Fixed (installer and agentic install — 2026-06-11)
 
 - **`install.sh` and `install.ps1` next-steps output** — after linking skills for `windsurf` or `copilot`, the scripts now print a complete "Next steps" guide: exact MCP config JSON to write (with the resolved `REPO_DIR` path already filled in), rules/hooks/workflows copy commands, and a link to the full docs. Previously the scripts printed "Run /sprang now" which was misleading — the MCP server and project rules still needed to be set up.
