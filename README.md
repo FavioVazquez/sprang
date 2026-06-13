@@ -1254,6 +1254,7 @@ packages/core/tests/
 │   └── embedding-search.test.ts            26 tests — cosine similarity, TF-IDF, vocabulary
 ├── orchestrator/
 │   ├── worktree.test.ts                      4 tests — worktree redirect, git-not-found
+│   └── phase2-security.test.ts               2 tests — real Phase 1→2 pipeline, security_summary + warnings
 └── integration/
     ├── pipeline.test.ts                     13 tests — full Phase 1 against simple-ts/ fixture
     ├── pipeline-python.test.ts               8 tests — full Phase 1 against simple-python/ fixture

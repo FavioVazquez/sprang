@@ -24,6 +24,10 @@ export default tseslint.config(
       'packages/dashboard/e2e/.bridge-root-*/**',
       // cascade-messaging is gitignored (only the compiled .vsix is committed)
       'packages/cascade-messaging/**',
+      // Agent git worktrees (gitignored, absent in CI) — ESLint flat config does
+      // not read .gitignore, so without this `pnpm lint` descends into every
+      // worktree copy and reports the whole repo's lint state N times over.
+      '.claude/worktrees/**',
     ],
   },
 
