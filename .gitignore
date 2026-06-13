@@ -20,6 +20,9 @@ dist/
 # Dashboard build
 packages/dashboard/dist/
 
+# npm pack artifacts
+*.tgz
+
 # Local env
 .env
 .env.local
