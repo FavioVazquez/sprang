@@ -40,7 +40,7 @@ function ConfidenceBar({ value }: { value: number }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function KnowledgeInfo() {
-  const { graph, selectedNodeId, nodesById, navigateToNode } = useDashboardStore();
+  const { graph, selectedNodeId, nodesById } = useDashboardStore();
 
   if (!graph || !selectedNodeId) return null;
   const node = nodesById.get(selectedNodeId);
@@ -50,8 +50,6 @@ export function KnowledgeInfo() {
   const frontmatter = (meta.frontmatter ?? {}) as Record<string, unknown>;
   const sourceUrl = meta.sourceUrl as string | undefined;
   const confidence = meta.confidence as number | undefined;
-  const wikilinks = (meta.wikilinks as string[] | undefined) ?? [];
-  const backlinks = (meta.backlinks as string[] | undefined) ?? [];
 
   // Build outgoing and incoming edges from graph
   const outgoing = graph.edges.filter((e) => e.source === selectedNodeId);

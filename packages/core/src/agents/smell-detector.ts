@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import type { AgentContext, AgentResult } from './base.js';
 import { BaseAgent } from './base.js';
 import type {
@@ -68,7 +67,7 @@ function detectGodNodes(
   graph: KnowledgeGraph,
   nodeMap: Map<string, SprangNode>,
   outEdges: Map<string, SprangEdge[]>,
-  inEdges: Map<string, SprangEdge[]>
+  _inEdges: Map<string, SprangEdge[]>
 ): void {
   const { godNodeOutDegree, godNodeFunctionCount } = DEFAULT_SMELL_THRESHOLDS;
 
@@ -117,7 +116,7 @@ function detectGodNodes(
 function detectCircularDependencies(
   graph: KnowledgeGraph,
   nodeMap: Map<string, SprangNode>,
-  outEdges: Map<string, SprangEdge[]>
+  _outEdges: Map<string, SprangEdge[]>
 ): void {
   const { circularMaxCycleLength } = DEFAULT_SMELL_THRESHOLDS;
 
@@ -558,7 +557,7 @@ function detectLowCohesion(
 
 function detectNameDuplicates(
   graph: KnowledgeGraph,
-  nodeMap: Map<string, SprangNode>,
+  _nodeMap: Map<string, SprangNode>,
 ): void {
   // Group function/class nodes by normalized name
   const byName = new Map<string, SprangNode[]>();
@@ -570,7 +569,7 @@ function detectNameDuplicates(
   }
 
   // Flag names that appear in 3+ different files
-  for (const [name, nodes] of byName) {
+  for (const [, nodes] of byName) {
     if (nodes.length < 3) continue;
 
     // Check they're from different files

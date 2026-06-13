@@ -12,7 +12,6 @@ import {
   LayoutGrid,
 } from 'lucide-react';
 import { TooltipProvider } from './components/ui/Tooltip';
-import { Button } from './components/ui/Button';
 import { Badge } from './components/ui/Badge';
 import { GraphView } from './pages/GraphView';
 import { HealthView } from './pages/HealthView';

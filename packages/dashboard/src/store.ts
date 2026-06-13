@@ -3,7 +3,6 @@ import Fuse from 'fuse.js';
 import type {
   KnowledgeGraph,
   SprangNode,
-  Layer,
   Tour,
   TourStep,
   Persona,

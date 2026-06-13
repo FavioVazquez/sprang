@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Search, X, FileText, Zap, Box, Settings, Server, Globe, Circle } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { Badge } from './ui/Badge';

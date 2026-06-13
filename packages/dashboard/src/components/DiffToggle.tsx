@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { GitCompare, X, AlertTriangle, Loader2 } from 'lucide-react';
+import { GitCompare, X, AlertTriangle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useDashboardStore } from '../store';
 import type { DiffOverlay } from '../types';

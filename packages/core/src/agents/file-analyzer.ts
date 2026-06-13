@@ -29,7 +29,6 @@ interface SymbolMatch {
 }
 
 function findFunctions(source: string): Array<SymbolMatch & { exported: boolean; isAsync: boolean }> {
-  const lines = source.split('\n');
   const results: Array<SymbolMatch & { exported: boolean; isAsync: boolean }> = [];
   const seen = new Set<string>();
 
@@ -214,8 +213,7 @@ function countMethodsInClass(source: string, startLine: number, endLine: number)
   const methodRe =
     /(?:^|\n)\s+(?:(?:public|private|protected|static|async|override|readonly)\s+)*(\w+)\s*\([^)]*\)\s*(?::\s*[^{]+)?\s*\{/g;
   let count = 0;
-  let m: RegExpExecArray | null;
-  while ((m = methodRe.exec(classSource)) !== null) {
+  while (methodRe.exec(classSource) !== null) {
     // Skip constructor if desired; count all
     count++;
   }

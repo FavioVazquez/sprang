@@ -1,11 +1,9 @@
 import path from 'node:path';
-import { writeFile, mkdir, readFile } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
 import type { KnowledgeGraph } from '../schema/types.js';
 import type { AgentContext, SprangOptions } from '../agents/base.js';
 import { NullLLMClient } from '../llm/client.js';
 import { loadGraph, saveGraph } from '../graph/store.js';
-import { createEmptyGraph } from '../graph/store.js';
-import { GRAPH_VERSION } from '../schema/constants.js';
 import { ArchitectureAnalyzerAgent } from '../agents/architecture-analyzer.js';
 import { DomainAnalyzerAgent } from '../agents/domain-analyzer.js';
 import { TourBuilderAgent } from '../agents/tour-builder.js';
@@ -66,6 +64,7 @@ export async function runPhase2(
       'domain-analyzer': { status: 'pending' },
       'git-layer': { status: 'pending' },
       'smell-detector': { status: 'pending' },
+      'security-scanner': { status: 'pending' },
       'tour-builder': { status: 'pending' },
       'risk-scorer': { status: 'pending' },
       'graph-reviewer': { status: 'pending' },
@@ -87,7 +86,7 @@ export async function runPhase2(
   // ── Group 1: parallel (no inter-dependencies) ────────────────────
   const group1 = async () => {
     const ctx = buildCtx(graph);
-    const [archResult, domainResult, gitResult, smellResult] = await Promise.allSettled([
+    const [archResult, domainResult, gitResult, smellResult, securityResult] = await Promise.allSettled([
       (async () => {
         progress.agents['architecture-analyzer'] = { status: 'running' };
         await writeProgress(intermediateDir, progress);
@@ -122,10 +121,19 @@ export async function runPhase2(
         progress.agents['smell-detector'] = { status: r.success ? 'done' : 'failed', error: r.error };
         return r;
       })(),
+      (async () => {
+        progress.agents['security-scanner'] = { status: 'running' };
+        await writeProgress(intermediateDir, progress);
+        onProgress?.('security-scanner running...');
+        const agent = await loadSecurityScanner();
+        const r = await agent.run(ctx);
+        progress.agents['security-scanner'] = { status: r.success ? 'done' : 'failed', error: r.error };
+        return r;
+      })(),
     ]);
 
     // Merge all group-1 results into graph
-    for (const result of [archResult, domainResult, gitResult, smellResult]) {
+    for (const result of [archResult, domainResult, gitResult, smellResult, securityResult]) {
       if (result.status === 'fulfilled' && result.value.success) {
         graph = mergeGraphs(graph, result.value.mutatedGraph);
         progress.tokensUsed += result.value.tokensUsed ?? 0;

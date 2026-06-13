@@ -211,7 +211,6 @@ describe('useDashboardStore — filters', () => {
 
   it('setFilters merges partial filter updates', () => {
     useDashboardStore.getState().resetFilters();
-    const { riskLevels } = useDashboardStore.getState().filters;
     const narrowed = new Set(['high'] as const);
     useDashboardStore.getState().setFilters({ riskLevels: narrowed });
     expect(useDashboardStore.getState().filters.riskLevels.size).toBe(1);

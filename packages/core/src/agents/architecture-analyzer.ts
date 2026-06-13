@@ -1,5 +1,4 @@
-import path from 'node:path';
-import type { AgentContext, AgentResult, SprangOptions } from './base.js';
+import type { AgentContext, AgentResult } from './base.js';
 import { BaseAgent } from './base.js';
 import type { KnowledgeGraph, SprangNode, Layer, StructuralWarning } from '../schema/types.js';
 
@@ -18,14 +17,6 @@ const LAYER_RANK: Record<string, number> = {
   api: 5,
   ui: 6,
 };
-
-interface LayerCandidate {
-  id: string;
-  name: string;
-  depth: number;
-  nodeIds: string[];
-  patterns: string[];
-}
 
 const LAYER_HEURISTICS: Array<{ id: string; name: string; patterns: RegExp[]; priority: number }> = [
   { id: 'infrastructure', name: 'Infrastructure', patterns: [/infra|k8s|docker|terraform|deploy|ci|cd|github|\.github/i], priority: 0 },
@@ -51,10 +42,6 @@ export class ArchitectureAnalyzerAgent extends BaseAgent {
       if (fileNodes.length === 0) {
         return this.success(ctx);
       }
-
-      // Build adjacency for depth calculation
-      const outEdges = this.buildOutEdges(graph);
-      const depths = this.computeLayerDepths(fileNodes, outEdges);
 
       // Assign each file node to a layer
       const layerMap = new Map<string, string[]>();
@@ -109,30 +96,6 @@ export class ArchitectureAnalyzerAgent extends BaseAgent {
     } catch (err) {
       return this.failure(ctx, err instanceof Error ? err.message : String(err));
     }
-  }
-
-  private buildOutEdges(graph: KnowledgeGraph): Map<string, string[]> {
-    const outEdges = new Map<string, string[]>();
-    for (const node of graph.nodes) {
-      outEdges.set(node.id, []);
-    }
-    for (const edge of graph.edges) {
-      const targets = outEdges.get(edge.source) ?? [];
-      targets.push(edge.target);
-      outEdges.set(edge.source, targets);
-    }
-    return outEdges;
-  }
-
-  private computeLayerDepths(nodes: SprangNode[], outEdges: Map<string, string[]>): Map<string, number> {
-    const depths = new Map<string, number>();
-    // Simple: BFS from all nodes, assign depth by longest path from any leaf
-    for (const node of nodes) {
-      if (!depths.has(node.id)) {
-        depths.set(node.id, 0);
-      }
-    }
-    return depths;
   }
 
   private classifyNode(node: SprangNode): string {

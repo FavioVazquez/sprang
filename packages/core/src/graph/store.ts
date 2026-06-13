@@ -1,5 +1,4 @@
 import { join } from 'node:path';
-import { basename } from 'node:path';
 import type { KnowledgeGraph } from '../schema/types.js';
 import { knowledgeGraphSchema } from '../schema/validators.js';
 import { writeFileAtomic, readJsonFile, readJsonFileOrNull } from '../utils/fs.js';

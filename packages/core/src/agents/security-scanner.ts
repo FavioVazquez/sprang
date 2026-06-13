@@ -87,10 +87,11 @@ export class SecurityScannerAgent extends BaseAgent {
 
   async run(ctx: AgentContext): Promise<AgentResult> {
     const graph = ctx.graph;
-    const fileNodes = graph.nodes.filter((n) => n.type === 'file' && n.filePath);
+    const fileNodes = graph.nodes.filter((n) => n.type === 'file' && n.location?.file);
 
     for (const node of fileNodes) {
-      const absPath = `${ctx.projectRoot}/${node.filePath}`;
+      const relPath = node.location!.file;
+      const absPath = `${ctx.projectRoot}/${relPath}`;
       let code: string;
       try {
         code = await readFile(absPath, 'utf-8');
@@ -98,7 +99,7 @@ export class SecurityScannerAgent extends BaseAgent {
         continue;
       }
 
-      const warnings = scanCode(code, node.filePath!);
+      const warnings = scanCode(code, relPath);
       if (warnings.length > 0) {
         node.security_warnings = warnings;
         // Boost risk score for high severity security findings

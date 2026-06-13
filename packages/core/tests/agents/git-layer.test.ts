@@ -4,7 +4,6 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { GitLayerAgent } from '../../src/agents/git-layer.js';
-import { createEmptyGraph } from '../../src/graph/store.js';
 import type { AgentContext, SprangOptions } from '../../src/agents/base.js';
 import type { KnowledgeGraph, SprangNode } from '../../src/schema/types.js';
 import { NullLLMClient } from '../../src/llm/client.js';

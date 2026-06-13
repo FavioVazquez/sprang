@@ -27,13 +27,6 @@ export function MatrixView({ graph, onNodeSelect }: MatrixViewProps) {
   const { nodes, cells } = useMemo(() => toMatrixData(graph, 120), [graph]);
   const n = nodes.length;
 
-  // Build quick lookup for cell weight
-  const cellMap = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const c of cells) m.set(`${c.row},${c.col}`, c.weight);
-    return m;
-  }, [cells]);
-
   const selectedRows = useMemo(() => {
     if (!selectedNodeId) return new Set<number>();
     const s = new Set<number>();

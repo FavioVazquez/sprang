@@ -19,7 +19,7 @@ import { Badge } from '../components/ui/Badge';
 import { SmellBadge } from '../components/SmellBadge';
 import { HealthGrade } from '../components/HealthGrade';
 import { Sparkline } from '../components/Sparkline';
-import { getRiskColor, getRiskLabel } from '../api/graphApi';
+import { getRiskColor } from '../api/graphApi';
 import type { KnowledgeGraph, SmellCategory, SprangNode, HistorySnapshot } from '../types';
 
 interface HealthViewProps {

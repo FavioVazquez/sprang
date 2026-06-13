@@ -10,6 +10,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 Security scanning, health grading, run history, architecture diagrams, on-demand dashboard analysis, a point-and-analyze landing screen, CodeFlow-parity static analysis (call graph, design patterns, layer violations), and three new visualization modes (3D graph, treemap, matrix) — all deterministic, no API key required.
 
+### Fixed (security scanner wiring — 2026-06-13)
+
+- **SecurityScannerAgent never ran in the Phase 2 pipeline.** `runPhase2` (in `orchestrator/phase2.ts`) defined `loadSecurityScanner()` but never invoked it — the agent was missing from both the parallel run batch and the progress map. As a result `stats.security_summary` was never populated on a full `sprang scan`, the health-grade security penalty was always 0, and the dashboard security section was always empty. Wired the scanner into Group 1 (it has no inter-agent dependencies) alongside architecture/domain/git/smell.
+- **SecurityScannerAgent read a never-populated field.** The agent filtered file nodes on `node.filePath` and read the source from `node.filePath`, but the project scanner stores the path on `node.location.file` (the canonical field every other agent uses). So even once invoked it would have scanned nothing. Switched to `node.location?.file`.
+- **New regression test** (`packages/core/tests/orchestrator/phase2-security.test.ts`, 2 tests) runs the real Phase 1 → Phase 2 pipeline against a deliberately vulnerable file (`eval()` + hardcoded API key) and asserts `stats.security_summary` is populated and the file node receives `security_warnings`. Core suite: 449 tests (656 unit total).
+
+### Added (lint — 2026-06-13)
+
+- **ESLint flat config** (`eslint.config.js`) — the repo declared `eslint`, `@eslint/js`, `globals`, and `typescript-eslint` as devDependencies and a `pnpm lint` script, but had no config file, so `pnpm lint` always errored. Added a flat config (ESLint v9): JS + TypeScript recommended (non-type-checked, so no per-package `parserOptions.project` and fast), `eslint-plugin-react-hooks` for the dashboard (`rules-of-hooks` error, `exhaustive-deps` warn), `_`-prefix ignore for intentionally-unused vars, and `off` for `no-control-regex` (MCP node-id sanitizers legitimately match control chars) and `no-empty-object-type` (MCP no-arg input contracts). Fixed ~60 real findings surfaced by the new config: removed dead imports and dead code (including unused `buildOutEdges`/`computeLayerDepths` machinery in `architecture-analyzer`), converted ternary-statements to `if/else`, and fixed two useless regex escapes. `pnpm lint` now passes clean (0 errors) and is wired into CI as a gate.
+
 ### Fixed (test harness — 2026-06-13)
 
 - **Bridge e2e suite leaked the host's `WINDSURF_CASCADE_TERMINAL_KIND`.** `playwright.bridge.config.ts` boots two preview servers with mock `claude`/`copilot` CLIs on `PATH` and asserts that `detectBridge` resolves to `claude` / `copilot`. When the suite was run from inside Windsurf / Devin Desktop, the inherited `WINDSURF_CASCADE_TERMINAL_KIND` env var forced detection to `windsurf`, failing the claude/copilot assertions. (CI was unaffected — GitHub runners don't set the var — so this only bit local validation.) Fixed by prefixing both spawned servers with `env -u WINDSURF_CASCADE_TERMINAL_KIND`, making bridge detection deterministic regardless of where the suite runs. All 8 bridge tests now pass locally and in CI (72 e2e total).
@@ -53,8 +63,9 @@ Real end-to-end validation that the Windsurf/Devin Desktop and GitHub Copilot in
 - **ArchitectureView reveal** — React Flow canvas wraps in `motion.div` (scale + opacity) that fires when ELK layout resolves.
 - **GraphCanvas selected-node pulse ring** — `AnimatePresence` `motion.div` ring positioned over the Sigma canvas at the selected node's viewport coordinates; pulses `scale: [1, 1.6, 1]` on repeat.
 
-### Planned (deferred visualizations)
+### Planned (deferred)
 
+- **Intra-layer dependency-depth ordering** — order nodes *within* an architecture layer by longest dependency path. A `computeLayerDepths` stub existed but was a no-op (computed depths were never applied) and was removed in the 2026-06-13 lint cleanup; reintroduce only with an actual consumer (e.g. Architecture view sub-sorting).
 - **Circular bundle view** — D3 hierarchical edge bundling; files on a circle, imports as bezier curves.
 - **Sankey flow diagram** — `d3-sankey`; import volume flowing between architectural layers.
 - **Hotspot heatmap** — scatter plot of `risk_score` vs `change_frequency` (requires git-layer Phase 2 data).

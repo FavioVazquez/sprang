@@ -1,4 +1,4 @@
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import PQueue from 'p-queue';
@@ -7,7 +7,6 @@ import { BaseAgent } from './base.js';
 import type {
   CommitRef,
   DecisionContext,
-  KnowledgeGraph,
   SprangNode,
 } from '../schema/types.js';
 import {

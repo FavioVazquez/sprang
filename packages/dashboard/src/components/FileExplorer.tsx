@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react';
+import { ChevronRight, File, Folder, FolderOpen } from 'lucide-react';
 import { useDashboardStore } from '../store';
 import type { SprangNode } from '../types';
 
@@ -211,7 +211,8 @@ export function FileExplorer() {
   const toggleFolder = (folderPath: string) => {
     setExpanded((cur) => {
       const next = new Set(cur);
-      next.has(folderPath) ? next.delete(folderPath) : next.add(folderPath);
+      if (next.has(folderPath)) next.delete(folderPath);
+      else next.add(folderPath);
       return next;
     });
   };

@@ -1,7 +1,6 @@
 import { resolve, join } from 'node:path';
 import { Command } from 'commander';
 import { readFile, stat } from 'node:fs/promises';
-import path from 'node:path';
 
 export function makeStatusCommand(): Command {
   const cmd = new Command('status');

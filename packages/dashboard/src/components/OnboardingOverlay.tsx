@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Sparkles, Search, Activity, BookOpen, Map, ArrowRight, X } from 'lucide-react';
 
 const STORAGE_KEY = 'sprang:onboarded';

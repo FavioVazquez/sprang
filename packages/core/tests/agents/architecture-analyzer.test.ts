@@ -42,7 +42,7 @@ function makeGraph(
   };
 }
 
-const mockLLM = {
+const _mockLLM = {
   complete: async () => '',
   completeBatch: async (prompts: string[]) => prompts.map(() => ''),
   getTokenUsage: () => 0,

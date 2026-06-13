@@ -57,7 +57,6 @@ describe('Phase 1 pipeline – Python project', () => {
 
     expect(result.success).toBe(true);
     // Verify importMap written to intermediate
-    const scanResult = result.mutatedGraph;
     // At least main.py and models/user.py should have been imported
     const fileNode = result.mutatedGraph.nodes.find((n) => n.id === 'file:main.py');
     expect(fileNode).toBeDefined();

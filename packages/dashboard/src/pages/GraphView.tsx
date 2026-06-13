@@ -76,7 +76,7 @@ export function GraphView({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'files' | 'source'>('files');
   const [hoveredLayerId, setHoveredLayerId] = useState<string | undefined>();
-  const [tooltipNodeId, setTooltipNodeId] = useState<string | null>(null);
+  const [tooltipNodeId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [showTourMenu, setShowTourMenu] = useState(false);

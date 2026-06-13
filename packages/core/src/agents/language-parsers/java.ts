@@ -7,7 +7,7 @@ export function parseJava(source: string): ParsedSymbols {
 
   // [access] [static] [return_type] methodName( ...
   const methodRe =
-    /^\s*(?:(?:public|private|protected|static|final|synchronized|native|abstract|default)\s+)*(?!class\s|interface\s|enum\s)(?:[\w<>\[\],\s.]+\s+)?(\w+)\s*\(/;
+    /^\s*(?:(?:public|private|protected|static|final|synchronized|native|abstract|default)\s+)*(?!class\s|interface\s|enum\s)(?:[\w<>[\],\s.]+\s+)?(\w+)\s*\(/;
   // [access] class/interface/enum Name
   const classRe =
     /^\s*(?:(?:public|private|protected|static|final|abstract)\s+)*(?:class|interface|enum|record)\s+(\w+)/;
