@@ -12,14 +12,14 @@ const RESET = '\x1b[0m';
 function findMcpServerPath(): string {
   const cliDist = dirname(fileURLToPath(import.meta.url));
 
-  // npm package layout: dist/mcp-server.js (sibling of dist/index.js)
-  const npmMcp = join(cliDist, 'mcp-server.js');
+  // npm package layout: dist/mcp-server.cjs (sibling of dist/index.js)
+  const npmMcp = join(cliDist, 'mcp-server.cjs');
   if (existsSync(npmMcp)) return realpathSync(npmMcp);
 
-  // Monorepo layout: walk up looking for packages/mcp/dist/server.js
+  // Monorepo layout: walk up looking for packages/mcp/dist/server.cjs
   let dir = cliDist;
   for (let i = 0; i < 8; i++) {
-    const candidate = join(dir, 'packages', 'mcp', 'dist', 'server.js');
+    const candidate = join(dir, 'packages', 'mcp', 'dist', 'server.cjs');
     if (existsSync(candidate)) return realpathSync(candidate);
     const parent = resolve(dir, '..');
     if (parent === dir) break;

@@ -9,10 +9,10 @@
  * Output layout inside packages/cli/dist/:
  *   dashboard/          — React SPA static files (served by dashboard-server.js)
  *   dashboard-server.js — standalone HTTP server (serves above)
- *   mcp-server.js       — MCP server (used in .mcp.json)
+ *   mcp-server.cjs      — MCP server CJS bundle (used in .mcp.json)
  */
 
-import { cpSync, copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { cpSync, copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,7 +22,7 @@ const MONO_ROOT = resolve(CLI_ROOT, '../..');
 
 const cliDist      = join(CLI_ROOT, 'dist');
 const dashDist     = join(MONO_ROOT, 'packages', 'dashboard', 'dist');
-const mcpServer    = join(MONO_ROOT, 'packages', 'mcp', 'dist', 'server.js');
+const mcpServer    = join(MONO_ROOT, 'packages', 'mcp', 'dist', 'server.cjs');
 const standaloneJs = join(dashDist, 'standalone.js');
 
 // Verify sources exist
@@ -44,9 +44,14 @@ const serverTarget = join(cliDist, 'dashboard-server.js');
 copyFileSync(standaloneJs, serverTarget);
 process.stdout.write(`Copied standalone server → dist/dashboard-server.js\n`);
 
-// Copy MCP server
-const mcpTarget = join(cliDist, 'mcp-server.js');
+// Copy MCP server (CJS standalone bundle — works without Vite or pnpm workspace)
+// Remove stale .js version from any previous build runs before copying the .cjs.
+const staleJs = join(cliDist, 'mcp-server.js');
+if (existsSync(staleJs)) rmSync(staleJs);
+const staleJsMap = join(cliDist, 'mcp-server.js.map');
+if (existsSync(staleJsMap)) rmSync(staleJsMap);
+const mcpTarget = join(cliDist, 'mcp-server.cjs');
 copyFileSync(mcpServer, mcpTarget);
-process.stdout.write(`Copied MCP server → dist/mcp-server.js\n`);
+process.stdout.write(`Copied MCP server → dist/mcp-server.cjs\n`);
 
 process.stdout.write('pack-assets: done\n');

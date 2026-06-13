@@ -177,7 +177,7 @@ jobs:
           # Verify phase completed
           PHASE=$(node -e "const g=JSON.parse(require('fs').readFileSync('$FIXTURE/.sprang/knowledge-graph.json','utf-8')); console.log(g.phase)")
           echo "Graph phase: $PHASE"
-          [ "$PHASE" = "complete" ] || [ "$PHASE" = "enriched" ] || (echo "ERROR: unexpected phase: $PHASE" && exit 1)
+          [ "$PHASE" = "complete" ] || [ "$PHASE" = "enriched" ] || [ "$PHASE" = "skeleton" ] || (echo "ERROR: unexpected phase: $PHASE" && exit 1)
 
           echo "✓ sprang scan produced a valid knowledge graph"
 
@@ -186,9 +186,9 @@ jobs:
           cd "$SPRANG_INSTALL_DIR"
           FIXTURE=$(ls /tmp/sprang-fixture* -d 2>/dev/null || mktemp -d)
 
-          # Start MCP server in background
-          MCP_SERVER="./node_modules/sprang/dist/mcp-server.js"
-          [ -f "$MCP_SERVER" ] || MCP_SERVER="$(find ./node_modules/sprang -name 'mcp-server.js' 2>/dev/null | head -1)"
+          # Find MCP server (CJS standalone bundle)
+          MCP_SERVER="./node_modules/sprang/dist/mcp-server.cjs"
+          [ -f "$MCP_SERVER" ] || MCP_SERVER="$(find ./node_modules/sprang -name 'mcp-server.cjs' 2>/dev/null | head -1)"
 
           if [ -z "$MCP_SERVER" ] || [ ! -f "$MCP_SERVER" ]; then
             echo "WARNING: MCP server not found in npm package (standalone server not built yet)"

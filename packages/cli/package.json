@@ -34,7 +34,6 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@sprang/core": "workspace:*",
     "commander": "^12.1.0",
     "ora": "^8.1.1",
     "chokidar": "^4.0.3",
@@ -48,6 +47,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@sprang/core": "workspace:*",
     "@types/micromatch": "^4.0.9",
     "@types/node": "^22.0.0",
     "@types/object-hash": "^3.0.6",
