@@ -1,0 +1,19 @@
+# Dev/test files excluded from npm publish
+tests/
+node_modules/
+*.test.ts
+*.spec.ts
+tsconfig*.json
+tsup.config.ts
+vitest.config.ts
+
+# Source (only dist/ ships)
+src/
+
+# GitHub-only
+.github/
+.vscode/
+
+# Build artifacts not needed in package
+dist/*.d.ts
+dist/*.d.ts.map

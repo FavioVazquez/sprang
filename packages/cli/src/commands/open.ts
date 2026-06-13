@@ -22,47 +22,63 @@ export function makeOpenCommand(): Command {
       process.stdout.write(`Opening Sprang dashboard for: ${projectRoot}\n`);
       process.stdout.write(`Dashboard: http://localhost:${options.port}\n`);
 
-      // Find the dashboard package dist relative to this CLI
-      // The CLI is at packages/cli/dist/index.js — dashboard is at packages/dashboard/dist/
+      // Locate the standalone server and dashboard static files.
+      // Resolution order (both monorepo dev and npm global install):
+      //   1. Sibling npm package: <cli-dist>/dashboard-server.js  (npm global)
+      //   2. Monorepo sibling:    packages/dashboard/dist/standalone.js
       const cliDist = resolve(import.meta.dirname ?? __dirname);
-      // Walk up to find the monorepo root (has pnpm-workspace.yaml)
-      let searchDir = cliDist;
+
+      let standaloneServer: string | null = null;
       let dashboardDist: string | null = null;
-      for (let i = 0; i < 8; i++) {
-        const candidate = join(searchDir, 'packages', 'dashboard', 'dist');
-        if (existsSync(candidate)) {
-          dashboardDist = candidate;
-          break;
-        }
-        const parent = resolve(searchDir, '..');
-        if (parent === searchDir) break;
-        searchDir = parent;
+
+      // Try npm package layout first (dist/dashboard-server.js)
+      const npmServer = join(cliDist, 'dashboard-server.js');
+      if (existsSync(npmServer)) {
+        standaloneServer = npmServer;
+        // Static files are at dist/dashboard/ in the npm package
+        const npmStatic = join(cliDist, 'dashboard');
+        dashboardDist = existsSync(join(npmStatic, 'index.html')) ? npmStatic : cliDist;
       }
 
-      if (!dashboardDist) {
+      // Monorepo: walk up looking for packages/dashboard/dist/standalone.js
+      if (!standaloneServer) {
+        let searchDir = cliDist;
+        for (let i = 0; i < 8; i++) {
+          const candidate = join(searchDir, 'packages', 'dashboard', 'dist', 'standalone.js');
+          if (existsSync(candidate)) {
+            standaloneServer = candidate;
+            dashboardDist = join(searchDir, 'packages', 'dashboard', 'dist');
+            break;
+          }
+          const parent = resolve(searchDir, '..');
+          if (parent === searchDir) break;
+          searchDir = parent;
+        }
+      }
+
+      if (!standaloneServer) {
         process.stderr.write(
-          'Dashboard dist not found. Run: pnpm --filter @sprang/dashboard build\n'
+          'Dashboard server not found. Run: pnpm --filter @sprang/dashboard build\n'
         );
         process.exit(1);
       }
 
-      // Find the dashboard package.json directory to run vite preview from
-      const dashboardPkg = resolve(dashboardDist, '..');
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        SPRANG_ROOT: projectRoot,
+        PORT: options.port,
+      };
+      if (dashboardDist) {
+        env['SPRANG_DASHBOARD_DIST'] = dashboardDist;
+      }
 
-      const env = { ...process.env, SPRANG_ROOT: projectRoot };
-      const child = spawn(
-        'npx',
-        ['vite', 'preview', '--port', options.port, '--host'],
-        {
-          cwd: dashboardPkg,
-          env,
-          stdio: 'inherit',
-          shell: false,
-        }
-      );
+      const child = spawn(process.execPath, [standaloneServer], {
+        env,
+        stdio: 'inherit',
+        shell: false,
+      });
 
       if (options.browser) {
-        // Give the server a moment to start, then open browser
         setTimeout(() => {
           const params = new URLSearchParams();
           if (options.autoScan) params.set('autoScan', '1');

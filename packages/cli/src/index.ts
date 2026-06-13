@@ -12,6 +12,7 @@ import { makeInstallHooksCommand } from './commands/install-hooks.js';
 import { makeMergeCommand } from './commands/merge.js';
 import { makeOpenCommand } from './commands/open.js';
 import { makeDiagramCommand } from './commands/diagram.js';
+import { makeInitCommand } from './commands/init.js';
 
 // Read version from package.json so it never drifts from the published version.
 const pkg = JSON.parse(
@@ -34,5 +35,6 @@ program.addCommand(makeStatusCommand());
 program.addCommand(makeInstallHooksCommand());
 program.addCommand(makeOpenCommand());
 program.addCommand(makeDiagramCommand());
+program.addCommand(makeInitCommand());
 
 program.parse(process.argv);

@@ -102,4 +102,22 @@ export default tseslint.config(
       globals: { ...globals.node },
     },
   },
+
+  // ── CLI bin + scripts (CJS/ESM, Node globals) ────────────────────────────────
+  {
+    files: ['packages/cli/bin/**/*.js', 'packages/cli/scripts/**/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: { ...globals.node },
+    },
+  },
+  {
+    files: ['packages/cli/bin/**/*.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
 );

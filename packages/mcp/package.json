@@ -10,7 +10,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "build": "tsup src/server.ts --format esm --dts --sourcemap",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev": "tsx src/server.ts"
