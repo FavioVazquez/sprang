@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { detectBridge, clearAgentSession } from './src/bridge/index.js';
@@ -19,6 +20,42 @@ let currentRoot: string = process.env['SPRANG_ROOT'] ?? process.cwd();
 
 function getSprangRoot(): string {
   return currentRoot;
+}
+
+// ── Resolve how to invoke the Sprang CLI for the landing-screen scan ──────────
+// Priority (so it "just works" in every scenario):
+//   1. Local monorepo build — node <repo>/packages/cli/dist/index.js (dev / repo
+//      install / marketplace install where the repo is present)
+//   2. `sprang` on PATH — globally installed or `pnpm link --global`
+//   3. `npx sprang` — published-to-npm fallback (auto-install with -y)
+const CONFIG_DIR = path.dirname(fileURLToPath(import.meta.url)); // packages/dashboard
+
+function resolveLocalCli(): string | null {
+  const candidates = [path.resolve(CONFIG_DIR, '../cli/dist/index.js')];
+  let dir = CONFIG_DIR;
+  for (let i = 0; i < 6; i++) {
+    candidates.push(path.join(dir, 'packages/cli/dist/index.js'));
+    dir = path.dirname(dir);
+  }
+  return candidates.find((p) => fs.existsSync(p)) ?? null;
+}
+
+function findOnPath(bin: string): string | null {
+  const dirs = (process.env['PATH'] ?? '').split(path.delimiter);
+  for (const d of dirs) {
+    if (!d) continue;
+    const full = path.join(d, bin);
+    try { fs.accessSync(full, fs.constants.X_OK); return full; } catch { /* not here */ }
+  }
+  return null;
+}
+
+function cliScanInvocation(targetDir: string): { cmd: string; args: string[] } {
+  const scanArgs = ['scan', '--phase1-only', targetDir];
+  const local = resolveLocalCli();
+  if (local) return { cmd: process.execPath, args: [local, ...scanArgs] };
+  if (findOnPath('sprang')) return { cmd: 'sprang', args: scanArgs };
+  return { cmd: 'npx', args: ['-y', 'sprang', ...scanArgs] };
 }
 
 function parseGitHubUrl(input: string): { owner: string; repo: string } | null {
@@ -316,8 +353,12 @@ function attachSprangMiddlewares(server: ConnectServer) {
           const gitChild = spawn('git', gitArgs, { stdio: 'ignore' });
           gitChild.on('close', (code) => {
             if (code !== 0) return;
-            const scanChild = spawn('npx', ['sprang', 'scan', '--phase1-only', cloneDir], {
+            const inv = cliScanInvocation(cloneDir);
+            const scanChild = spawn(inv.cmd, inv.args, {
               cwd: cloneDir, detached: true, stdio: 'ignore',
+            });
+            scanChild.on('error', (err) => {
+              process.stderr.write(`[sprang] analyze scan failed to start: ${err.message}\n`);
             });
             scanChild.unref();
           });
@@ -342,8 +383,12 @@ function attachSprangMiddlewares(server: ConnectServer) {
       res.end(JSON.stringify({ ok: true, started: true, mode: 'local', root: sprangRoot }));
 
       import('node:child_process').then(({ spawn }) => {
-        const child = spawn('npx', ['sprang', 'scan', '--phase1-only', sprangRoot], {
+        const inv = cliScanInvocation(sprangRoot);
+        const child = spawn(inv.cmd, inv.args, {
           cwd: sprangRoot, detached: true, stdio: 'ignore',
+        });
+        child.on('error', (err) => {
+          process.stderr.write(`[sprang] analyze scan failed to start: ${err.message}\n`);
         });
         child.unref();
       }).catch(() => {/* ignore */});
