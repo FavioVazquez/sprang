@@ -65,6 +65,25 @@ The same infrastructure works for knowledge bases: Obsidian vaults, Logseq datab
 
 > **Note:** Windsurf AI and Devin Desktop are the same product — Windsurf was rebranded as Devin Desktop. All instructions, skills, and workflows are identical for both. Both names appear in this README.
 
+### Quick install (npm)
+
+```bash
+npm install -g sprang   # or: npx sprang init
+```
+
+Run `sprang init` inside any project to write `.mcp.json` pointing at the bundled MCP server:
+
+```bash
+cd my-project
+sprang init            # writes .mcp.json → reopen Claude Code / Copilot to pick it up
+sprang scan            # build the knowledge graph (Phase 1, ~15 s)
+sprang open            # launch the dashboard at http://localhost:7777
+```
+
+The `sprang` npm package bundles the dashboard, MCP server, and CLI into a single tarball — no separate build step, no pnpm workspace, no Node version pinning beyond Node 22.
+
+---
+
 ### Platform comparison
 
 | Feature | Claude Code | Windsurf / Devin Desktop | GitHub Copilot |
