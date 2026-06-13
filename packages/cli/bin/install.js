@@ -51,11 +51,11 @@ Options:
 
 // Find where the MCP server lives (relative to this script)
 // bin/install.js is in packages/cli/bin/
-// MCP server will be at packages/cli/dist/mcp-server.js after prepublishOnly copy
-// In the npm global install: <prefix>/lib/node_modules/sprang/dist/mcp-server.js
+// MCP server is at dist/mcp-server.cjs (CJS standalone bundle — no peer installs needed)
+// In the npm global install: <prefix>/lib/node_modules/sprang/dist/mcp-server.cjs
 const BIN_DIR = path.dirname(fs.realpathSync(__filename));
 const PACKAGE_ROOT = path.resolve(BIN_DIR, '..');
-const MCP_SERVER_PATH = path.join(PACKAGE_ROOT, 'dist', 'mcp-server.js');
+const MCP_SERVER_PATH = path.join(PACKAGE_ROOT, 'dist', 'mcp-server.cjs');
 
 function validateTargetPath(raw) {
   if (!raw) return null;
@@ -77,7 +77,7 @@ function writeMcpJson(projectRoot) {
 
   // Check if MCP server is available
   const mcpServerExists = fs.existsSync(MCP_SERVER_PATH);
-  const serverPath = mcpServerExists ? MCP_SERVER_PATH : path.join(PACKAGE_ROOT, 'packages', 'mcp', 'dist', 'server.js');
+  const serverPath = mcpServerExists ? MCP_SERVER_PATH : path.join(PACKAGE_ROOT, 'packages', 'mcp', 'dist', 'server.cjs');
 
   let existing = {};
   if (fs.existsSync(mcpPath)) {
