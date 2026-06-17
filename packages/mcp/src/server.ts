@@ -23,10 +23,15 @@ import type { SprangRespondInput } from './tools/sprang_respond.js';
 const sprangRoot = process.env['SPRANG_ROOT'] ?? process.cwd();
 const loader = new GraphLoader(sprangRoot);
 
+// Injected at build time by tsup `define` (see tsup.config.ts) so it always
+// matches package.json. Falls back to a dev sentinel when run un-bundled via tsx.
+declare const __SPRANG_VERSION__: string;
+const VERSION = typeof __SPRANG_VERSION__ !== 'undefined' ? __SPRANG_VERSION__ : '0.0.0-dev';
+
 const server = new Server(
   {
     name: 'sprang',
-    version: '0.2.0',
+    version: VERSION,
   },
   {
     capabilities: {

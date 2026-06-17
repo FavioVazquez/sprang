@@ -650,7 +650,7 @@ pnpm link --global
 cd ../..
 
 which sprang        # verify: should print $PNPM_HOME/sprang
-sprang --version    # 0.2.1
+sprang --version    # 0.2.2
 ```
 
 ```bash

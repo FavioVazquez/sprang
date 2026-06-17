@@ -6,6 +6,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.2] — 2026-06-17
+
+Patch release: keep the MCP server's advertised version in lockstep with the package version.
+
+### Fixed (MCP server version drift — 2026-06-17)
+
+- **MCP server reported a stale hardcoded `serverInfo.version` of `0.2.0`** while the package shipped as `0.2.1`. The version string in `packages/mcp/src/server.ts` was a literal that nobody bumped, so an MCP client inspecting `serverInfo` saw the wrong version. It is now injected at build time from `package.json` via a tsup `define` (`__SPRANG_VERSION__`), applied to **both** the CJS standalone bundle (`mcp-server.cjs`) and the ESM build, so it can never drift again. Running un-bundled via `tsx` (dev) falls back to a `0.0.0-dev` sentinel. Verified the published `mcp-server.cjs` now answers `initialize` with `serverInfo.version: 0.2.2`.
+
+> npm package versions are immutable, so this fix could not be republished under `0.2.1`; `0.2.2` is the first release carrying it.
+
+---
+
 ## [0.2.1] — 2026-06-17
 
 Security scanning, health grading, run history, architecture diagrams, on-demand dashboard analysis, a point-and-analyze landing screen, CodeFlow-parity static analysis (call graph, design patterns, layer violations), and three new visualization modes (3D graph, treemap, matrix) — all deterministic, no API key required.
