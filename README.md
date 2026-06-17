@@ -293,9 +293,17 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
    sprang open .
    Dashboard will be at http://localhost:7777
 
-7. Report what was installed and where. Then tell me:
+7. Install the cascade-messaging VS Code extension (enables the Ask Agent panel in the dashboard):
+   if ! windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging; then
+     windsurf --install-extension ~/tools/sprang/cascade-messaging-0.1.0.vsix 2>/dev/null || \
+     code --install-extension ~/tools/sprang/cascade-messaging-0.1.0.vsix 2>/dev/null || \
+     echo "Manual install: Extensions → Install from VSIX → ~/tools/sprang/cascade-messaging-0.1.0.vsix"
+   fi
+
+8. Report what was installed and where. Then tell me:
    "Setup complete. Please reload the window now (Cmd/Ctrl+Shift+P → Reload Window)
-   so the MCP server activates. Dashboard is live at http://localhost:7777.
+   so the MCP server and cascade-messaging extension activate.
+   Dashboard is live at http://localhost:7777.
    Once reloaded, type /sprang-onboard to begin."
 ```
 
