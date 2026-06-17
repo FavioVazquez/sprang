@@ -27,10 +27,9 @@ export class GraphLoader {
 
   private async checkAndReload(): Promise<void> {
     const filePath = this.graphPath();
-    let mtime: number;
+    let fileStats: Awaited<ReturnType<typeof stat>>;
     try {
-      const stats = await stat(filePath);
-      mtime = stats.mtimeMs;
+      fileStats = await stat(filePath);
     } catch {
       // File does not exist
       this.graphCache = null;
@@ -38,13 +37,13 @@ export class GraphLoader {
       return;
     }
 
+    const mtime = fileStats.mtimeMs;
     if (mtime === this.lastMtime && this.graphCache !== null) {
       return;
     }
 
     const MAX_GRAPH_BYTES = 50 * 1024 * 1024; // 50 MB safety limit
     try {
-      const fileStats = await stat(filePath);
       if (fileStats.size > MAX_GRAPH_BYTES) {
         this.graphCache = null;
         this.lastMtime = 0;
@@ -53,13 +52,15 @@ export class GraphLoader {
       const raw = await readFile(filePath, 'utf-8');
       const result = knowledgeGraphSchema.safeParse(JSON.parse(raw));
       if (!result.success) {
+        process.stderr.write(`[sprang] Graph validation failed: ${result.error.message}\n`);
         this.graphCache = null;
         this.lastMtime = 0;
         return;
       }
       this.graphCache = result.data as KnowledgeGraph;
       this.lastMtime = mtime;
-    } catch {
+    } catch (err) {
+      process.stderr.write(`[sprang] Graph load error: ${err instanceof Error ? err.message : String(err)}\n`);
       this.graphCache = null;
       this.lastMtime = 0;
     }

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronRight, File, Folder, FolderOpen } from 'lucide-react';
 import { useDashboardStore } from '../store';
 import type { SprangNode } from '../types';
 
@@ -121,25 +122,41 @@ function FileTreeRow({
           style={{ paddingLeft }}
           title={entry.path}
         >
-          {isExpanded
-            ? <ChevronDown className="w-3 h-3 text-surface-500 shrink-0" />
-            : <ChevronRight className="w-3 h-3 text-surface-500 shrink-0" />}
+          <motion.span
+            animate={{ rotate: isExpanded ? 90 : 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            style={{ display: 'inline-flex', flexShrink: 0 }}
+          >
+            <ChevronRight className="w-3 h-3 text-surface-500" />
+          </motion.span>
           {isExpanded
             ? <FolderOpen className="w-3 h-3 text-sprang-400 shrink-0" />
             : <Folder className="w-3 h-3 text-surface-500 shrink-0" />}
           <span className="truncate font-medium">{entry.name}</span>
         </button>
-        {isExpanded && entry.children.map((child) => (
-          <FileTreeRow
-            key={child.path}
-            entry={child}
-            depth={depth + 1}
-            expanded={expanded}
-            selectedNodeId={selectedNodeId}
-            toggleFolder={toggleFolder}
-            openFile={openFile}
-          />
-        ))}
+        <AnimatePresence initial={false}>
+          {isExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              style={{ overflow: 'hidden' }}
+            >
+              {entry.children.map((child) => (
+                <FileTreeRow
+                  key={child.path}
+                  entry={child}
+                  depth={depth + 1}
+                  expanded={expanded}
+                  selectedNodeId={selectedNodeId}
+                  toggleFolder={toggleFolder}
+                  openFile={openFile}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </>
     );
   }
@@ -194,7 +211,8 @@ export function FileExplorer() {
   const toggleFolder = (folderPath: string) => {
     setExpanded((cur) => {
       const next = new Set(cur);
-      next.has(folderPath) ? next.delete(folderPath) : next.add(folderPath);
+      if (next.has(folderPath)) next.delete(folderPath);
+      else next.add(folderPath);
       return next;
     });
   };

@@ -1,249 +1,25 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { detectBridge, askAgent, clearAgentSession } from './src/bridge/index.js';
+import { registerRoutes } from './src/server/routes.js';
 
-const MAX_SOURCE_FILE_BYTES = 1024 * 1024; // 1 MB cap for source files
+// Mutable project root — can be overridden at runtime via POST /analyze
+let currentRoot: string = process.env['SPRANG_ROOT'] ?? process.cwd();
 
-// Allowlist cache — rebuilt only when knowledge-graph.json mtime changes
-let allowlistCache: Set<string> | null = null;
-let allowlistCacheMtime = 0;
-
-function getSprangRoot(): string {
-  return process.env['SPRANG_ROOT'] ?? process.cwd();
-}
-
-function resolveGraphFile(fileName: string): string | null {
-  const root = getSprangRoot();
-  const candidates = [
-    path.join(root, '.sprang', fileName),
-    path.join(root, fileName),
-  ];
-  return candidates.find((c) => fs.existsSync(c)) ?? null;
-}
-
-/** Build the allowlist of relative file paths from the graph so we only serve
- *  files that are actually part of the analyzed project (security guard).
- *  Result is cached and invalidated only when the graph file's mtime changes. */
-function buildFileAllowList(): Set<string> {
-  const graphFile = resolveGraphFile('knowledge-graph.json');
-  if (!graphFile) return new Set();
-  try {
-    const mtime = fs.statSync(graphFile).mtimeMs;
-    if (allowlistCache !== null && mtime === allowlistCacheMtime) {
-      return allowlistCache;
-    }
-    const allowed = new Set<string>();
-    const raw = JSON.parse(fs.readFileSync(graphFile, 'utf-8')) as {
-      nodes?: Array<{ filePath?: unknown; location?: { file?: unknown } }>;
-    };
-    for (const node of raw.nodes ?? []) {
-      const fp = node.filePath ?? node.location?.file;
-      if (typeof fp === 'string' && fp.length > 0) {
-        const normalized = path.normalize(fp).split(path.sep).join('/');
-        if (!normalized.startsWith('..') && !path.isAbsolute(normalized)) {
-          allowed.add(normalized);
-        }
-      }
-    }
-    allowlistCache = allowed;
-    allowlistCacheMtime = mtime;
-    return allowed;
-  } catch {
-    return allowlistCache ?? new Set();
-  }
-}
-
-const EXT_TO_LANG: Record<string, string> = {
-  ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx',
-  py: 'python', go: 'go', rs: 'rust', java: 'java', kt: 'kotlin',
-  cs: 'csharp', rb: 'ruby', php: 'php', c: 'c', cpp: 'cpp', h: 'c',
-  css: 'css', scss: 'scss', html: 'html', md: 'markdown', json: 'json',
-  yaml: 'yaml', yml: 'yaml', toml: 'toml', sh: 'bash', bash: 'bash',
-  sql: 'sql', graphql: 'graphql', proto: 'protobuf', tf: 'hcl',
-};
+const getRoot = () => currentRoot;
+const setRoot = (r: string) => { currentRoot = r; };
 
 type ConnectServer = { middlewares: import('vite').Connect.Server };
 
-// ---------------------------------------------------------------------------
-// Response file path (shared by all bridge kinds)
-// ---------------------------------------------------------------------------
-function getResponseFilePath(): string {
-  return path.join(getSprangRoot(), '.sprang', 'cascade-response.json');
-}
-
 function attachSprangMiddlewares(server: ConnectServer) {
-  // GET /knowledge-graph.json
-  server.middlewares.use('/knowledge-graph.json', (_req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
-    const graphFile = resolveGraphFile('knowledge-graph.json');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    if (graphFile) {
-      res.setHeader('Content-Type', 'application/json');
-      res.end(fs.readFileSync(graphFile));
-    } else {
-      res.statusCode = 404;
-      res.end('Not Found');
-    }
-  });
-
-  // GET /diff-overlay.json
-  server.middlewares.use('/diff-overlay.json', (_req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
-    const overlayFile = resolveGraphFile('diff-overlay.json');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    if (overlayFile) {
-      res.setHeader('Content-Type', 'application/json');
-      res.end(fs.readFileSync(overlayFile));
-    } else {
-      res.statusCode = 404;
-      res.end('Not Found');
-    }
-  });
-
-  // GET /file-content.json?path=<relpath>
-  // Returns { path, language, content } for files in the analyzed project.
-  // Only serves paths that appear as filePath/location.file in the graph (allowlist).
-  server.middlewares.use('/file-content.json', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Type', 'application/json');
-
-    const url = new URL(req.url ?? '', 'http://localhost');
-    const rawPath = url.searchParams.get('path') ?? '';
-
-    if (!rawPath) {
-      res.statusCode = 400;
-      res.end(JSON.stringify({ error: 'Missing path parameter' }));
-      return;
-    }
-
-    // Normalize and security-check path
-    const normalized = path.normalize(rawPath).split(path.sep).join('/');
-    if (normalized.startsWith('..') || path.isAbsolute(normalized) || normalized.includes('\0')) {
-      res.statusCode = 400;
-      res.end(JSON.stringify({ error: 'Invalid path' }));
-      return;
-    }
-
-    // Check against allowlist
-    const allowed = buildFileAllowList();
-    if (!allowed.has(normalized)) {
-      res.statusCode = 403;
-      res.end(JSON.stringify({ error: 'Path not in analyzed graph' }));
-      return;
-    }
-
-    const projectRoot = getSprangRoot();
-    const absPath = path.join(projectRoot, normalized);
-    if (!absPath.startsWith(projectRoot)) {
-      res.statusCode = 403;
-      res.end(JSON.stringify({ error: 'Path traversal denied' }));
-      return;
-    }
-
-    if (!fs.existsSync(absPath)) {
-      res.statusCode = 404;
-      res.end(JSON.stringify({ error: 'File not found' }));
-      return;
-    }
-
-    const stat = fs.statSync(absPath);
-    if (stat.size > MAX_SOURCE_FILE_BYTES) {
-      res.statusCode = 413;
-      res.end(JSON.stringify({ error: 'File too large', size: stat.size }));
-      return;
-    }
-
-    const content = fs.readFileSync(absPath, 'utf-8');
-    const ext = path.extname(absPath).slice(1).toLowerCase();
-    const language = EXT_TO_LANG[ext] ?? 'text';
-
-    res.end(JSON.stringify({ path: normalized, language, content }));
-  });
-
-  // GET /bridge-status — returns which agent bridge is currently active.
-  server.middlewares.use('/bridge-status', (_req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
-    res.setHeader('Content-Type', 'application/json');
-    const status = detectBridge(getSprangRoot());
-    res.statusCode = 200;
-    res.end(JSON.stringify(status));
-  });
-
-  // POST /cascade-ask  { "message": "..." }
-  // Routes to the appropriate agent bridge (windsurf / claude / copilot).
-  server.middlewares.use('/cascade-ask', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
-    res.setHeader('Content-Type', 'application/json');
-    if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
-    if (req.method !== 'POST') { res.statusCode = 405; res.end(JSON.stringify({ error: 'POST only' })); return; }
-
-    const MAX_BODY_BYTES = 64 * 1024;
-    let body = '';
-    let bodyBytes = 0;
-    let aborted = false;
-    req.on('data', (chunk: Buffer) => {
-      if (aborted) return;
-      bodyBytes += chunk.length;
-      if (bodyBytes > MAX_BODY_BYTES) {
-        aborted = true;
-        res.statusCode = 413;
-        res.end(JSON.stringify({ error: 'Request body too large' }));
-        return;
-      }
-      body += chunk.toString('utf-8');
-    });
-    req.on('end', () => {
-      if (aborted) return;
-      try {
-        const { message } = JSON.parse(body) as { message?: string };
-        if (!message || typeof message !== 'string' || message.trim() === '') {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ error: 'message field required' }));
-          return;
-        }
-        const userMessage = message.trim().slice(0, 4096);
-        const result = askAgent(userMessage, getSprangRoot());
-        if (!result.ok) {
-          res.statusCode = 503;
-          res.end(JSON.stringify({ error: result.error ?? 'Agent bridge unavailable' }));
-          return;
-        }
-        res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, sent: userMessage, mode: result.mode }));
-      } catch {
-        res.statusCode = 400;
-        res.end(JSON.stringify({ error: 'Invalid JSON body' }));
-      }
-    });
-  });
-
-  // GET /cascade-response
-  // Polls for the response written by the sprang_respond MCP tool.
-  server.middlewares.use('/cascade-response', (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
-    res.setHeader('Content-Type', 'application/json');
-    if (req.method === 'DELETE') {
-      clearAgentSession(getSprangRoot());
-      res.statusCode = 200;
-      res.end(JSON.stringify({ ok: true }));
-      return;
-    }
-    const responsePath = getResponseFilePath();
-    if (fs.existsSync(responsePath)) {
-      try {
-        const data = fs.readFileSync(responsePath, 'utf-8');
-        res.statusCode = 200;
-        res.end(data);
-      } catch {
-        res.statusCode = 500;
-        res.end(JSON.stringify({ error: 'Failed to read response' }));
-      }
-    } else {
-      res.statusCode = 204;
-      res.end();
-    }
-  });
+  registerRoutes(
+    (prefix, handler) => server.middlewares.use(prefix, handler),
+    getRoot,
+    setRoot,
+  );
 }
 
-// Serve knowledge-graph.json, file-content.json, and diff-overlay.json
-// Works in both `vite` (dev) and `vite preview` (serves pre-built dist/) modes.
+// Works in both `vite` (dev) and `vite preview` modes.
 const sprangGraphPlugin = () => ({
   name: 'sprang-graph-serve',
   configureServer(server: import('vite').ViteDevServer) {
@@ -259,6 +35,60 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),
+    },
+  },
+  build: {
+    // @xyflow/react (React Flow) + ELK are inherently large (~1.5 MB combined).
+    // They're lazy-loaded — only downloaded when visiting Architecture/Domains views.
+    // The main bundle is ~142 KB; this limit silences the warning for the lazy chunk.
+    chunkSizeWarningLimit: 1600,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return;
+          // Isolate react-force-graph and its entire dependency stack in their own chunk.
+          // react-force-graph → 3d-force-graph → three.js + d3-force, creating circular deps
+          // with vendor (React) and vendor-graph (Sigma/D3). Isolating the whole stack
+          // prevents the circular that corrupts Sigma.js (EventEmitter undefined crash).
+          // Graph3DCanvas imports 3d-force-graph + react-kapsule directly (not react-force-graph).
+          // Isolate the entire 3D force-graph stack to keep it out of the eagerly-loaded
+          // vendor chunk (mixing it in creates circular chunk deps that crash Sigma.js init).
+          if (id.includes('3d-force-graph') || id.includes('three-forcegraph') ||
+              id.includes('three-render-objects') || id.includes('super-three') ||
+              id.includes('react-kapsule') || id.includes('kapsule') ||
+              id.includes('ngraph') || id.includes('d3-force-3d') ||
+              id.includes('d3-binarytree') || id.includes('d3-octree') ||
+              id.includes('accessor-fn') || id.includes('data-bind-mapper') ||
+              id.includes('tinycolor2') || id.includes('index-array-by') ||
+              id.includes('float-tooltip') || id.includes('jerrypick') ||
+              id.includes('canvas-color-tracker') || id.includes('@tweenjs') ||
+              id.includes('nipplejs') || id.includes('bezier-js') ||
+              id.includes('/three/') || id.includes('/three@') ||
+              id.includes('three.module') || id.includes('three.cjs')) {
+            return 'vendor-3d';
+          }
+          // Co-locate `events` (Node.js EventEmitter polyfill) with Sigma.js to avoid
+          // circular chunk initialization order that corrupts EventEmitter (undefined crash).
+          if (id.includes('sigma') || id.includes('graphology') || id.includes('d3-force') ||
+              id.includes('/events/') || id.includes('/events@')) {
+            return 'vendor-graph';
+          }
+          if (id.includes('@xyflow') || id.includes('elkjs')) {
+            return 'vendor-flow';
+          }
+          if (id.includes('framer-motion')) {
+            return 'vendor-motion';
+          }
+          if (id.includes('prism-react-renderer')) {
+            return 'vendor-prism';
+          }
+          if (id.includes('@radix-ui') || id.includes('cmdk') || id.includes('lucide-react') || id.includes('class-variance') || id.includes('clsx') || id.includes('tailwind-merge')) {
+            return 'vendor-ui';
+          }
+          // React and react-dom share internals — keep them together in the main vendor chunk
+          return 'vendor';
+        },
+      },
     },
   },
   server: {

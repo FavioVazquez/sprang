@@ -16,7 +16,13 @@ Generate a comprehensive onboarding guide for someone new to this codebase.
 
 4. **Read the guided tour** — grep for `"tours"` to get the ordered walkthrough steps.
 
-5. **Read file-level nodes only** — grep for nodes with types: file, config, document, service, pipeline, table, schema, resource, endpoint. Skip function/class nodes — keep the guide high-level. For each: name, filePath, summary, complexity, risk_score, layer.
+5. **Detect or ask about persona** — adapt the depth of the guide to the audience:
+   - `non-technical` — executive / business stakeholder: entry-points and domains only, no code details
+   - `pm` — product manager: domain and service nodes, business capability focus
+   - `junior` (default) — new developer: all steps with language lessons and step-by-step explanations
+   - `senior` or `experienced` — experienced engineer: skip intro, focus on risks, coupling, and architecture decisions
+
+   Read file-level nodes with types: file, config, document, service, pipeline, table, schema, resource, endpoint. Skip function/class nodes — keep the guide high-level. For each: name, filePath, summary, complexity, risk_score, layer.
 
 6. **Read top-risk nodes** — from the file nodes, identify those with `risk_score > 0.5`. Read their `risk_factors` and `structural_warnings`.
 

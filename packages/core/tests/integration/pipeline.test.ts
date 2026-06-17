@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { runPhase1 } from '../../src/orchestrator/phase1.js';
 import { NullLLMClient } from '../../src/llm/client.js';
 import type { SprangOptions } from '../../src/agents/base.js';
-import { REPORT_FILE, INTERMEDIATE_DIR, CACHE_DIR } from '../../src/schema/constants.js';
+import { REPORT_FILE, INTERMEDIATE_DIR } from '../../src/schema/constants.js';
 import { readJsonFileOrNull } from '../../src/utils/fs.js';
 import type { KnowledgeGraph } from '../../src/schema/types.js';
 

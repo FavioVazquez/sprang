@@ -7,7 +7,7 @@
  * giving the user a continuous conversation thread.
  */
 
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -25,6 +25,7 @@ const ALLOWED_MCP_TOOLS = [
   'mcp__sprang__sprang_health',
   'mcp__sprang__sprang_why',
   'mcp__sprang__sprang_annotate',
+  'mcp__sprang__sprang_respond',
 ].join(',');
 
 interface ClaudeJsonOutput {
@@ -82,6 +83,12 @@ Question: ${question}`;
     '--output-format', 'json',
     '--allowedTools', ALLOWED_MCP_TOOLS,
   ];
+
+  // Explicitly pass --mcp-config so MCP tools are available regardless of CWD
+  const mcpConfigPath = path.join(sprangRoot, '.mcp.json');
+  if (fs.existsSync(mcpConfigPath)) {
+    args.push('--mcp-config', mcpConfigPath);
+  }
 
   if (sessionId) {
     args.push('--resume', sessionId);
@@ -150,6 +157,61 @@ Question: ${question}`;
   }
 
   return { ok: true, response, session_id: newSessionId };
+}
+
+/**
+ * Non-blocking variant — spawns `claude -p` in the background and writes
+ * `.sprang/cascade-response.json` when done. Returns immediately.
+ * Used by the HTTP endpoint so it does not block Node's event loop.
+ */
+export function askClaudeBackground(
+  question: string,
+  sprangRoot: string,
+  responsePath: string,
+): void {
+  const sessionId = loadSessionId(sprangRoot);
+
+  const prompt = `You are answering a question from the Sprang dashboard about this codebase.
+Use the available MCP tools (sprang_query, sprang_node, sprang_health, etc.) to ground your answer in the knowledge graph.
+Be concise — this answer will be displayed in a small chat panel.
+
+Question: ${question}`;
+
+  const args = ['-p', prompt, '--output-format', 'json', '--allowedTools', ALLOWED_MCP_TOOLS];
+
+  const mcpConfigPath = path.join(sprangRoot, '.mcp.json');
+  if (fs.existsSync(mcpConfigPath)) args.push('--mcp-config', mcpConfigPath);
+  if (sessionId) args.push('--resume', sessionId);
+
+  const child = spawn('claude', args, {
+    cwd: sprangRoot,
+    timeout: CLAUDE_TIMEOUT_MS,
+  });
+
+  let stdout = '';
+  child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf-8'); });
+
+  child.on('close', (code) => {
+    if (code !== 0 || !stdout.trim()) return;
+    let responseText = stdout.trim();
+    let newSessionId: string | undefined;
+    for (const line of stdout.split('\n').reverse()) {
+      try {
+        const obj = JSON.parse(line) as ClaudeJsonOutput;
+        if (obj.type === 'result' || obj.result !== undefined) {
+          if (obj.session_id) newSessionId = obj.session_id;
+          responseText = obj.result ?? responseText;
+          break;
+        }
+      } catch { /* skip */ }
+    }
+    if (newSessionId) saveSessionId(sprangRoot, newSessionId);
+    const payload = { response: responseText, question, written_at: new Date().toISOString(), bridge: 'claude', session_id: newSessionId };
+    const dir = path.dirname(responsePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const tmp = responsePath + '.tmp';
+    try { fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf-8'); fs.renameSync(tmp, responsePath); } catch { /* ignore */ }
+  });
 }
 
 /** Clear the persisted session so the next question starts a fresh conversation. */

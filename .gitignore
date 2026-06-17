@@ -15,9 +15,17 @@ dist/
 .sprang/knowledge-graph.json
 .sprang/SPRANG_REPORT.md
 .sprang/config.json
+.sprang/annotations/*.md
 
 # Dashboard build
 packages/dashboard/dist/
+
+# npm pack artifacts
+*.tgz
+
+# LICENSE/README copied into the CLI package by pack-assets.mjs (source of truth is repo root)
+packages/cli/LICENSE
+packages/cli/README.md
 
 # Local env
 .env
@@ -38,6 +46,8 @@ test-results/
 playwright-report/
 packages/dashboard/test-results/
 packages/dashboard/playwright-report/
+packages/dashboard/e2e/.bridge-root-claude/
+packages/dashboard/e2e/.bridge-root-copilot/
 
 # Development tool artifacts (never commit)
 .claude/worktrees/
@@ -60,3 +70,7 @@ packages/cascade-messaging/
 .sprang/claude-session.json
 .sprang/copilot-session.json
 .sprang/.cascade-bridge-active
+.sprang/diff-overlay.json
+
+# Nested .sprang dirs from e2e test fixtures (vite server CWD artifacts)
+packages/dashboard/.sprang/

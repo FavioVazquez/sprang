@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 // ─── Layer color palette (indexed 0-8) ───────────────────────────────────────
@@ -53,11 +54,14 @@ export default function LayerCardNode({ data }: NodeProps) {
   const color = LAYER_COLORS[d.colorIndex % LAYER_COLORS.length];
 
   return (
-    <div
+    <motion.div
       role="button"
       tabIndex={0}
       onClick={() => d.onSelect(d.layerId)}
       onKeyDown={(e) => e.key === 'Enter' && d.onSelect(d.layerId)}
+      initial={{ opacity: 0, scale: 0.92 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: d.colorIndex * 0.06, duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       style={{
         width: 280,
         minHeight: 160,
@@ -130,6 +134,6 @@ export default function LayerCardNode({ data }: NodeProps) {
         position={Position.Bottom}
         style={{ background: color, border: 'none', width: 8, height: 8 }}
       />
-    </div>
+    </motion.div>
   );
 }

@@ -2,7 +2,7 @@ import React from 'react';
 import { Network, Activity, Globe, BookOpen, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export type MobileView = 'graph' | 'health' | 'domain' | 'architecture' | 'learn';
+export type MobileView = 'graph' | 'health' | 'domain' | 'architecture' | 'learn' | 'treemap' | 'matrix';
 
 const NAV_ITEMS: Array<{ id: MobileView; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'graph', label: 'Graph', icon: Network },

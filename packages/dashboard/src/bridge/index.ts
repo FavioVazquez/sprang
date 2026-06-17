@@ -2,7 +2,7 @@
  * Unified agent bridge entry point.
  *
  * askAgent() selects the right bridge at call time:
- *   - windsurf: write trigger file → extension picks up → async (poll /cascade-response)
+ *   - windsurf: write trigger file → extension picks up → async (poll /agent-response)
  *   - claude:   spawn claude -p   → synchronous response → write cascade-response.json
  *   - none:     return error immediately
  */
@@ -17,14 +17,14 @@ import {
   getWindsurfResponsePath,
 } from './windsurf.js';
 
-export { detectBridge, clearClaudeSession, clearCopilotSession };
+export { detectBridge, clearClaudeSession, clearCopilotSession, getWindsurfResponsePath };
 export type { BridgeStatus };
 
 export type AskAgentMode = 'async' | 'sync';
 
 export interface AskAgentResult {
-  /** 'async': response will arrive via /cascade-response polling (Windsurf).
-   *  'sync':  response is already written to cascade-response.json (Claude). */
+  /** 'async': response will arrive via /agent-response polling (Windsurf).
+   *  'sync':  response is already written to cascade-response.json (Claude/Copilot). */
   mode: AskAgentMode;
   ok: boolean;
   error?: string;
@@ -34,7 +34,7 @@ export interface AskAgentResult {
  * Send a question to the appropriate agent bridge.
  *
  * For the Windsurf bridge (async): writes the trigger file and returns
- * immediately — the dashboard polls /cascade-response.
+ * immediately — the dashboard polls /agent-response.
  *
  * For the Claude bridge (sync): spawns `claude -p`, waits for the response,
  * writes it to cascade-response.json so the dashboard polling logic works

@@ -1,5 +1,6 @@
 import type { GraphLoader } from '../graph-loader.js';
 import type { RiskFactor, SmellCategory } from '@sprang/core';
+import { calcHealthGrade, gradeColor, loadHistory } from '@sprang/core';
 
 export interface SprangHealthInput {
   // no fields required
@@ -25,6 +26,30 @@ export interface SprangHealthResult {
   orphan_count: number;
   circular_dependency_count: number;
   nodes_without_tests: number;
+  health_score: number;
+  health_grade: string;
+  grade_color: string;
+  grade_breakdown: {
+    dead_code_penalty: number;
+    circular_penalty: number;
+    god_node_penalty: number;
+    coupling_penalty: number;
+    security_penalty: number;
+  };
+  security_summary: {
+    total: number;
+    by_severity: { high: number; medium: number; low: number };
+    by_category: Partial<Record<string, number>>;
+  };
+  history: Array<{
+    timestamp: string;
+    health_score: number;
+    health_grade: string;
+    total_nodes: number;
+    total_edges: number;
+    smell_count: number;
+    security_count: number;
+  }>;
 }
 
 export async function sprangHealth(
@@ -45,17 +70,13 @@ export async function sprangHealth(
 
   const orphanCount = graph.nodes.filter((n) => !nodeIdsWithEdges.has(n.id)).length;
 
-  // Circular dependency count: nodes that have a circular_dependency structural warning
   const circularDependencyCount = graph.nodes.filter((n) =>
     n.structural_warnings?.some((w) => w.category === 'circular_dependency')
   ).length;
 
-  // Nodes without tests: non-test nodes with no 'tested_by' edge pointing to them
   const testedNodeIds = new Set<string>();
   for (const edge of graph.edges) {
-    if (edge.type === 'tested_by') {
-      testedNodeIds.add(edge.target);
-    }
+    if (edge.type === 'tested_by') testedNodeIds.add(edge.target);
   }
 
   const nodesWithoutTests = graph.nodes.filter((n) => {
@@ -67,7 +88,6 @@ export async function sprangHealth(
     return !isTestNode && !testedNodeIds.has(n.id);
   }).length;
 
-  // Top 10 risky nodes
   const sortedByRisk = [...graph.nodes]
     .filter((n) => n.risk_score !== undefined)
     .sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0))
@@ -81,6 +101,22 @@ export async function sprangHealth(
     risk_factors: n.risk_factors ?? [],
   }));
 
+  const godNodeCount = graph.stats.smell_summary['god_node'] ?? 0;
+  const gradeResult = calcHealthGrade(graph.stats, {
+    orphanCount,
+    circularCount: circularDependencyCount,
+    godNodeCount,
+  });
+
+  const securitySummary = graph.stats.security_summary ?? {
+    total: 0,
+    by_severity: { high: 0, medium: 0, low: 0 },
+    by_category: {},
+  };
+
+  const projectRoot = process.env.SPRANG_ROOT ?? '.';
+  const history = await loadHistory(projectRoot).catch(() => []);
+
   return {
     phase: graph.phase,
     generated_at: graph.generated_at,
@@ -93,5 +129,11 @@ export async function sprangHealth(
     orphan_count: orphanCount,
     circular_dependency_count: circularDependencyCount,
     nodes_without_tests: nodesWithoutTests,
+    health_score: gradeResult.score,
+    health_grade: gradeResult.grade,
+    grade_color: gradeColor(gradeResult.grade),
+    grade_breakdown: gradeResult.breakdown,
+    security_summary: securitySummary,
+    history: history.slice(-30),
   };
 }

@@ -57,6 +57,11 @@ const TOOLS = [
           type: 'number',
           description: 'Maximum number of results to return (default 10)',
         },
+        mode: {
+          type: 'string',
+          enum: ['keyword', 'semantic'],
+          description: 'Search mode: "keyword" for TF-IDF text match (default), "semantic" for embedding-based similarity search.',
+        },
       },
       required: ['query'],
     },
@@ -96,7 +101,7 @@ const TOOLS = [
   {
     name: 'sprang_tour',
     description:
-      'Return a guided architecture tour of the codebase. Supports different personas: junior (all steps), senior (skip intro), pm (domain/service nodes only).',
+      'Return a guided architecture tour of the codebase. Supports personas: junior (all steps + language lessons), senior/experienced (skip intro, technical focus), pm (domain/service nodes, business process focus), non-technical (entry-points and domains only, no code details).',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -106,9 +111,9 @@ const TOOLS = [
         },
         persona: {
           type: 'string',
-          enum: ['junior', 'senior', 'pm'],
+          enum: ['junior', 'senior', 'experienced', 'pm', 'non-technical'],
           description:
-            'Filter tour steps for a persona. junior=all, senior=skip intro, pm=domain/service only.',
+            'Filter tour steps by audience. junior=all steps, senior/experienced=skip intro, pm=domain/service only, non-technical=entry-points and domains only.',
         },
       },
       required: [],
@@ -132,7 +137,7 @@ const TOOLS = [
   {
     name: 'sprang_health',
     description:
-      'Return a comprehensive health report: node/edge counts, risk summary, smell summary, top 10 risky nodes, orphan count, circular dependency count, nodes without tests.',
+      'Return a comprehensive health report: health grade (A–F), score (0–100), node/edge counts, risk summary, smell summary, security summary, top 10 risky nodes, orphan count, circular dependency count, nodes without tests, and run history (last 30 snapshots).',
     inputSchema: {
       type: 'object' as const,
       properties: {},
@@ -218,6 +223,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         if (input['limit'] !== undefined) {
           queryInput.limit = input['limit'] as number;
+        }
+        if (input['mode'] !== undefined) {
+          queryInput.mode = input['mode'] as 'keyword' | 'semantic';
         }
         result = await sprangQuery(loader, queryInput);
         break;

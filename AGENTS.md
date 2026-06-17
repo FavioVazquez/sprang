@@ -33,7 +33,7 @@ This repository has Sprang installed. A knowledge graph is available at `.sprang
 
 ## MCP Tools Reference
 
-All 9 tools available to Cascade via the MCP server:
+All 9 tools available to your AI agent via the MCP server:
 
 ### `sprang_query`
 ```
@@ -67,10 +67,10 @@ Use for: blast radius analysis before committing or after `/sprang-diff`.
 
 ### `sprang_tour`
 ```
-Input:  { tour_id?: string, persona?: "junior" | "senior" | "pm" }
+Input:  { tour_id?: string, persona?: "junior" | "senior" | "experienced" | "pm" | "non-technical" }
 Output: { tour_id, title, steps: TourStep[] }
 ```
-Use for: onboarding, guided walkthroughs. Persona filters: junior=all, senior=skip intro, pm=domain/service only.
+Use for: onboarding, guided walkthroughs. Persona filters: `junior`=all steps, `senior`/`experienced`=skip intro, `pm`=domain/service nodes, `non-technical`=entry-points and domains only.
 
 ### `sprang_domain`
 ```
@@ -82,10 +82,23 @@ Use for: understanding business processes and which code owns each domain.
 ### `sprang_health`
 ```
 Input:  {}
-Output: { phase, node_count, edge_count, risk_summary, smell_summary, top_risky_nodes,
-          orphan_count, circular_dep_count, nodes_without_tests }
+Output: {
+  phase, generated_at, total_nodes, total_edges,
+  health_grade: "A"|"B"|"C"|"D"|"F",
+  health_score: number,                  // 0–100
+  grade_color: string,                   // hex (#22c55e for A → #ef4444 for F)
+  grade_breakdown: { dead_code_penalty, circular_penalty, god_node_penalty,
+                     coupling_penalty, security_penalty },
+  risk_summary: { high, medium, low },
+  smell_summary: Partial<Record<SmellCategory, number>>,
+  security_summary: { total, by_severity: { high, medium, low },
+                      by_category: Partial<Record<SecurityCategory, number>> },
+  top_10_risky_nodes: TopRiskyNode[],
+  orphan_count, circular_dependency_count, nodes_without_tests,
+  history: HistorySnapshot[]             // last 30 run snapshots
+}
 ```
-Use for: structural health check, prioritizing refactoring targets.
+Use for: structural health check, letter grade at a glance, security audit, prioritizing refactoring targets.
 
 ### `sprang_why`
 ```
@@ -101,9 +114,16 @@ Output: { success: true, path: string, node_id, node_label }
 ```
 Writes `.sprang/annotations/<sanitized-node-id>.md` with YAML frontmatter. Commit these files.
 
+### `sprang_respond`
+```
+Input:  { response: string, question?: string }
+Output: { success: true, path: string, written_at: string }
+```
+Writes `.sprang/cascade-response.json` so the dashboard Ask Agent panel displays your reply. Call this at the end of every dashboard chat response.
+
 ---
 
-## For Cascade — Best Practices
+## For AI Agents — Best Practices
 
 **Before editing any file:**
 1. Call `sprang_node` with the file path to check `risk_score`, `structural_warnings`, `layer`, `in_degree`, and `has_annotation`
@@ -134,16 +154,43 @@ If no graph exists yet: run `/sprang` to build one.
 
 ---
 
+## Dashboard
+
+Sprang ships a polished React + Vite dashboard (Sigma.js graph, framer-motion throughout) with a considered design system: OKLCH-tinted surface ramp, three themes (dark / light / high-contrast), Outfit + JetBrains Mono type pairing, spring-physics motion, and full `prefers-reduced-motion` support. Risk is rendered as an accessible heat scale, not a naive red/green.
+
+Start it:
+
+```bash
+pnpm --filter @sprang/dashboard preview   # serves pre-built dist (daily use), http://localhost:7777
+pnpm --filter @sprang/dashboard dev        # hot-reload for dashboard development, http://localhost:7338
+sprang open [path] [--auto-scan]           # point the dashboard at any folder without cd
+```
+
+**Views** (keyboard `1`–`7` / `g h d a t m l`):
+- **Graph** — force-directed knowledge graph; toggle the risk heat overlay with `R`
+- **Health** — letter grade A–F, smell table (incl. `layer_violation`), top-10 risk nodes, security findings, detected design patterns
+- **Domains** — business domain → flow → step hierarchy
+- **Architecture** — layer card view (React Flow + ELK)
+- **Treemap** — D3 file/folder hierarchy sized by lines, colored by risk score
+- **Matrix** — file-to-file adjacency matrix sorted by layer rank
+- **Learn** — persona-adaptive guided tour player
+
+**Instant analysis (no agent needed):** opening the dashboard on a project with no graph shows a **landing screen** — type a local path or paste a GitHub URL (`github.com/owner/repo`) and the server runs Phase 1 (static, <60s, clones the repo to a temp folder for GitHub URLs). `sprang open --auto-scan` skips the click. This is the zero-friction, point-and-analyze entry point; Phase 2 enrichment then layers in semantic summaries, decision context, and risk.
+
+**What Phase 1 surfaces deterministically (zero LLM, zero API key):** import graph, function-to-function call edges (`internalCalls` / `externalCalls` / `callerCount` per function), design patterns (singleton, factory, observer, strategy, decorator, react_hook, context_provider, event_emitter, dependency_injection), architecture layers, layer violations, code smells, security findings, and health grade.
+
+---
+
 ## Dashboard Chat (Ask Agent)
 
 The Sprang dashboard has an **Ask Agent** panel that routes questions through whichever agent bridge is active:
-- **Windsurf / Devin Desktop** — writes `.cascade-trigger-session`; the `cascade-messaging` VS Code extension forwards to Cascade
+- **Windsurf / Devin Desktop** — writes `.cascade-trigger-session`; the `cascade-messaging` VS Code extension forwards it to Cascade (the Windsurf AI), which calls `sprang_respond` to write the reply
 - **Claude Code** — spawns `claude -p` non-interactively with session continuity via `--resume`
 - **Copilot CLI** — spawns `copilot --prompt` non-interactively with session continuity via `--resume=<id>`
 
 Conversation history is maintained in `.sprang/agent-conversation.md` (gitignored — use `cat` to read it, not `read_file`).
 
-The rule `.devin/rules/cascade-messaging.md` (always_on) governs this — it tells Cascade to:
+The rule `.devin/rules/cascade-messaging.md` (always_on) governs this for Windsurf — it tells Cascade to:
 1. Run `cat .sprang/agent-conversation.md 2>/dev/null || echo "(no history yet)"` before each message
 2. Answer the message fully
 3. Call `sprang_respond` MCP tool so the reply appears in the dashboard UI

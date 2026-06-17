@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { stat } from 'node:fs/promises';
-import type { KnowledgeGraph, SprangNode, ScanResult } from '../schema/types.js';
+import type { ScanResult } from '../schema/types.js';
 import type { SprangOptions } from '../agents/base.js';
 import { NullLLMClient } from '../llm/client.js';
 import { loadGraph, saveGraph } from '../graph/store.js';
@@ -132,13 +132,13 @@ export async function runIncrementalUpdate(
     const { SmellDetectorAgent } = await import('../agents/smell-detector.js');
     const smellResult = await new SmellDetectorAgent().run({ ...ctx, graph });
     if (smellResult.success) graph = smellResult.mutatedGraph;
-  } catch {}
+  } catch { /* best-effort re-enrichment; ignore failures */ }
 
   try {
     const { RiskScorerAgent } = await import('../agents/risk-scorer.js');
     const riskResult = await new RiskScorerAgent().run({ ...ctx, graph });
     if (riskResult.success) graph = riskResult.mutatedGraph;
-  } catch {}
+  } catch { /* best-effort re-enrichment; ignore failures */ }
 
   // Atomic save
   await saveGraph(sprangDir, graph);

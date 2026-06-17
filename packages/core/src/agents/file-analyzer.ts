@@ -9,6 +9,7 @@ import type {
   FileAnalysis,
   FunctionRecord,
   ClassRecord,
+  DetectedPattern,
 } from '../schema/types.js';
 import { BaseAgent } from './base.js';
 import type { AgentContext, AgentResult } from './base.js';
@@ -28,7 +29,6 @@ interface SymbolMatch {
 }
 
 function findFunctions(source: string): Array<SymbolMatch & { exported: boolean; isAsync: boolean }> {
-  const lines = source.split('\n');
   const results: Array<SymbolMatch & { exported: boolean; isAsync: boolean }> = [];
   const seen = new Set<string>();
 
@@ -91,6 +91,97 @@ function findClasses(source: string): Array<SymbolMatch & { exported: boolean }>
   return results;
 }
 
+function detectPatterns(source: string): DetectedPattern[] {
+  const patterns: DetectedPattern[] = [];
+
+  // Singleton: private constructor + static instance field
+  if (/private\s+(?:static\s+)?(?:readonly\s+)?instance\s*[:=]/i.test(source) ||
+      (/private\s+constructor\s*\(/.test(source) && /static\s+\w*instance\w*/i.test(source))) {
+    patterns.push('singleton');
+  }
+
+  // Factory: function/method named create* or make* returning an object type
+  if (/(?:function|static)\s+(?:create|make|build)\w*\s*\(/i.test(source)) {
+    patterns.push('factory');
+  }
+
+  // Observer/EventEmitter: subscribe/unsubscribe/emit patterns
+  if (/(?:addEventListener|\.on\(|\.subscribe\(|\.emit\(|EventEmitter)/i.test(source)) {
+    patterns.push('observer');
+  }
+
+  // React hook: exported function starting with use + hook usage
+  if (/export\s+(?:function|const)\s+use[A-Z]\w+/.test(source) &&
+      /use(?:State|Effect|Ref|Memo|Callback|Context|Reducer)\s*\(/.test(source)) {
+    patterns.push('react_hook');
+  }
+
+  // Strategy: interface/abstract class with multiple implementations
+  if (/(?:implements\s+\w+Strategy|interface\s+\w+Strategy)/i.test(source)) {
+    patterns.push('strategy');
+  }
+
+  // Dependency injection: constructor with multiple typed parameters (common DI pattern)
+  if (/constructor\s*\(\s*(?:private|readonly|public)\s+\w+\s*:\s*\w+[^)]*,\s*(?:private|readonly|public)/.test(source)) {
+    patterns.push('dependency_injection');
+  }
+
+  // React Context Provider: createContext + a <Something.Provider> or .Provider usage
+  if (/createContext\s*[(<]/.test(source) &&
+      /\.\s*Provider\b/.test(source)) {
+    patterns.push('context_provider');
+  }
+
+  // Decorator: a capitalized decorator applied on its own line above a class/method
+  // (e.g. @Injectable, @Component, @Module) — distinct from emails or JSDoc @param.
+  if (/(?:^|\n)\s*@[A-Z]\w*(?:\([^)]*\))?\s*(?:\n|$)/.test(source)) {
+    patterns.push('decorator');
+  }
+
+  // EventEmitter: extending or instantiating an emitter class
+  if (/(?:extends\s+\w*EventEmitter|new\s+\w*EventEmitter\s*\(|extends\s+\w+Emitter\b)/.test(source)) {
+    patterns.push('event_emitter');
+  }
+
+  return [...new Set(patterns)];
+}
+
+// ─── Function call-graph extraction ───────────────────────────────────
+
+/** JS/TS keywords and globals that look like calls but are not user functions. */
+const CALL_STOPWORDS = new Set([
+  'if', 'for', 'while', 'switch', 'catch', 'return', 'function', 'super',
+  'typeof', 'instanceof', 'new', 'await', 'yield', 'void', 'delete', 'in', 'of',
+  'console', 'require', 'import', 'parseInt', 'parseFloat', 'String', 'Number',
+  'Boolean', 'Array', 'Object', 'JSON', 'Math', 'Date', 'Promise', 'Set', 'Map',
+  'Symbol', 'RegExp', 'Error', 'isNaN', 'isFinite', 'setTimeout', 'setInterval',
+]);
+
+/**
+ * Extract the names of functions invoked inside a body of source.
+ * Matches `name(` and `obj.method(` call sites, filtering out keywords.
+ * Returns a frequency map of callee name → call count.
+ */
+function extractCallSites(body: string): Map<string, number> {
+  const calls = new Map<string, number>();
+  // Strip line + block comments and string literals so we don't match inside them.
+  const cleaned = body
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/`(?:\\.|[^`\\])*`/g, '``')
+    .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    .replace(/"(?:\\.|[^"\\])*"/g, '""');
+  // Bare calls: identifier immediately followed by '('
+  const re = /(?:\.\s*)?\b([A-Za-z_$][\w$]*)\s*\(/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(cleaned)) !== null) {
+    const name = m[1];
+    if (!name || CALL_STOPWORDS.has(name)) continue;
+    calls.set(name, (calls.get(name) ?? 0) + 1);
+  }
+  return calls;
+}
+
 /**
  * Estimate the end line of a symbol by scanning forward from startLine
  * to find a matching closing brace at the same indentation level.
@@ -122,8 +213,7 @@ function countMethodsInClass(source: string, startLine: number, endLine: number)
   const methodRe =
     /(?:^|\n)\s+(?:(?:public|private|protected|static|async|override|readonly)\s+)*(\w+)\s*\([^)]*\)\s*(?::\s*[^{]+)?\s*\{/g;
   let count = 0;
-  let m: RegExpExecArray | null;
-  while ((m = methodRe.exec(classSource)) !== null) {
+  while (methodRe.exec(classSource) !== null) {
     // Skip constructor if desired; count all
     count++;
   }
@@ -144,6 +234,13 @@ export class FileAnalyzerAgent extends BaseAgent {
       const graph = ctx.graph;
       const newNodes: SprangNode[] = [];
       const newEdges: SprangEdge[] = [];
+
+      // Call-graph collection: function registry + bodies for a resolution pass
+      interface FnEntry { nodeId: string; name: string; filePath: string; body: string; exported: boolean; }
+      const fnEntries: FnEntry[] = [];
+      const fnsByFile = new Map<string, FnEntry[]>();
+      // filePath → set of resolved imported file paths (populated in the import-edge pass)
+      const resolvedImportsByFile = new Map<string, Set<string>>();
 
       // Output directory for per-file analysis
       const analysisDir = join(ctx.intermediateDir, 'file-analysis');
@@ -220,6 +317,14 @@ export class FileAnalyzerAgent extends BaseAgent {
             target: nodeId,
             type: 'contains',
           });
+
+          // Register for call-graph resolution (capture the body slice)
+          const body = lines.slice(fn.startLine - 1, endLine).join('\n');
+          const entry: FnEntry = { nodeId, name: fn.name, filePath: fileRecord.path, body, exported: fn.exported };
+          fnEntries.push(entry);
+          const bucket = fnsByFile.get(fileRecord.path) ?? [];
+          bucket.push(entry);
+          fnsByFile.set(fileRecord.path, bucket);
         }
 
         // Process classes
@@ -266,6 +371,15 @@ export class FileAnalyzerAgent extends BaseAgent {
           });
         }
 
+        // Detect and attach patterns to the existing file node in graph
+        const filePatterns = detectPatterns(source);
+        if (filePatterns.length > 0) {
+          const existingFileNode = graph.nodes.find(n => n.id === fileNodeId);
+          if (existingFileNode) {
+            existingFileNode.detected_patterns = filePatterns;
+          }
+        }
+
         // Write per-file analysis
         const analysis: FileAnalysis = {
           path: fileRecord.path,
@@ -292,6 +406,10 @@ export class FileAnalyzerAgent extends BaseAgent {
         for (const importPath of importPaths) {
           const resolvedPath = resolveLanguageImport(lang, importPath, fromRelPath, allRelPaths);
           if (!resolvedPath) continue;
+          // Track resolved imports per file for cross-file call resolution
+          const set = resolvedImportsByFile.get(fromRelPath) ?? new Set<string>();
+          set.add(resolvedPath);
+          resolvedImportsByFile.set(fromRelPath, set);
           const targetNodeId = `file:${resolvedPath}`;
           const existsInGraph = graph.nodes.some((n) => n.id === targetNodeId);
           const existsInNew = newNodes.some((n) => n.id === targetNodeId);
@@ -304,6 +422,72 @@ export class FileAnalyzerAgent extends BaseAgent {
             }
           }
         }
+      }
+
+      // ─── Call-graph resolution pass ───────────────────────────────────
+      // Resolve function-to-function calls into `calls` edges. Internal calls
+      // (same file) resolve precisely; external calls resolve against exported
+      // functions in files the caller's file directly imports.
+      const callMeta = new Map<string, { internal: number; external: number; callers: Set<string> }>();
+      const ensureMeta = (id: string) => {
+        let m = callMeta.get(id);
+        if (!m) { m = { internal: 0, external: 0, callers: new Set() }; callMeta.set(id, m); }
+        return m;
+      };
+      // Index exported functions by name within each file for external lookup
+      const exportedByFile = new Map<string, Map<string, FnEntry>>();
+      for (const [fp, entries] of fnsByFile) {
+        const idx = new Map<string, FnEntry>();
+        for (const e of entries) if (e.exported) idx.set(e.name, e);
+        exportedByFile.set(fp, idx);
+      }
+      const seenCallEdges = new Set<string>();
+      for (const caller of fnEntries) {
+        const sites = extractCallSites(caller.body);
+        const sameFile = fnsByFile.get(caller.filePath) ?? [];
+        const sameFileByName = new Map(sameFile.map((e) => [e.name, e]));
+        const importedFiles = resolvedImportsByFile.get(caller.filePath) ?? new Set<string>();
+        for (const [calleeName, count] of sites) {
+          if (calleeName === caller.name) continue; // ignore self-recursion edges
+          // Internal call — same file
+          const internal = sameFileByName.get(calleeName);
+          if (internal) {
+            const key = `${caller.nodeId}→${internal.nodeId}`;
+            ensureMeta(caller.nodeId).internal += count;
+            ensureMeta(internal.nodeId).callers.add(caller.nodeId);
+            if (!seenCallEdges.has(key)) {
+              seenCallEdges.add(key);
+              newEdges.push({ source: caller.nodeId, target: internal.nodeId, type: 'calls', weight: count });
+            }
+            continue;
+          }
+          // External call — exported function in a directly-imported file
+          for (const impFile of importedFiles) {
+            const target = exportedByFile.get(impFile)?.get(calleeName);
+            if (target) {
+              const key = `${caller.nodeId}→${target.nodeId}`;
+              ensureMeta(caller.nodeId).external += count;
+              ensureMeta(target.nodeId).callers.add(caller.nodeId);
+              if (!seenCallEdges.has(key)) {
+                seenCallEdges.add(key);
+                newEdges.push({ source: caller.nodeId, target: target.nodeId, type: 'calls', weight: count });
+              }
+              break;
+            }
+          }
+        }
+      }
+      // Stamp call metadata onto function nodes
+      for (const node of newNodes) {
+        const m = callMeta.get(node.id);
+        if (!m) continue;
+        node.metadata = {
+          ...node.metadata,
+          internalCalls: m.internal,
+          externalCalls: m.external,
+          callerCount: m.callers.size,
+          isUnused: m.callers.size === 0 && node.metadata?.['exported'] !== true,
+        };
       }
 
       const updatedGraph: KnowledgeGraph = {

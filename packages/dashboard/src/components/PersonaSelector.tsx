@@ -4,18 +4,23 @@ import type { Persona } from '../types';
 const PERSONAS: { id: Persona; label: string; description: string }[] = [
   {
     id: 'non-technical',
-    label: 'Overview',
-    description: 'High-level explanations without jargon — great for PMs and stakeholders',
+    label: 'Business',
+    description: 'Entry-points and domains only — for executives and business stakeholders who want the big picture without code details',
+  },
+  {
+    id: 'pm',
+    label: 'Product',
+    description: 'Domain and service nodes — for product managers focused on business processes and feature areas',
   },
   {
     id: 'junior',
     label: 'Learn',
-    description: 'Step-by-step explanations with language lessons — ideal for developers new to this codebase',
+    description: 'All steps with language lessons — ideal for developers who are new to this codebase',
   },
   {
-    id: 'experienced',
+    id: 'senior',
     label: 'Deep Dive',
-    description: 'Technical details, trade-offs, and architectural decisions — for senior engineers',
+    description: 'Technical details, trade-offs, and architectural decisions — skips intro steps for experienced engineers',
   },
 ];
 

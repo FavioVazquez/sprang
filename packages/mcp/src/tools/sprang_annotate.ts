@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import type { GraphLoader } from '../graph-loader.js';
 import type { SprangNode } from '@sprang/core';
 
@@ -17,11 +17,29 @@ export interface SprangAnnotateResult {
 }
 
 function sanitizeNodeId(nodeId: string): string {
-  // Replace all path-unsafe and shell-special chars; then strip to basename to prevent traversal
+  // Replace all path-unsafe and shell-special chars; preserve full path to prevent monorepo collisions
   const sanitized = nodeId
     .replace(/[:/\\<>"|?*\x00-\x1f]/g, '-')
-    .replace(/\.{2,}/g, '-');
-  return basename(sanitized) || 'unknown-node';
+    .replace(/\.{2,}/g, '-')
+    .replace(/^-+|-+$/g, '');  // trim leading/trailing hyphens
+  return sanitized || 'unknown-node';
+}
+
+function resolveNode(nodes: SprangNode[], nodeId: string): SprangNode | undefined {
+  // Try exact match first
+  let found = nodes.find((n) => n.id === nodeId);
+  if (found) return found;
+  // Try with file: prefix
+  found = nodes.find((n) => n.id === `file:${nodeId}`);
+  if (found) return found;
+  // Try without file: prefix
+  if (nodeId.startsWith('file:')) {
+    found = nodes.find((n) => n.id === nodeId.slice(5));
+    if (found) return found;
+  }
+  // Try suffix match (for cases where stored ID includes project root prefix)
+  found = nodes.find((n) => n.id.endsWith(`/${nodeId}`) || n.id.endsWith(nodeId));
+  return found;
 }
 
 export async function sprangAnnotate(
@@ -34,12 +52,12 @@ export async function sprangAnnotate(
     return { error: 'Knowledge graph not found', code: 'GRAPH_NOT_FOUND' };
   }
 
-  const node = graph.nodes.find((n: SprangNode) => n.id === input.node_id);
+  const node = resolveNode(graph.nodes, input.node_id);
   if (!node) {
     return { error: 'Node not found', code: 'NODE_NOT_FOUND' };
   }
 
-  const sanitizedId = sanitizeNodeId(input.node_id);
+  const sanitizedId = sanitizeNodeId(node.id);
   const annotationsDir = join(sprangRoot, '.sprang', 'annotations');
   const filename = `${sanitizedId}.md`;
   const filePath = join(annotationsDir, filename);
@@ -68,7 +86,7 @@ export async function sprangAnnotate(
   return {
     success: true,
     path: relativePath,
-    node_id: input.node_id,
+    node_id: node.id,
     node_label: node.label,
   };
 }

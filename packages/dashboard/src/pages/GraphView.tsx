@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Search,
@@ -19,6 +19,9 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Tooltip } from '../components/ui/Tooltip';
 import { GraphCanvas } from '../components/GraphCanvas';
+const Graph3DCanvas = lazy(() =>
+  import('../components/Graph3DCanvas').then((m) => ({ default: m.Graph3DCanvas })),
+);
 import { NodePanel } from '../components/NodePanel';
 import { RiskOverlay } from '../components/RiskOverlay';
 import { TourPlayer } from '../components/TourPlayer';
@@ -66,12 +69,14 @@ export function GraphView({
     diffMode,
     changedNodeIds,
     affectedNodeIds,
+    graphViewMode,
+    setGraphViewMode,
   } = useDashboardStore();
   const [showSearch, setShowSearch] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'files' | 'source'>('files');
   const [hoveredLayerId, setHoveredLayerId] = useState<string | undefined>();
-  const [tooltipNodeId, setTooltipNodeId] = useState<string | null>(null);
+  const [tooltipNodeId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [showTourMenu, setShowTourMenu] = useState(false);
@@ -158,6 +163,24 @@ export function GraphView({
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* 2D / 3D toggle */}
+        <div className="flex items-center rounded-md overflow-hidden border border-surface-700 text-xs font-medium">
+          {(['2d', '3d'] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setGraphViewMode(mode)}
+              className={`px-2.5 py-1 transition-colors ${
+                graphViewMode === mode
+                  ? 'bg-surface-700 text-surface-50'
+                  : 'text-surface-500 hover:text-surface-300 hover:bg-surface-800/50'
+              }`}
+              title={`Switch to ${mode.toUpperCase()} graph`}
+            >
+              {mode.toUpperCase()}
+            </button>
+          ))}
+        </div>
 
         {/* Risk overlay toggle */}
         <RiskOverlay
@@ -369,15 +392,6 @@ export function GraphView({
           Skeleton graph ready — run <code className="mx-1 px-1 py-0.5 rounded bg-surface-800 text-sprang-200 font-mono">/sprang-analyze</code> to enrich with architecture layers, guided tour, and risk scores.
         </div>
       )}
-      {graph.phase === 'enriched' && (
-        <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-300 flex-shrink-0">
-          <span className="relative flex h-2 w-2 flex-shrink-0">
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-          </span>
-          Analysis incomplete — Architecture and Learn tabs need phases 3–6. Run <code className="mx-1 px-1 py-0.5 rounded bg-surface-800 text-amber-200 font-mono">/sprang-analyze</code> to resume from where it stopped.
-        </div>
-      )}
-
       {/* Main content */}
       <div className="flex-1 relative overflow-hidden">
         {/* Left sidebar: FileExplorer + CodeViewer */}
@@ -447,16 +461,47 @@ export function GraphView({
           style={{ left: sidebarOpen ? (codeViewerOpen ? 560 : 240) : 0 }}
           onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
         >
-          <GraphCanvas
-            graph={graph}
-            selectedNodeId={selectedNodeId}
-            onNodeSelect={handleNodeSelect}
-            showRiskOverlay={showRiskOverlay}
-            hoveredLayerId={hoveredLayerId}
-            diffMode={diffMode}
-            changedNodeIds={changedNodeIds}
-            affectedNodeIds={affectedNodeIds}
-          />
+          <AnimatePresence mode="wait">
+            {graphViewMode === '3d' ? (
+              <motion.div
+                key="3d"
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <Suspense fallback={<div className="absolute inset-0 bg-surface-950" />}>
+                  <Graph3DCanvas
+                    graph={graph}
+                    selectedNodeId={selectedNodeId}
+                    onNodeSelect={handleNodeSelect}
+                    showRiskOverlay={showRiskOverlay}
+                  />
+                </Suspense>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="2d"
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <GraphCanvas
+                  graph={graph}
+                  selectedNodeId={selectedNodeId}
+                  onNodeSelect={handleNodeSelect}
+                  showRiskOverlay={showRiskOverlay}
+                  hoveredLayerId={hoveredLayerId}
+                  diffMode={diffMode}
+                  changedNodeIds={changedNodeIds}
+                  affectedNodeIds={affectedNodeIds}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Layer legend — bottom-left of canvas */}
           {graph.kind !== 'knowledge' && (

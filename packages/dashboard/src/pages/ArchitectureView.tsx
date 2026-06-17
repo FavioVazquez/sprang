@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import {
   ReactFlow,
   Background,
@@ -278,6 +279,11 @@ export function ArchitectureView() {
 
   const hasLayers = Boolean(graph && graph.layers && graph.layers.length > 0);
 
+  const allLayerEdges = useMemo(
+    () => (graph ? aggregateLayerEdges(graph) : []),
+    [graph],
+  );
+
   // Run ELK layout whenever graph layers change
   useEffect(() => {
     if (!graph || !hasLayers) {
@@ -293,8 +299,7 @@ export function ArchitectureView() {
       height: CARD_HEIGHT,
     }));
 
-    const layerEdges = aggregateLayerEdges(graph);
-    const elkEdges = layerEdges.map((le) => ({
+    const elkEdges = allLayerEdges.map((le) => ({
       id: `${le.sourceLayerId}--${le.targetLayerId}`,
       sources: [le.sourceLayerId],
       targets: [le.targetLayerId],
@@ -312,7 +317,7 @@ export function ArchitectureView() {
         });
         setPositions(fallback);
       });
-  }, [graph, hasLayers]);
+  }, [graph, hasLayers, allLayerEdges]);
 
   const handleSelect = useCallback(
     (layerId: string) => {
@@ -337,7 +342,7 @@ export function ArchitectureView() {
     return <EmptyState />;
   }
 
-  const crossLayerCount = aggregateLayerEdges(graph).length;
+  const crossLayerCount = allLayerEdges.length;
 
   const selectedLayer = graph.layers.find((l) => l.id === selectedLayerId);
   const selectedColorIndex = selectedLayer ? graph.layers.indexOf(selectedLayer) : 0;
@@ -381,7 +386,12 @@ export function ArchitectureView() {
         {positions === null ? (
           <LoadingLayout />
         ) : (
-          <div className="flex-1 min-h-0">
+          <motion.div
+            className="flex-1 min-h-0"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          >
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -406,7 +416,7 @@ export function ArchitectureView() {
                 maskColor="rgba(0,0,0,0.7)"
               />
             </ReactFlow>
-          </div>
+          </motion.div>
         )}
 
         {/* Layer detail panel */}

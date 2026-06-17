@@ -3,7 +3,6 @@ import Fuse from 'fuse.js';
 import type {
   KnowledgeGraph,
   SprangNode,
-  Layer,
   Tour,
   TourStep,
   Persona,
@@ -130,12 +129,16 @@ export interface DashboardStore {
   // Node type category quick-toggles
   nodeTypeFilters: Record<NodeCategory, boolean>;
 
+  // Graph view mode (2D Sigma vs 3D WebGL)
+  graphViewMode: '2d' | '3d';
+
   // Toolbar panels
   exportMenuOpen: boolean;
   pathFinderOpen: boolean;
 
   // Actions — graph
   setGraph: (graph: KnowledgeGraph) => void;
+  setGraphViewMode: (mode: '2d' | '3d') => void;
 
   // Actions — selection
   selectNode: (nodeId: string | null) => void;
@@ -230,6 +233,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     code: true, config: true, docs: true, infra: true,
     data: true, domain: true, knowledge: true,
   },
+  graphViewMode: '2d',
   exportMenuOpen: false,
   pathFinderOpen: false,
 
@@ -338,6 +342,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
 
   // ─── View mode ─────────────────────────────────────────────────────────────
   setViewMode: (mode) => set({ viewMode: mode }),
+  setGraphViewMode: (mode) => set({ graphViewMode: mode }),
 
   // ─── Diff ──────────────────────────────────────────────────────────────────
   setDiffOverlay: (overlay) => set({

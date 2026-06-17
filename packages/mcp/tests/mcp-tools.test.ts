@@ -209,6 +209,18 @@ describe('sprang_tour', () => {
     expect(result.total_steps).toBe(0);
   });
 
+  it('skips first step for experienced persona (alias for senior)', async () => {
+    const { loader } = await setupGraph();
+    const result = await sprangTour(loader, { persona: 'experienced' }) as { total_steps: number };
+    expect(result.total_steps).toBe(1);
+  });
+
+  it('returns empty steps for non-technical persona (no entry-point/domain nodes in fixture)', async () => {
+    const { loader } = await setupGraph();
+    const result = await sprangTour(loader, { persona: 'non-technical' }) as { total_steps: number };
+    expect(result.total_steps).toBe(0);
+  });
+
   it('returns error for unknown tour_id', async () => {
     const { loader } = await setupGraph();
     const result = await sprangTour(loader, { tour_id: 'tour:nonexistent' });
@@ -269,6 +281,31 @@ describe('sprang_query', () => {
     const { loader } = await setupGraph();
     const result = await sprangQuery(loader, { query: 'ts', limit: 2 }) as { nodes: unknown[] };
     expect(result.nodes.length).toBeLessThanOrEqual(2);
+  });
+
+  it('matches multi-word query via token matching', async () => {
+    const { loader } = await setupGraph();
+    // "auth index" should match both auth.ts (label 'auth') and index.ts (label 'index')
+    const result = await sprangQuery(loader, { query: 'auth index' }) as { nodes: Array<{ id: string }> };
+    const ids = result.nodes.map((n) => n.id);
+    expect(ids).toContain('file:src/auth.ts');
+    expect(ids).toContain('file:src/index.ts');
+  });
+
+  it('matches by node ID (file path) when label does not match', async () => {
+    const { loader } = await setupGraph();
+    // Query for path component "src" — appears in all IDs but not in labels
+    const result = await sprangQuery(loader, { query: 'src/auth' }) as { nodes: Array<{ id: string }> };
+    const ids = result.nodes.map((n) => n.id);
+    expect(ids).toContain('file:src/auth.ts');
+  });
+
+  it('ranks label matches above ID-only matches', async () => {
+    const { loader } = await setupGraph();
+    // 'auth' matches label of auth.ts directly; index.ts has no label match
+    const result = await sprangQuery(loader, { query: 'auth' }) as { nodes: Array<{ id: string }> };
+    const authIdx = result.nodes.findIndex((n) => n.id === 'file:src/auth.ts');
+    expect(authIdx).toBe(0); // auth.ts ranked first
   });
 });
 

@@ -1,5 +1,20 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { KnowledgeGraph } from '../src/types';
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
+
+// After each test run, remove session artifacts created by agent-ask/bridge tests
+// so they don't leak into subsequent runs and cause false bridge detection.
+test.afterAll(async () => {
+  const cwd = process.cwd(); // playwright runs from packages/dashboard/
+  const artifacts = [
+    join(cwd, '.cascade-trigger-session'),
+    join(cwd, '.sprang', 'cascade-response.json'),
+    join(cwd, '.sprang', 'claude-session.json'),
+    join(cwd, '.sprang', 'copilot-session.json'),
+  ];
+  await Promise.allSettled(artifacts.map((f) => rm(f, { force: true })));
+});
 
 // ---------------------------------------------------------------------------
 // Mock graph – rich enough to exercise health, domains, risk, smells,
@@ -82,10 +97,49 @@ const mockGraph: KnowledgeGraph = {
   },
 };
 
+// Mock graph without tours — exercises Learn empty state
+const mockGraphNoTours: KnowledgeGraph = {
+  ...mockGraph,
+  tours: [],
+};
+
 // Mock graph without layers — exercises Architecture empty state
 const mockGraphNoLayers: KnowledgeGraph = {
   ...mockGraph,
   layers: [],
+};
+
+// Mock graph with security findings — exercises HealthView security section
+const mockGraphWithSecurity: KnowledgeGraph = {
+  ...mockGraph,
+  nodes: [
+    ...mockGraph.nodes,
+    {
+      id: 'file:src/db.ts',
+      label: 'db.ts',
+      type: 'file',
+      tags: [],
+      risk_score: 0.7,
+      security_warnings: [
+        {
+          category: 'sql_injection' as import('../src/types').SecurityCategory,
+          severity: 'high' as const,
+          line: 42,
+          pattern: 'sql-interpolation',
+          snippet: "db.query(`SELECT * FROM users WHERE id = '${userId}'`)",
+          description: 'String interpolation in SQL query',
+        },
+      ],
+    },
+  ],
+  stats: {
+    ...mockGraph.stats,
+    security_summary: {
+      total: 1,
+      by_severity: { high: 1, medium: 0, low: 0 },
+      by_category: { sql_injection: 1 },
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -122,28 +176,47 @@ async function waitForAppLoaded(page: Page) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1: Error state (no knowledge-graph.json)
+// Test 1: Landing screen (no knowledge-graph.json)
 // ---------------------------------------------------------------------------
-test('error state – no knowledge-graph.json', async ({ page }) => {
+test('landing screen – no knowledge-graph.json', async ({ page }) => {
   await page.route('**/knowledge-graph.json', (route) =>
     route.fulfill({ status: 404, body: 'Not Found' }),
   );
 
   await page.goto('/');
 
+  // Landing screen shows the Sprang brand heading and an Analyze affordance
   await expect(
-    page.getByRole('heading', { name: 'No knowledge graph found' }),
+    page.getByRole('heading', { name: 'Sprang' }),
   ).toBeVisible({ timeout: 15000 });
 
-  await expect(page.getByText('sprang scan', { exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder('/path/to/your/project')).toBeVisible();
+  await expect(page.getByRole('button', { name: /analyze/i })).toBeVisible();
 
-  const retryButton = page.getByRole('button', { name: /retry/i });
+  // Retry affordance re-attempts loading the existing graph
+  const retryButton = page.getByRole('button', { name: /retry loading existing graph/i });
   await expect(retryButton).toBeVisible();
-
   await retryButton.click();
   await expect(
-    page.getByRole('heading', { name: 'No knowledge graph found' }),
+    page.getByRole('heading', { name: 'Sprang' }),
   ).toBeVisible({ timeout: 15000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 1b: Landing screen detects GitHub URL vs local path
+// ---------------------------------------------------------------------------
+test('landing screen – detects GitHub URL input', async ({ page }) => {
+  await page.route('**/knowledge-graph.json', (route) =>
+    route.fulfill({ status: 404, body: 'Not Found' }),
+  );
+
+  await page.goto('/');
+  const input = page.getByPlaceholder('/path/to/your/project');
+  await expect(input).toBeVisible({ timeout: 15000 });
+
+  // Typing a GitHub URL flips the mode badge to "GitHub"
+  await input.fill('github.com/faviovazquez/sprang');
+  await expect(page.getByText('GitHub', { exact: true })).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------
@@ -349,9 +422,9 @@ test('nav bar – logo persists across all view switches', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 15: Error state – retry button is functional
+// Test 15: Landing screen – retry button re-attempts graph load
 // ---------------------------------------------------------------------------
-test('error state – retry re-attempts graph load', async ({ page }) => {
+test('landing screen – retry re-attempts graph load', async ({ page }) => {
   let callCount = 0;
   await page.route('**/knowledge-graph.json', (route) => {
     callCount++;
@@ -360,14 +433,14 @@ test('error state – retry re-attempts graph load', async ({ page }) => {
 
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: 'No knowledge graph found' }),
+    page.getByRole('heading', { name: 'Sprang' }),
   ).toBeVisible({ timeout: 15000 });
 
   const before = callCount;
-  await page.getByRole('button', { name: /retry/i }).click();
+  await page.getByRole('button', { name: /retry loading existing graph/i }).click();
 
   await expect(
-    page.getByRole('heading', { name: 'No knowledge graph found' }),
+    page.getByRole('heading', { name: 'Sprang' }),
   ).toBeVisible({ timeout: 10000 });
   expect(callCount).toBeGreaterThan(before);
 });
@@ -461,21 +534,69 @@ test('keyboard shortcut – l switches to learn view', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 22: Learn tab – keyboard shortcut '5' (was '4' pre-v0.2.0)
+// Test 22: Treemap tab – keyboard shortcut '5'
 // ---------------------------------------------------------------------------
-test('keyboard shortcut – 5 switches to learn view', async ({ page }) => {
+test('keyboard shortcut – 5 switches to treemap view', async ({ page }) => {
   await gotoApp(page);
 
   await page.locator('body').click({ position: { x: 200, y: 200 } });
   await page.keyboard.press('5');
 
+  await expect(navTab(page, 'Treemap')).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 22b: Treemap tab – keyboard shortcut 't'
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – t switches to treemap view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('t');
+
+  await expect(navTab(page, 'Treemap')).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 22c: Matrix tab – keyboard shortcut '6'
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 6 switches to matrix view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('6');
+
+  await expect(navTab(page, 'Matrix')).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 22d: Matrix tab – keyboard shortcut 'm'
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – m switches to matrix view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('m');
+
+  await expect(navTab(page, 'Matrix')).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 22e: Learn tab – keyboard shortcut '7' (moved from '5' in v0.2.1)
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 7 switches to learn view', async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('7');
+
   await expect(navTab(page, 'Learn')).toBeVisible({ timeout: 5000 });
 });
 
 // ---------------------------------------------------------------------------
-// Test 23: Keyboard shortcuts modal shows Architecture and updated Learn shortcuts
+// Test 23: Keyboard shortcuts modal shows all view shortcuts including new ones
 // ---------------------------------------------------------------------------
-test('keyboard shortcuts modal – shows A/4 for architecture and L/5 for learn', async ({ page }) => {
+test('keyboard shortcuts modal – shows A/4 for architecture, T/5 for treemap, L/7 for learn', async ({ page }) => {
   await gotoApp(page);
 
   await page.locator('body').click({ position: { x: 200, y: 200 } });
@@ -484,44 +605,97 @@ test('keyboard shortcuts modal – shows A/4 for architecture and L/5 for learn'
   const modal = page.getByText(/keyboard shortcuts/i).first();
   await expect(modal).toBeVisible({ timeout: 5000 });
 
-  // Architecture shortcut should be present
+  // All view shortcuts should be present
   await expect(page.getByText('Architecture view')).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText('Treemap view')).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText('Matrix view')).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText('Learn view')).toBeVisible({ timeout: 3000 });
 
   await page.keyboard.press('Escape');
 });
 
 // ---------------------------------------------------------------------------
-// Test 24: All 5 nav tabs are present and functional
+// Test 24: All 7 nav tabs are present and functional
 // ---------------------------------------------------------------------------
-test('nav – all 5 tabs (graph, health, domains, architecture, learn) are present', async ({ page }) => {
+test('nav – all 7 tabs (graph, health, domains, architecture, treemap, matrix, learn) are present', async ({ page }) => {
   await gotoApp(page);
 
-  for (const tab of ['Graph', 'Health', 'Domains', 'Architecture', 'Learn']) {
+  for (const tab of ['Graph', 'Health', 'Domains', 'Architecture', 'Treemap', 'Matrix', 'Learn']) {
     await expect(navTab(page, tab)).toBeVisible({ timeout: 5000 });
   }
 });
 
 // ---------------------------------------------------------------------------
-// Test 25: Cascade bridge – /cascade-response returns 204 when no file exists
+// Test 24b: Treemap tab – visible in nav and clickable
 // ---------------------------------------------------------------------------
-test('cascade bridge – GET /cascade-response returns 204 when no pending response', async ({
+test('treemap tab – visible in nav and clickable', async ({ page }) => {
+  await gotoApp(page);
+
+  const treemapTab = navTab(page, 'Treemap');
+  await expect(treemapTab).toBeVisible({ timeout: 5000 });
+  await treemapTab.click();
+
+  // Treemap view renders its toolbar heading
+  await expect(
+    page.getByText(/treemap/i).first(),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 24c: Matrix tab – visible in nav and clickable
+// ---------------------------------------------------------------------------
+test('matrix tab – visible in nav and clickable', async ({ page }) => {
+  await gotoApp(page);
+
+  const matrixTab = navTab(page, 'Matrix');
+  await expect(matrixTab).toBeVisible({ timeout: 5000 });
+  await matrixTab.click();
+
+  // Matrix view renders its toolbar heading
+  await expect(
+    page.getByText(/matrix/i).first(),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 24d: Treemap view – shows empty state when no file nodes
+// ---------------------------------------------------------------------------
+test('treemap view – shows empty state message when graph has no file nodes', async ({ page }) => {
+  const graphNoFiles: KnowledgeGraph = {
+    ...mockGraph,
+    nodes: mockGraph.nodes.map((n) => ({ ...n, type: 'function' as const })),
+  };
+  await gotoApp(page, graphNoFiles);
+
+  const treemapTab = navTab(page, 'Treemap');
+  await treemapTab.click();
+
+  await expect(
+    page.getByText(/no file nodes found|run analysis/i).first(),
+  ).toBeVisible({ timeout: 8000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 25: agent bridge – /agent-response returns 204 when no file exists
+// ---------------------------------------------------------------------------
+test('agent bridge – GET /agent-response returns 204 when no pending response', async ({
   page,
 }) => {
   await gotoApp(page);
 
   // Use page.request to hit the Vite dev-server middleware directly
-  const response = await page.request.get('/cascade-response');
+  const response = await page.request.get('/agent-response');
   // 204 = no content (no response file exists yet), or 200 if a stale file exists
   expect([200, 204]).toContain(response.status());
 });
 
 // ---------------------------------------------------------------------------
-// Test 26: Cascade bridge – POST /cascade-ask validates empty message
+// Test 26: agent bridge – POST /agent-ask validates empty message
 // ---------------------------------------------------------------------------
-test('cascade bridge – POST /cascade-ask rejects empty message', async ({ page }) => {
+test('agent bridge – POST /agent-ask rejects empty message', async ({ page }) => {
   await gotoApp(page);
 
-  const response = await page.request.post('/cascade-ask', {
+  const response = await page.request.post('/agent-ask', {
     data: { message: '' },
     headers: { 'Content-Type': 'application/json' },
   });
@@ -532,17 +706,17 @@ test('cascade bridge – POST /cascade-ask rejects empty message', async ({ page
 });
 
 // ---------------------------------------------------------------------------
-// Test 27: Cascade bridge – POST /cascade-ask accepts valid message
+// Test 27: agent bridge – POST /agent-ask accepts valid message
 // ---------------------------------------------------------------------------
-test('cascade bridge – POST /cascade-ask accepts valid message', async ({ page }) => {
+test('agent bridge – POST /agent-ask accepts valid message', async ({ page }) => {
   await gotoApp(page);
 
-  const response = await page.request.post('/cascade-ask', {
+  // All bridges now fire-and-forget — the endpoint returns 200 immediately and
+  // the dashboard polls /agent-response. 503 = no bridge detected.
+  const response = await page.request.post('/agent-ask', {
     data: { message: 'What does auth.ts do?' },
     headers: { 'Content-Type': 'application/json' },
   });
-  // 200 = a bridge was found and message dispatched
-  // 503 = no bridge available in this environment (expected in CI without claude/copilot)
   expect([200, 503]).toContain(response.status());
 
   const body = await response.json() as { ok?: boolean; sent?: string; error?: string };
@@ -711,14 +885,16 @@ test('Ask Agent panel – opens and displays bridge info', async ({ page }) => {
   // Empty state shows bridge detection message
   await expect(page.getByText(/no bridge detected|detecting agent bridge/i)).toBeVisible({ timeout: 3000 });
 
-  // Close by pressing Escape
+  // Close by pressing Escape — the slide-in panel should disappear
   await page.keyboard.press('Escape');
+  // The panel header span is only rendered when open=true; after Escape it should be gone
+  await expect(page.locator('span.text-xs.font-semibold', { hasText: 'Ask Agent' })).not.toBeVisible({ timeout: 2000 });
 });
 
 // ---------------------------------------------------------------------------
-// Test 35: Ask Agent panel – /cascade-ask returns 503 when no bridge
+// Test 35: Ask Agent panel – /agent-ask returns 503 when no bridge
 // ---------------------------------------------------------------------------
-test('Ask Agent panel – /cascade-ask 503 when no agent bridge available', async ({ page }) => {
+test('Ask Agent panel – /agent-ask 503 when no agent bridge available', async ({ page }) => {
   await page.addInitScript(() => { localStorage.setItem('sprang:onboarded', 'true'); });
   await page.route('**/knowledge-graph.json', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockGraph) }),
@@ -726,12 +902,10 @@ test('Ask Agent panel – /cascade-ask 503 when no agent bridge available', asyn
   await page.goto('/');
   await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
 
-  // In test environment, no claude/copilot CLIs and no trigger file → bridge=none
-  // /cascade-ask should return 503
-  const resp = await page.request.post('/cascade-ask', {
+  // All bridges now non-blocking — response is always fast (200 = bridge found, 503 = none).
+  const resp = await page.request.post('/agent-ask', {
     data: { message: 'what does auth.ts do?' },
   });
-  // 503 = no bridge, 200 = a bridge was found (e.g. claude CLI installed on CI)
   expect([200, 503]).toContain(resp.status());
   if (resp.status() === 503) {
     const body = await resp.json() as { error: string };
@@ -749,4 +923,274 @@ test('nav bar – Architecture tab visible across all view switches', async ({ p
     await navTab(page, tab).click();
     await expect(navTab(page, 'Architecture')).toBeVisible({ timeout: 5000 });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Test 37: GET /health-history.json returns array
+// ---------------------------------------------------------------------------
+test('GET /health-history.json returns array', async ({ page }) => {
+  const res = await page.request.get('/health-history.json');
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  expect(Array.isArray(body)).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Test 38: GET /analyze-status returns 204 when no progress file
+// ---------------------------------------------------------------------------
+test('GET /analyze-status returns 204 when no progress file', async ({ page }) => {
+  const res = await page.request.get('/analyze-status');
+  expect([200, 204]).toContain(res.status());
+});
+
+// ---------------------------------------------------------------------------
+// Test 39: POST /analyze returns started:true
+// ---------------------------------------------------------------------------
+test('POST /analyze returns started:true', async ({ page }) => {
+  const res = await page.request.post('/analyze', {
+    data: {},
+    headers: { 'Content-Type': 'application/json' },
+  });
+  expect(res.status()).toBe(200);
+  const body = await res.json() as { ok: boolean; started: boolean };
+  expect(body.ok).toBe(true);
+  expect(body.started).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Test 40: Health view shows grade badge
+// ---------------------------------------------------------------------------
+test('health view shows grade badge', async ({ page }) => {
+  await gotoApp(page);
+  // Navigate to health view using the desktop nav tab helper
+  await navTab(page, 'Health').click();
+  // Grade badge should be visible (A, B, C, D, or F)
+  await expect(page.locator('text=/^[ABCDF]$/')).toBeVisible({ timeout: 5000 });
+});
+
+// Test 41: File content API – rejects path traversal attack
+// ---------------------------------------------------------------------------
+test('file content API – rejects path traversal (../)', async ({ page }) => {
+  await gotoApp(page);
+
+  const resp = await page.request.get('/file-content.json?path=../etc/passwd');
+  expect(resp.status()).toBe(400);
+  const body = await resp.json() as { error: string };
+  expect(typeof body.error).toBe('string');
+  expect(body.error.toLowerCase()).toMatch(/invalid path|path traversal/i);
+});
+
+// ---------------------------------------------------------------------------
+// Test 42: File content API – rejects absolute path
+// ---------------------------------------------------------------------------
+test('file content API – rejects absolute path', async ({ page }) => {
+  await gotoApp(page);
+
+  const resp = await page.request.get('/file-content.json?path=%2Fetc%2Fpasswd');
+  expect(resp.status()).toBe(400);
+  const body = await resp.json() as { error: string };
+  expect(typeof body.error).toBe('string');
+});
+
+// ---------------------------------------------------------------------------
+// Test 43: File content API – rejects path not in graph allowlist
+// ---------------------------------------------------------------------------
+test('file content API – rejects path not in analyzed graph', async ({ page }) => {
+  await gotoApp(page);
+
+  const resp = await page.request.get('/file-content.json?path=some/random/file.ts');
+  // 403 = not in allowlist (no graph built), 404 = file doesn't exist
+  expect([403, 404]).toContain(resp.status());
+});
+
+// ---------------------------------------------------------------------------
+// Test 44: agent response – DELETE clears the session
+// ---------------------------------------------------------------------------
+test('agent response – DELETE /agent-response returns ok', async ({ page }) => {
+  await gotoApp(page);
+
+  const resp = await page.request.delete('/agent-response');
+  expect(resp.status()).toBe(200);
+  const body = await resp.json() as { ok: boolean };
+  expect(body.ok).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Test 45: Risk overlay – R key toggles heatmap
+// ---------------------------------------------------------------------------
+test('risk overlay – R key toggles on/off', async ({ page }) => {
+  await gotoApp(page);
+
+  // Make sure we're on the graph view
+  await navTab(page, 'Graph').click();
+  await page.locator('body').click({ position: { x: 300, y: 300 } });
+
+  // Toggle on
+  await page.keyboard.press('r');
+  // A risk toggle button or label should now be highlighted/active
+  // The toolbar shows a risk button — check it exists
+  await expect(page.getByTitle(/risk/i).or(page.getByLabel(/risk/i)).first()).toBeVisible({ timeout: 5000 });
+
+  // Toggle off again
+  await page.keyboard.press('r');
+});
+
+// ---------------------------------------------------------------------------
+// Test 46: Learn view – shows empty state when graph has no tours
+// ---------------------------------------------------------------------------
+test('learn view – shows empty state when graph has no tours', async ({ page }) => {
+  await gotoApp(page, mockGraphNoTours);
+  await navTab(page, 'Learn').click();
+  await expect(
+    page.getByText(/no tours|no guided tour|tour not available|run \/sprang-analyze/i).first()
+  ).toBeVisible({ timeout: 8000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 47: Bridge status – returns kind and detail fields
+// ---------------------------------------------------------------------------
+test('bridge status – response has expected shape', async ({ page }) => {
+  await gotoApp(page);
+
+  const resp = await page.request.get('/bridge-status');
+  expect(resp.status()).toBe(200);
+  const body = await resp.json() as { kind: string; detail?: string };
+  expect(['windsurf', 'claude', 'copilot', 'none']).toContain(body.kind);
+  // detail is always present (may be empty string for active bridges)
+  expect(typeof body.detail).toBe('string');
+});
+
+// ---------------------------------------------------------------------------
+// Test 48: Health view – high-risk node appears in top-risky list
+// ---------------------------------------------------------------------------
+test('health view – high-risk node label visible', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Health').click();
+  // auth.ts has risk_score 0.85 — should appear in top risky nodes
+  await expect(page.getByText('auth.ts').first()).toBeVisible({ timeout: 8000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 49: Graph view – nodes rendered (canvas is not empty)
+// ---------------------------------------------------------------------------
+test('graph view – sigma canvas is present and non-zero', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Graph').click();
+  const canvas = page.locator('canvas').first();
+  await expect(canvas).toBeVisible({ timeout: 8000 });
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.width).toBeGreaterThan(100);
+  expect(box!.height).toBeGreaterThan(100);
+});
+
+// ---------------------------------------------------------------------------
+// Test 50: Keyboard shortcut '1' switches to graph view
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 1 switches to graph view', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Health').click(); // start away from graph
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('1');
+  await expect(page.getByText('Test Project')).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 51: Keyboard shortcut '2' switches to health view
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 2 switches to health view', async ({ page }) => {
+  await gotoApp(page);
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('2');
+  await expect(
+    page.getByRole('heading', { name: 'Structural Health Report' }),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 52: Keyboard shortcut '3' switches to domains view
+// ---------------------------------------------------------------------------
+test('keyboard shortcut – 3 switches to domains view', async ({ page }) => {
+  await gotoApp(page);
+  await page.locator('body').click({ position: { x: 200, y: 200 } });
+  await page.keyboard.press('3');
+  await expect(
+    page.getByText(/Authentication|Business Domain|Domain/i).first(),
+  ).toBeVisible({ timeout: 10000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 53: Learn view – persona selector shows all 4 personas
+// ---------------------------------------------------------------------------
+test('learn view – persona selector shows all 4 personas', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Learn').click();
+  // All four persona labels must be visible in the selector
+  await expect(page.getByRole('button', { name: /business/i }).first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole('button', { name: /product/i }).first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole('button', { name: /learn/i }).first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole('button', { name: /deep dive/i }).first()).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 54: Learn view – start tour button is clickable and shows first step
+// ---------------------------------------------------------------------------
+test('learn view – start tour button advances to first tour step', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Learn').click();
+
+  // Pre-tour state shows the tour title and start button
+  const startBtn = page.getByRole('button', { name: /start tour/i });
+  await expect(startBtn).toBeVisible({ timeout: 8000 });
+  await startBtn.click();
+
+  // After starting, first step title should be visible
+  await expect(page.getByText(/entry point|auth module/i).first()).toBeVisible({ timeout: 5000 });
+
+  // Step counter "1 / 2" is visible
+  await expect(page.getByText(/1\s*\/\s*2/).first()).toBeVisible({ timeout: 3000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 55: Learn view – tour step advance and exit
+// ---------------------------------------------------------------------------
+test('learn view – tour can advance to next step and exit', async ({ page }) => {
+  await gotoApp(page);
+  await navTab(page, 'Learn').click();
+
+  const startBtn = page.getByRole('button', { name: /start tour/i });
+  await expect(startBtn).toBeVisible({ timeout: 8000 });
+  await startBtn.click();
+
+  // Advance to step 2
+  const nextBtn = page.getByRole('button', { name: /next/i }).first();
+  await expect(nextBtn).toBeVisible({ timeout: 3000 });
+  await nextBtn.click();
+
+  // Step counter should now show 2 / 2
+  await expect(page.getByText(/2\s*\/\s*2/).first()).toBeVisible({ timeout: 3000 });
+
+  // Exit button dismisses the tour
+  const exitBtn = page.getByRole('button', { name: /exit tour/i });
+  await expect(exitBtn).toBeVisible({ timeout: 3000 });
+  await exitBtn.click();
+
+  // Back to pre-tour state — start button reappears
+  await expect(page.getByRole('button', { name: /start tour/i })).toBeVisible({ timeout: 5000 });
+});
+
+// ---------------------------------------------------------------------------
+// Test 56: Health view – security section renders with findings
+// ---------------------------------------------------------------------------
+test('health view – security section shows findings when graph has security_warnings', async ({ page }) => {
+  await gotoApp(page, mockGraphWithSecurity);
+  await navTab(page, 'Health').click();
+  // The security section heading appears when stats.security_summary.total > 0
+  await expect(
+    page.getByText(/security issues/i).first(),
+  ).toBeVisible({ timeout: 8000 });
+  // The sql_injection finding from the mock should appear
+  await expect(
+    page.getByText(/sql.inject/i).first(),
+  ).toBeVisible({ timeout: 5000 });
 });

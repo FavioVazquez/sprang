@@ -15,6 +15,8 @@ import {
   ExternalLink,
   ChevronRight,
   HelpCircle,
+  Shield,
+  CheckCircle,
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -274,6 +276,68 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
               </Section>
             )}
 
+            {/* Security warnings */}
+            {node.security_warnings && node.security_warnings.length > 0 && (
+              <Section title="Security Issues" tooltip="Security vulnerabilities detected by static pattern analysis. High severity issues increase the risk score by 0.15.">
+                <div className="space-y-2">
+                  {node.security_warnings.map((warning, i) => (
+                    <div
+                      key={i}
+                      className={`p-3 rounded-lg border space-y-1.5 ${
+                        warning.severity === 'high' ? 'bg-red-950 border-red-900' :
+                        warning.severity === 'medium' ? 'bg-amber-950 border-amber-900' :
+                        'bg-surface-800 border-surface-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Shield className={`w-3.5 h-3.5 flex-shrink-0 ${
+                          warning.severity === 'high' ? 'text-red-400' :
+                          warning.severity === 'medium' ? 'text-amber-400' : 'text-surface-400'
+                        }`} />
+                        <span className={`text-xs font-medium ${
+                          warning.severity === 'high' ? 'text-red-300' :
+                          warning.severity === 'medium' ? 'text-amber-300' : 'text-surface-300'
+                        }`}>
+                          {warning.category.replace(/_/g, ' ')}
+                          {warning.line && <span className="opacity-60 font-normal ml-1.5">line {warning.line}</span>}
+                        </span>
+                        <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded border uppercase font-bold ${
+                          warning.severity === 'high' ? 'text-red-300 border-red-800' :
+                          warning.severity === 'medium' ? 'text-amber-300 border-amber-800' :
+                          'text-surface-400 border-surface-700'
+                        }`}>
+                          {warning.severity}
+                        </span>
+                      </div>
+                      <p className="text-xs text-surface-400 leading-relaxed">{warning.description}</p>
+                      {warning.snippet && (
+                        <code className="block text-[10px] font-mono text-surface-500 bg-surface-900/60 px-2 py-1 rounded truncate">
+                          {warning.snippet}
+                        </code>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* Detected patterns */}
+            {node.detected_patterns && node.detected_patterns.length > 0 && (
+              <Section title="Design Patterns" tooltip="Design patterns detected by static analysis. These are architectural strengths.">
+                <div className="flex flex-wrap gap-1.5">
+                  {node.detected_patterns.map((pattern) => (
+                    <span
+                      key={pattern}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-950 text-green-300 border border-green-900"
+                    >
+                      <CheckCircle className="w-2.5 h-2.5 flex-shrink-0" />
+                      {pattern.replace(/_/g, ' ')}
+                    </span>
+                  ))}
+                </div>
+              </Section>
+            )}
+
             {/* Decision context */}
             {node.decision_context && (
               <Section title="Decision Context" tooltip="Git history analysis: who changed this file and why, extracted from commit messages. Rationale snippets are LLM-summarized commit message patterns.">
@@ -373,7 +437,7 @@ export function NodePanel({ node, graph, onClose }: NodePanelProps) {
                     {neighbors.slice(0, 12).map((neighbor) => (
                       <div
                         key={neighbor.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-800 transition-colors"
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-800 hover:translate-x-0.5 transition-all duration-150 motion-reduce:transition-none motion-reduce:hover:translate-x-0"
                       >
                         <NodeIcon
                           type={neighbor.type}

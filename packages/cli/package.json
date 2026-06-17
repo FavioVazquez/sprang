@@ -1,25 +1,55 @@
 {
-  "name": "@sprang/cli",
-  "version": "0.2.0",
+  "name": "sprang",
+  "version": "0.2.1",
   "type": "module",
   "license": "MIT",
+  "description": "Knowledge graph dashboard for any codebase — scan, visualize, and chat about your code.",
+  "homepage": "https://github.com/FavioVazquez/sprang#readme",
+  "bugs": { "url": "https://github.com/FavioVazquez/sprang/issues" },
+  "repository": { "type": "git", "url": "https://github.com/FavioVazquez/sprang.git" },
+  "author": "Favio Vazquez",
+  "keywords": ["knowledge-graph", "code-analysis", "mcp", "dashboard", "claude-code", "windsurf", "copilot"],
+  "publishConfig": { "access": "public" },
+  "engines": { "node": ">=22.0.0" },
   "bin": {
     "sprang": "./dist/index.js"
   },
+  "files": [
+    "dist/",
+    ".claude/",
+    ".windsurf/",
+    ".devin/",
+    ".copilot-plugin/",
+    ".claude-plugin/",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --sourcemap",
+    "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@sprang/core": "workspace:*",
     "commander": "^12.1.0",
-    "ora": "^8.1.1"
+    "ora": "^8.1.1",
+    "chokidar": "^4.0.3",
+    "fast-glob": "^3.3.3",
+    "lru-cache": "^11.0.2",
+    "micromatch": "^4.0.8",
+    "object-hash": "^3.0.0",
+    "p-queue": "^8.0.1",
+    "simple-git": "^3.27.0",
+    "web-tree-sitter": "^0.24.7",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@sprang/core": "workspace:*",
+    "@types/micromatch": "^4.0.9",
     "@types/node": "^22.0.0",
+    "@types/object-hash": "^3.0.6",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.0",

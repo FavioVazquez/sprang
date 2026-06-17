@@ -20,6 +20,8 @@ import type { FingerprintStore } from '../utils/fingerprint.js';
 const IMPORT_FROM_RE =
   /(?:import|require)\s*(?:type\s+)?(?:\{[^}]*\}|[\w*$]+(?:\s*,\s*(?:\{[^}]*\}|[\w*$]+))?)?\s*from\s*['"]([^'"]+)['"]/g;
 const DYNAMIC_IMPORT_RE = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+// CommonJS require() calls: require('./path') or require('package')
+const CJS_REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 function extractTsJsImports(source: string): string[] {
   const imports = new Set<string>();
@@ -31,6 +33,11 @@ function extractTsJsImports(source: string): string[] {
   }
   DYNAMIC_IMPORT_RE.lastIndex = 0;
   while ((m = DYNAMIC_IMPORT_RE.exec(source)) !== null) {
+    const p = m[1];
+    if (p !== undefined) imports.add(p);
+  }
+  CJS_REQUIRE_RE.lastIndex = 0;
+  while ((m = CJS_REQUIRE_RE.exec(source)) !== null) {
     const p = m[1];
     if (p !== undefined) imports.add(p);
   }

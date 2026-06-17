@@ -1,6 +1,6 @@
 ---
 name: sprang-team
-description: Surface all team annotations attached to graph nodes. Browse and display knowledge that teammates have written about specific files and functions.
+description: Browse and write team annotations attached to graph nodes — institutional knowledge, decision history, ownership. Use when the user says "/sprang-team", "add annotation", "team knowledge", "who owns this", or "document this decision".
 ---
 
 Follow the detailed instructions in `.windsurf/workflows/sprang-team.md`.
@@ -13,8 +13,9 @@ Quick steps:
 5. Present annotation index table sorted by `annotated_at` descending.
 6. If `$ARGUMENTS` is a node path or ID: call `sprang_why` + `sprang_node` for that node and display annotation, decision context, and current structural state side-by-side.
 7. **Staleness detection** — for each annotated node:
-   - Call `sprang_node` to get `node.decision_context.last_changed` and current `in_degree`/`out_degree`
-   - If `last_changed > annotated_at`: flag as ⚠️ **possibly stale**
+   - Call `sprang_node` to check `in_degree`/`out_degree` and `node.decision_context.last_changed`
+   - Use `last_changed` if present; otherwise fall back to `graph.stats.generated_at` as the "last analyzed" proxy
+   - If the fallback date > `annotated_at`: flag as ⚠️ **possibly stale** (graph was re-analyzed since annotation was written)
    - Report a staleness summary table
 8. **Suggest unannotated candidates**: nodes with `risk_score > 0.6` OR `in_degree > 10` that have no annotation file.
 9. **Offer to write**: use `sprang_annotate` MCP tool to create `.sprang/annotations/<node-id>.md` with purpose, decisions, caveats, and ownership.

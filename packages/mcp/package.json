@@ -1,13 +1,16 @@
 {
   "name": "@sprang/mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "license": "MIT",
   "bin": {
     "sprang-mcp": "./dist/server.js"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
-    "build": "tsup src/server.ts --format esm --dts --sourcemap",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev": "tsx src/server.ts"

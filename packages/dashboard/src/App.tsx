@@ -1,22 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
   Globe,
   Network,
   RefreshCw,
-  Terminal,
   Sparkles,
   BookOpen,
   Layers,
+  Grid3x3,
+  LayoutGrid,
+  Plus,
 } from 'lucide-react';
 import { TooltipProvider } from './components/ui/Tooltip';
-import { Button } from './components/ui/Button';
 import { Badge } from './components/ui/Badge';
 import { GraphView } from './pages/GraphView';
 import { HealthView } from './pages/HealthView';
-import { DomainView } from './pages/DomainView';
-import { ArchitectureView } from './pages/ArchitectureView';
+// Heavy views — lazy-loaded so React Flow + ELK only download when needed
+const DomainView = lazy(() => import('./pages/DomainView').then((m) => ({ default: m.DomainView })));
+const ArchitectureView = lazy(() => import('./pages/ArchitectureView').then((m) => ({ default: m.ArchitectureView })));
+const TreemapView = lazy(() => import('./pages/TreemapView').then((m) => ({ default: m.TreemapView })));
+const MatrixView = lazy(() => import('./pages/MatrixView').then((m) => ({ default: m.MatrixView })));
 import { LearnPanel } from './components/LearnPanel';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { WarningBanner } from './components/WarningBanner';
@@ -24,9 +28,10 @@ import { ThemePicker, useTheme } from './components/ThemePicker';
 import { OnboardingOverlay, useOnboarding } from './components/OnboardingOverlay';
 import { MobileBottomNav, type MobileView } from './components/MobileLayout';
 import { AskAgentPanel } from './components/AskCascadePanel';
+import { LandingScreen, type AnalyzeParams } from './components/LandingScreen';
 import { loadGraph } from './api/graphApi';
 import { useDashboardStore } from './store';
-import type { KnowledgeGraph } from './types';
+import type { KnowledgeGraph, HistorySnapshot } from './types';
 
 type View = MobileView;
 
@@ -39,6 +44,8 @@ const NAV_ITEMS: Array<{
   { id: 'health', label: 'Health', icon: Activity },
   { id: 'domain', label: 'Domains', icon: Globe },
   { id: 'architecture', label: 'Architecture', icon: Layers },
+  { id: 'treemap', label: 'Treemap', icon: Grid3x3 },
+  { id: 'matrix', label: 'Matrix', icon: LayoutGrid },
   { id: 'learn', label: 'Learn', icon: BookOpen },
 ];
 
@@ -76,41 +83,6 @@ function LoadingScreen() {
   );
 }
 
-function ErrorScreen({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-surface-950 flex items-center justify-center z-50">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="text-center space-y-5 max-w-sm px-6"
-      >
-        <div className="mx-auto w-14 h-14 rounded-2xl bg-surface-800 border border-surface-700 flex items-center justify-center">
-          <Terminal className="w-7 h-7 text-surface-500" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-base font-bold text-surface-200">
-            No knowledge graph found
-          </h2>
-          <p className="text-sm text-surface-500 leading-relaxed">
-            Run the sprang scanner in your project root to generate a knowledge graph.
-          </p>
-        </div>
-        <div className="px-4 py-3 rounded-xl bg-surface-900 border border-surface-800 text-left space-y-1">
-          <p className="text-[10px] text-surface-600 font-medium">
-            Run in your project root
-          </p>
-          <code className="text-sm text-surface-300 font-mono">sprang scan</code>
-        </div>
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          <RefreshCw className="w-3.5 h-3.5" />
-          Retry
-        </Button>
-      </motion.div>
-    </div>
-  );
-}
-
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -118,8 +90,12 @@ export default function App() {
   const [showRiskOverlay, setShowRiskOverlay] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [schemaWarnings, setSchemaWarnings] = useState<string[]>([]);
+  const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [theme, setTheme] = useTheme();
   const [showOnboarding, dismissOnboarding] = useOnboarding();
+  // When true, show the landing screen even though a graph is loaded
+  // (lets the user start a fresh analysis of another project).
+  const [forceLanding, setForceLanding] = useState(false);
 
   const { graph, setGraph, selectedNodeId, navigateToNode, selectNode, startTour, stopTour } =
     useDashboardStore();
@@ -137,6 +113,14 @@ export default function App() {
           warns.push(`stats.node_count (${(g as KnowledgeGraph).stats.node_count}) differs from actual node count (${(g as KnowledgeGraph).nodes.length})`);
         }
         setSchemaWarnings(warns);
+        // Load health history
+        try {
+          const histRes = await fetch('/health-history.json');
+          if (histRes.ok) {
+            const hist = await histRes.json() as HistorySnapshot[];
+            setHistory(Array.isArray(hist) ? hist : []);
+          }
+        } catch { /* history is optional */ }
       } else {
         if (!silent) setHasError(true);
       }
@@ -173,6 +157,32 @@ export default function App() {
     return () => clearInterval(id);
   }, [graph?.phase, fetchGraph]);
 
+  const analyzeProject = useCallback(async (params?: AnalyzeParams) => {
+    const res = await fetch('/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params ?? {}),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(body.error ?? `Server error ${res.status}`);
+    }
+    // Start polling for the graph
+    setLoading(true);
+    setHasError(false);
+    const poll = setInterval(async () => {
+      const g = await loadGraph();
+      if (g) {
+        clearInterval(poll);
+        setGraph(g as KnowledgeGraph);
+        setLoading(false);
+        setForceLanding(false);
+      }
+    }, 2000);
+    // Stop polling after 3 minutes (GitHub clone + scan can take longer)
+    setTimeout(() => clearInterval(poll), 180_000);
+  }, [setGraph]);
+
   const handleNodeSelect = useCallback(
     (nodeId: string) => {
       navigateToNode(nodeId);
@@ -198,7 +208,11 @@ export default function App() {
           setCurrentView('domain'); break;
         case 'a': case '4':
           setCurrentView('architecture'); break;
-        case 'l': case '5':
+        case 't': case '5':
+          setCurrentView('treemap'); break;
+        case 'm': case '6':
+          setCurrentView('matrix'); break;
+        case 'l': case '7':
           setCurrentView('learn'); break;
         case 'r':
           setShowRiskOverlay((v) => !v); break;
@@ -210,8 +224,18 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [selectedNodeId, selectNode]);
 
+  const autoScan = new URLSearchParams(window.location.search).get('autoScan') === '1';
+  const defaultPath = new URLSearchParams(window.location.search).get('path') ?? '';
+
   if (loading) return <LoadingScreen />;
-  if (hasError || !graph) return <ErrorScreen onRetry={fetchGraph} />;
+  if (forceLanding || hasError || !graph) return (
+    <LandingScreen
+      onAnalyze={analyzeProject}
+      onRetry={() => { setForceLanding(false); void fetchGraph(false); }}
+      autoScan={autoScan}
+      defaultPath={defaultPath}
+    />
+  );
 
   return (
     <TooltipProvider>
@@ -264,11 +288,6 @@ export default function App() {
                 skeleton
               </Badge>
             )}
-            {graph.phase === 'enriched' && (
-              <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/40">
-                enriched
-              </Badge>
-            )}
             {graph.languages && graph.languages.length > 0 && (
               <Badge variant="outline" className="text-[10px]">
                 {graph.languages.slice(0, 2).join(', ')}
@@ -290,6 +309,15 @@ export default function App() {
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
+
+          <button
+            onClick={() => { selectNode(null); setForceLanding(true); }}
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-colors"
+            title="Analyze another project"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">New analysis</span>
+          </button>
         </nav>
 
         {/* View content */}
@@ -299,10 +327,10 @@ export default function App() {
               <motion.div
                 key="graph"
                 className="flex-1 flex overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
                 <GraphView
                   graph={graph}
@@ -321,12 +349,12 @@ export default function App() {
               <motion.div
                 key="health"
                 className="flex-1 flex overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
-                <HealthView graph={graph} onNodeSelect={handleNodeSelect} />
+                <HealthView graph={graph} onNodeSelect={handleNodeSelect} history={history} />
               </motion.div>
             )}
 
@@ -334,12 +362,14 @@ export default function App() {
               <motion.div
                 key="domain"
                 className="flex-1 flex overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
-                <DomainView graph={graph} onNodeSelect={handleNodeSelect} />
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground">Loading…</div>}>
+                  <DomainView graph={graph} onNodeSelect={handleNodeSelect} />
+                </Suspense>
               </motion.div>
             )}
 
@@ -347,12 +377,44 @@ export default function App() {
               <motion.div
                 key="architecture"
                 className="flex-1 flex overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
-                <ArchitectureView />
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground">Loading…</div>}>
+                  <ArchitectureView />
+                </Suspense>
+              </motion.div>
+            )}
+
+            {currentView === 'treemap' && (
+              <motion.div
+                key="treemap"
+                className="flex-1 flex overflow-hidden"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-surface-500">Loading…</div>}>
+                  <TreemapView graph={graph} onNodeSelect={handleNodeSelect} />
+                </Suspense>
+              </motion.div>
+            )}
+
+            {currentView === 'matrix' && (
+              <motion.div
+                key="matrix"
+                className="flex-1 flex overflow-hidden"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-surface-500">Loading…</div>}>
+                  <MatrixView graph={graph} onNodeSelect={handleNodeSelect} />
+                </Suspense>
               </motion.div>
             )}
 
@@ -360,10 +422,10 @@ export default function App() {
               <motion.div
                 key="learn"
                 className="flex-1 flex overflow-hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               >
                 <div className="flex-1 max-w-xl mx-auto w-full h-full overflow-hidden border-x border-surface-800">
                   <LearnPanel />

@@ -108,12 +108,12 @@ function Install-CliBin {
 function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
         Write-Host "→ Updating existing checkout at $RepoDir"
-        git -C $RepoDir pull --ff-only
+        git -C "$RepoDir" pull --ff-only
     } else {
         Write-Host "→ Cloning $RepoUrl → $RepoDir"
         $parent = Split-Path -Parent $RepoDir
         if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
-        git clone $RepoUrl $RepoDir
+        git clone "$RepoUrl" "$RepoDir"
     }
     Write-Host '→ Installing dependencies and building...'
     Push-Location $RepoDir
@@ -146,7 +146,7 @@ function Link-Skills([string]$Target, [string]$Style) {
                     New-Item -ItemType Junction -Path $dest -Target $src | Out-Null
                     Write-Host "  ✓ linked $skill (junction)"
                 } catch {
-                    cmd /c mklink /D `"$dest`" `"$src`" | Out-Null
+                    New-Item -ItemType SymbolicLink -Path "$dest" -Target "$src" | Out-Null
                     Write-Host "  ✓ linked $skill (symlink)"
                 }
             }
@@ -158,7 +158,7 @@ function Link-Skills([string]$Target, [string]$Style) {
                 New-Item -ItemType Junction -Path $dest -Target $root | Out-Null
                 Write-Host "  ✓ linked skills folder → $dest (junction)"
             } catch {
-                cmd /c mklink /D `"$dest`" `"$root`" | Out-Null
+                New-Item -ItemType SymbolicLink -Path "$dest" -Target "$root" | Out-Null
                 Write-Host "  ✓ linked skills folder → $dest (symlink)"
             }
         }
@@ -190,15 +190,27 @@ function Unlink-Skills([string]$Target, [string]$Style) {
 function Install-Claude {
     Write-Host ''
     Write-Host '→ Claude Code installation'
-    Write-Host '  Claude Code uses a project-local .mcp.json file.'
-    Write-Host '  No global install is needed — Sprang is already configured per-project.'
+    Write-Host '  Claude Code uses project-local config files.'
+    Write-Host '  No global install is needed — all config ships with Sprang.'
     Write-Host ''
-    Write-Host '  To enable Sprang in a project:'
-    Write-Host "  1. Copy .mcp.json and CLAUDE.md from $RepoDir into your project root:"
-    Write-Host "       Copy-Item $RepoDir\.mcp.json <your-project>\"
-    Write-Host "       Copy-Item $RepoDir\CLAUDE.md <your-project>\"
-    Write-Host '  2. In .mcp.json, set SPRANG_ROOT to the project root (default: ".")'
-    Write-Host '  3. Build the knowledge graph: run /sprang inside Claude Code'
+    Write-Host '  Option A — Plugin marketplace (recommended, gives namespaced commands /sprang:sprang-*):'
+    Write-Host '    Inside a Claude Code session run:'
+    Write-Host '      /plugin marketplace add FavioVazquez/sprang'
+    Write-Host '      /plugin install sprang'
+    Write-Host '    Then build the MCP server binary (find the versioned cache folder):'
+    Write-Host '      cd "$env:USERPROFILE\.claude\plugins\cache\sprang\sprang\<version>"'
+    Write-Host '      pnpm install; pnpm build'
+    Write-Host '    Then run /reload-plugins inside Claude Code.'
+    Write-Host ''
+    Write-Host '  Option B — Manual copy (gives unnamespaced /sprang, /sprang-onboard, etc.):'
+    Write-Host '    Copy these into your project root:'
+    Write-Host "      Copy-Item '$RepoDir\.mcp.json'  <your-project>\"
+    Write-Host "      Copy-Item '$RepoDir\CLAUDE.md'  <your-project>\"
+    Write-Host "      Copy-Item '$RepoDir\AGENTS.md'  <your-project>\"
+    Write-Host "      Copy-Item -Recurse '$RepoDir\.claude'  <your-project>\.claude"
+    Write-Host "    Then in <your-project>\.mcp.json update args to the absolute server path:"
+    Write-Host "      `"args`": [`"$RepoDir\packages\mcp\dist\server.js`"]"
+    Write-Host '    Open the project in Claude Code and run /sprang.'
     Write-Host ''
     Write-Host "  For full details: $RepoDir\CLAUDE.md"
 }
@@ -236,6 +248,48 @@ if ($plat.Style -eq 'claude') {
 } else {
     Write-Host "→ Linking skills into $($plat.Target)"
     Link-Skills $plat.Target $plat.Style
-    Write-Host "`n✓ Sprang installed for $Platform."
-    Write-Host "  Run /sprang inside $Platform to build the knowledge graph."
+    Write-Host "`n✓ Skills linked for $Platform.`n"
+    switch ($Platform) {
+        'windsurf' {
+            Write-Host 'Next steps to complete the Windsurf / Devin Desktop setup:'
+            Write-Host ''
+            Write-Host '  1. Add the MCP server to %USERPROFILE%\.codeium\windsurf\mcp_config.json:'
+            Write-Host '     {'
+            Write-Host '       "mcpServers": { "sprang": {'
+            Write-Host "         `"command`": `"node`","
+            Write-Host "         `"args`": [`"$RepoDir\packages\mcp\dist\server.js`"],"
+            Write-Host '         "env": { "SPRANG_ROOT": "C:\path\to\your\project" }'
+            Write-Host '       }}'
+            Write-Host '     }'
+            Write-Host ''
+            Write-Host '  2. Copy rules + hooks into your project root:'
+            Write-Host "     Copy-Item -Recurse '$RepoDir\.windsurf\rules\*' .windsurf\rules\"
+            Write-Host "     Copy-Item -Recurse '$RepoDir\.devin\rules\*' .devin\rules\"
+            Write-Host "     Copy-Item '$RepoDir\.windsurf\hooks.json' .windsurf\"
+            Write-Host "     Copy-Item '$RepoDir\.windsurf\hooks\save-conversation.py' .windsurf\hooks\"
+            Write-Host "     Copy-Item -Recurse '$RepoDir\.windsurf\workflows\*' .windsurf\workflows\"
+            Write-Host "     Copy-Item -Recurse '$RepoDir\.windsurf\skills\sprang*' .windsurf\skills\"
+            Write-Host ''
+            Write-Host '  3. Reload the Windsurf window (Ctrl+Shift+P → Reload Window)'
+            Write-Host '  4. Run: sprang scan C:\path\to\your\project --phase1-only'
+            Write-Host ''
+            Write-Host '  Full docs: https://github.com/faviovazquez/sprang#windsurf--devin-desktop--agentic-install'
+        }
+        'copilot' {
+            Write-Host 'Next steps to complete the GitHub Copilot setup:'
+            Write-Host ''
+            Write-Host '  1. Copy .vscode\mcp.json into your project root:'
+            Write-Host "     Copy-Item '$RepoDir\.vscode\mcp.json' .vscode\mcp.json"
+            Write-Host "     Then edit .vscode\mcp.json → update args to: [`"$RepoDir\packages\mcp\dist\server.js`"]"
+            Write-Host ''
+            Write-Host '  2. Copy copilot-instructions.md into your project:'
+            Write-Host "     Copy-Item '$RepoDir\.github\copilot-instructions.md' .github\"
+            Write-Host ''
+            Write-Host '  3. Open VS Code, switch Copilot to Agent mode (model selector in chat panel)'
+            Write-Host '  4. Run: sprang scan C:\path\to\your\project --phase1-only'
+            Write-Host ''
+            Write-Host '  Note: MCP tools only work in Copilot Agent mode (not default ask/edit modes).'
+            Write-Host '  Full docs: https://github.com/faviovazquez/sprang#github-copilot'
+        }
+    }
 }

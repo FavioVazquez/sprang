@@ -1,7 +1,6 @@
 import type { AgentContext, AgentResult } from './base.js';
 import { BaseAgent } from './base.js';
 import type {
-  KnowledgeGraph,
   RiskFactor,
   SprangNode,
 } from '../schema/types.js';
@@ -103,9 +102,6 @@ export class RiskScorerAgent extends BaseAgent {
       inEdges.get(edge.target)?.push({ source: edge.source, type: edge.type });
       outEdges.get(edge.source)?.push({ target: edge.target, type: edge.type });
     }
-
-    // Build node map
-    const nodeMap = new Map<string, SprangNode>(graph.nodes.map((n) => [n.id, n]));
 
     // Build test-node set for quick lookup
     const testNodeIds = new Set<string>(

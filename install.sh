@@ -23,6 +23,8 @@
 
 set -euo pipefail
 
+# WARNING: Setting SPRANG_REPO_URL redirects the clone to an arbitrary URL with
+# no integrity check. Only use this to point to a trusted fork.
 REPO_URL="${SPRANG_REPO_URL:-https://github.com/faviovazquez/sprang.git}"
 REPO_DIR="${SPRANG_DIR:-$HOME/.sprang/repo}"
 
@@ -96,14 +98,11 @@ install_cli_bin() {
   local bin_dir="${HOME}/.local/bin"
   mkdir -p "$bin_dir"
   # Write a wrapper script so it works without 'node' prefix
-  cat > "$bin_dir/sprang" <<WRAPPER
-#!/usr/bin/env sh
-exec node "$cli_bin" "\$@"
-WRAPPER
+  printf '#!/usr/bin/env sh\nexec node "%s" "$@"\n' "$cli_bin" > "$bin_dir/sprang"
   chmod +x "$bin_dir/sprang"
   printf '  ✓ sprang CLI linked → %s/sprang\n' "$bin_dir"
   # Remind user to add ~/.local/bin to PATH if not already there
-  if ! echo "$PATH" | grep -q "$bin_dir"; then
+  if ! echo "$PATH" | grep -qF "$bin_dir"; then
     printf '  ℹ Add %s to your PATH if not already present:\n' "$bin_dir"
     printf '      echo '\''export PATH="$HOME/.local/bin:$PATH"'\'' >> ~/.zshrc  # or ~/.bashrc\n'
   fi
@@ -198,14 +197,28 @@ unlink_skills() {
 
 install_claude() {
   printf '\n→ Claude Code installation\n'
-  printf '  Claude Code uses a project-local .mcp.json file.\n'
-  printf '  No global install is needed — Sprang is already configured per-project.\n\n'
-  printf '  To enable Sprang in a project:\n'
-  printf '  1. Copy .mcp.json and CLAUDE.md from the Sprang repo into your project root:\n'
-  printf '       cp %s/.mcp.json <your-project>/\n' "$REPO_DIR"
-  printf '       cp %s/CLAUDE.md <your-project>/\n' "$REPO_DIR"
-  printf '  2. In .mcp.json, set SPRANG_ROOT to the project root (default: ".")\n'
-  printf '  3. Build the knowledge graph: run /sprang inside Claude Code\n\n'
+  printf '  Claude Code uses project-local config files.\n'
+  printf '  No global install is needed — all config ships with Sprang.\n\n'
+
+  printf '  Option A — Plugin marketplace (recommended, gives namespaced commands /sprang:sprang-*):\n'
+  printf '    Inside a Claude Code session run:\n'
+  printf '      /plugin marketplace add FavioVazquez/sprang\n'
+  printf '      /plugin install sprang\n'
+  printf '    Then build the MCP server binary:\n'
+  printf '      cd "$(ls -d ~/.claude/plugins/cache/sprang/sprang/*/ | tail -1)"\n'
+  printf '      pnpm install && pnpm build\n'
+  printf '    Then run /reload-plugins inside Claude Code.\n\n'
+
+  printf '  Option B — Manual copy (gives unnamespaced /sprang, /sprang-onboard, etc.):\n'
+  printf '    Copy these into your project root:\n'
+  printf '      cp %s/.mcp.json          <your-project>/\n' "$REPO_DIR"
+  printf '      cp %s/CLAUDE.md          <your-project>/\n' "$REPO_DIR"
+  printf '      cp %s/AGENTS.md          <your-project>/\n' "$REPO_DIR"
+  printf '      cp -r %s/.claude/        <your-project>/.claude/\n' "$REPO_DIR"
+  printf '    Then in <your-project>/.mcp.json update args to the absolute server path:\n'
+  printf '      "args": ["%s/packages/mcp/dist/server.js"]\n' "$REPO_DIR"
+  printf '    Finally, open the project in Claude Code and run /sprang.\n\n'
+
   printf '  For full details: %s/CLAUDE.md\n' "$REPO_DIR"
 }
 
@@ -279,6 +292,45 @@ if [[ "$style" == "claude" ]]; then
 else
   printf '→ Linking skills into %s\n' "$target"
   link_skills "$target" "$style"
-  printf '\n✓ Sprang installed for %s.\n' "$PLATFORM"
-  printf '  Run /sprang inside %s to build the knowledge graph.\n' "$PLATFORM"
+  printf '\n✓ Skills linked for %s.\n\n' "$PLATFORM"
+  case "$PLATFORM" in
+    windsurf)
+      printf 'Next steps to complete the Windsurf / Devin Desktop setup:\n\n'
+      printf '  1. Add the MCP server to ~/.codeium/windsurf/mcp_config.json:\n'
+      printf '     {\n'
+      printf '       "mcpServers": { "sprang": {\n'
+      printf '         "command": "node",\n'
+      printf '         "args": ["%s/packages/mcp/dist/server.js"],\n' "$REPO_DIR"
+      printf '         "env": { "SPRANG_ROOT": "/path/to/your/project" }\n'
+      printf '       }}\n'
+      printf '     }\n\n'
+      printf '  2. Copy rules + hooks into your project root:\n'
+      printf '     mkdir -p .windsurf/rules .devin/rules .windsurf/hooks .windsurf/workflows .windsurf/skills\n'
+      printf '     cp %s/.windsurf/rules/*.md .windsurf/rules/\n' "$REPO_DIR"
+      printf '     cp %s/.devin/rules/*.md .devin/rules/\n' "$REPO_DIR"
+      printf '     cp %s/.windsurf/hooks.json .windsurf/hooks.json\n' "$REPO_DIR"
+      printf '     cp %s/.windsurf/hooks/save-conversation.py .windsurf/hooks/save-conversation.py\n' "$REPO_DIR"
+      printf '     cp %s/.windsurf/workflows/*.md .windsurf/workflows/\n' "$REPO_DIR"
+      printf '     cp -r %s/.windsurf/skills/sprang* .windsurf/skills/\n\n' "$REPO_DIR"
+      printf '  3. Reload the Windsurf window (Cmd/Ctrl+Shift+P → Reload Window)\n'
+      printf '  4. Run: sprang scan /path/to/your/project --phase1-only\n\n'
+      printf '  Tip: instead of steps 1-4, paste the agentic install prompt from the README\n'
+      printf '  into Cascade or Devin — it handles everything automatically.\n'
+      printf '  Full docs: https://github.com/faviovazquez/sprang#windsurf--devin-desktop--agentic-install\n'
+      ;;
+    copilot)
+      printf 'Next steps to complete the GitHub Copilot setup:\n\n'
+      printf '  1. Copy .vscode/mcp.json into your project root:\n'
+      printf '     mkdir -p .vscode\n'
+      printf '     cp %s/.vscode/mcp.json .vscode/mcp.json\n' "$REPO_DIR"
+      printf '     Then edit .vscode/mcp.json → update args to: ["%s/packages/mcp/dist/server.js"]\n\n' "$REPO_DIR"
+      printf '  2. Copy copilot-instructions.md into your project:\n'
+      printf '     mkdir -p .github\n'
+      printf '     cp %s/.github/copilot-instructions.md .github/copilot-instructions.md\n\n' "$REPO_DIR"
+      printf '  3. Open VS Code, switch Copilot to Agent mode (model selector in chat panel)\n'
+      printf '  4. Run: sprang scan /path/to/your/project --phase1-only\n\n'
+      printf '  Note: MCP tools only work in Copilot Agent mode (not default ask/edit modes).\n'
+      printf '  Full docs: https://github.com/faviovazquez/sprang#github-copilot\n'
+      ;;
+  esac
 fi

@@ -18,6 +18,9 @@ The file `.sprang/agent-conversation.md` is an **append-only log** of every prio
 
 ## When you receive a dashboard message:
 1. **Run `cat .sprang/agent-conversation.md 2>/dev/null || echo "(no history yet)"`** — restores all prior context (the file is gitignored so the Read tool won't work)
-2. Answer the question fully, using MCP tools (sprang_query, sprang_node, etc.) to ground your answer
-3. Call the `sprang_respond` MCP tool with your answer so it appears in the dashboard UI
+2. Answer the question fully using MCP tools (sprang_query, sprang_node, sprang_health, etc.) to ground your answer in the knowledge graph
+3. Call `sprang_respond` with **both** fields so the dashboard shows question and answer together:
+   ```
+   sprang_respond({ response: "<your full answer>", question: "<the user's original question>" })
+   ```
 4. This is a continuous conversation — every question builds on the full history in that file

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Graph from 'graphology';
 import { Sigma } from 'sigma';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
@@ -74,6 +75,11 @@ export function GraphCanvas({
   const graphologyRef = useRef<Graph | null>(null);
   const showRiskRef = useRef(showRiskOverlay);
   const hoveredLayerRef = useRef(hoveredLayerId);
+  const [pulsePos, setPulsePos] = useState<{ x: number; y: number; size: number } | null>(null);
+  // Keep the latest selected node id readable from the Sigma event handlers
+  // (the renderer is created once, on [graph], so it can't close over the prop).
+  const selectedNodeIdRef = useRef(selectedNodeId);
+  selectedNodeIdRef.current = selectedNodeId;
 
   // Build in-degree map
   const buildInDegreeMap = useCallback(() => {
@@ -235,6 +241,30 @@ export function GraphCanvas({
       // Allow parent to handle deselection through its own state
     });
 
+    // Keep the pulse ring glued to the selected node on every render so it
+    // tracks camera pan/zoom/animation instead of being frozen at stale
+    // viewport coordinates (which left "orphaned" rings detached from nodes).
+    renderer.on('afterRender', () => {
+      const gg = graphologyRef.current;
+      const sel = selectedNodeIdRef.current;
+      if (!gg || !sel || !gg.hasNode(sel)) {
+        setPulsePos((prev) => (prev === null ? prev : null));
+        return;
+      }
+      const a = gg.getNodeAttributes(sel);
+      try {
+        const vp = renderer.graphToViewport({ x: a.x as number, y: a.y as number });
+        const size = (a.size as number) ?? 8;
+        setPulsePos((prev) =>
+          prev && Math.abs(prev.x - vp.x) < 0.5 && Math.abs(prev.y - vp.y) < 0.5 && prev.size === size
+            ? prev
+            : { x: vp.x, y: vp.y, size },
+        );
+      } catch {
+        /* viewport not ready */
+      }
+    });
+
     return () => {
       cancelAnimationFrame(rafId);
       ro.disconnect();
@@ -307,6 +337,20 @@ export function GraphCanvas({
       });
     });
     renderer.refresh();
+
+    // Compute pulse ring position from graph coords
+    if (selectedNodeId && g.hasNode(selectedNodeId)) {
+      const attrs = g.getNodeAttributes(selectedNodeId);
+      try {
+        const vp = renderer.graphToViewport({ x: attrs.x as number, y: attrs.y as number });
+        const nodeSize = (attrs.size as number) ?? 8;
+        setPulsePos({ x: vp.x, y: vp.y, size: nodeSize });
+      } catch {
+        setPulsePos(null);
+      }
+    } else {
+      setPulsePos(null);
+    }
   }, [selectedNodeId]);
 
   return (
@@ -318,6 +362,36 @@ export function GraphCanvas({
         role="img"
         aria-label={`Knowledge graph: ${graph.nodes.length} nodes, ${graph.edges.length} edges. Click a node to inspect it.`}
       />
+
+      {/* Selected node pulse ring */}
+      <AnimatePresence>
+        {pulsePos && (
+          <motion.div
+            key={selectedNodeId}
+            style={{
+              position: 'absolute',
+              left: pulsePos.x - pulsePos.size * 2,
+              top: pulsePos.y - pulsePos.size * 2,
+              width: pulsePos.size * 4,
+              height: pulsePos.size * 4,
+              borderRadius: '50%',
+              border: '2px solid #d946ef',
+              pointerEvents: 'none',
+            }}
+            initial={{ scale: 0.5, opacity: 0.8 }}
+            animate={{
+              scale: [1, 1.6, 1],
+              opacity: [0.8, 0.2, 0.6],
+              transition: { duration: 1.2, repeat: Infinity, ease: 'easeInOut' },
+            }}
+            // Exit needs its own finite, non-repeating transition. Inheriting the
+            // repeat:Infinity pulse transition meant the exit animation never
+            // completed, so AnimatePresence never unmounted the old ring — leaving
+            // "orphaned" rings frozen in empty space after switching selection.
+            exit={{ scale: 0.5, opacity: 0, transition: { duration: 0.2, repeat: 0 } }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Zoom controls */}
       <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">

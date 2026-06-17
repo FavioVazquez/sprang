@@ -17,12 +17,13 @@ export function makeQueryCommand(): Command {
   cmd
     .description('Search the knowledge graph for nodes matching a question or keyword')
     .argument('<question>', 'Search query — matched against node labels and summaries')
+    .argument('[path]', 'Project root path')
     .option('-t, --types <types>', 'Comma-separated node types to filter (e.g. function,class)')
     .option('-n, --limit <n>', 'Maximum results to show', '20')
-    .option('-p, --path <path>', 'Project root path', undefined)
+    .option('-p, --path <path>', 'Project root path (alternative to positional argument)', undefined)
     .option('--semantic', 'Use semantic similarity search instead of keyword matching')
-    .action(async (question: string, options: { types?: string; limit: string; path?: string; semantic?: boolean }) => {
-      const projectRoot = resolve(options.path ?? process.cwd());
+    .action(async (question: string, pathArg: string | undefined, options: { types?: string; limit: string; path?: string; semantic?: boolean }) => {
+      const projectRoot = resolve(options.path ?? pathArg ?? process.cwd());
       const sprangDir = join(projectRoot, '.sprang');
 
       const graph = await loadGraphOrNull(sprangDir);

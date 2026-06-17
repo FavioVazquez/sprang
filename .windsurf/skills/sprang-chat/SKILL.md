@@ -1,6 +1,6 @@
 ---
 name: sprang-chat
-description: Ask any question about the codebase using the knowledge graph — "How does auth work?", "What calls this function?", "Which files handle payments?"
+description: Ask any question about the codebase using the knowledge graph. Use when the user says "/sprang-chat", "ask about the codebase", "what does X do", or any question about code that should be answered from the knowledge graph.
 argument-hint: ["<question about the codebase>"]
 ---
 

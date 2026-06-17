@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { SmellDetectorAgent } from '../../src/agents/smell-detector.js';
 import type { AgentContext } from '../../src/agents/base.js';
 import type { KnowledgeGraph, SprangNode, SprangEdge } from '../../src/schema/types.js';

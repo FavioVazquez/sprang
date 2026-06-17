@@ -26,6 +26,7 @@ export const structuralWarningSchema = z.object({
   category: z.enum([
     'duplicate_logic', 'unclear_coupling', 'low_cohesion', 'god_node',
     'unstable_interface', 'orphan_node', 'circular_dependency', 'over_connected',
+    'name_duplicate', 'layer_violation',
   ]),
   severity: z.enum(['low', 'medium', 'high']),
   description: z.string(),
@@ -134,7 +135,7 @@ export const knowledgeGraphSchema = z.object({
   description: z.string().optional(),
   languages: z.array(z.string()).optional(),
   frameworks: z.array(z.string()).optional(),
-  phase: z.enum(['skeleton', 'enriched', 'complete']),
+  phase: z.enum(['skeleton', 'complete']),
   nodes: z.array(sprangNodeSchema),
   edges: z.array(sprangEdgeSchema),
   layers: z.array(layerSchema),

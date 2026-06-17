@@ -189,7 +189,8 @@ export function FilterPanel() {
                     color={COMPLEXITY_COLORS[c]}
                     onClick={() => {
                       const next = new Set(filters.complexities);
-                      next.has(c) ? next.delete(c) : next.add(c);
+                      if (next.has(c)) next.delete(c);
+                      else next.add(c);
                       setFilters({ complexities: next });
                     }}
                   />
@@ -206,7 +207,8 @@ export function FilterPanel() {
                     color={r === 'high' ? '#ef4444' : r === 'medium' ? '#f97316' : '#22c55e'}
                     onClick={() => {
                       const next = new Set(filters.riskLevels);
-                      next.has(r) ? next.delete(r) : next.add(r);
+                      if (next.has(r)) next.delete(r);
+                      else next.add(r);
                       setFilters({ riskLevels: next });
                     }}
                   />
@@ -222,7 +224,8 @@ export function FilterPanel() {
                     active={filters.edgeCategories.has(cat)}
                     onClick={() => {
                       const next = new Set(filters.edgeCategories);
-                      next.has(cat) ? next.delete(cat) : next.add(cat);
+                      if (next.has(cat)) next.delete(cat);
+                      else next.add(cat);
                       setFilters({ edgeCategories: next });
                     }}
                   />

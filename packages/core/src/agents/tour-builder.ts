@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import type { AgentContext, AgentResult } from './base.js';
 import { BaseAgent } from './base.js';
 import type { KnowledgeGraph, Tour, TourStep, SprangNode } from '../schema/types.js';
-import { ENTRY_POINT_PATTERNS } from '../schema/constants.js';
 import { detectLanguageLessons } from './language-lessons.js';
 
 export class TourBuilderAgent extends BaseAgent {

@@ -16,10 +16,15 @@ Build the knowledge graph on first use:
 /sprang
 ```
 
-The dashboard opens at `http://localhost:7338`:
+The dashboard opens at `http://localhost:7777` (for daily use, run `preview`):
 
+```bash
+pnpm --filter @sprang/dashboard preview
 ```
-pnpm --filter @sprang/dashboard dev
+
+For dashboard source development only (hot-reload):
+```bash
+pnpm --filter @sprang/dashboard dev  # port 7338
 ```
 
 ---
@@ -50,12 +55,12 @@ If you copy Sprang into another project: set `SPRANG_ROOT` to the project root, 
 | `sprang_query` | `{ query, node_types?, limit?, mode? }` | Find nodes by keyword; add `"mode": "semantic"` for embedding search |
 | `sprang_node` | `{ node_id }` | Full node + 1-hop neighbors, risk score, layer, annotation status |
 | `sprang_diff_impact` | `{ files: string[] }` | BFS blast radius before committing |
-| `sprang_tour` | `{ tour_id?, persona? }` | Guided walkthrough; persona: `"junior"` / `"senior"` / `"pm"` |
+| `sprang_tour` | `{ tour_id?, persona? }` | Guided walkthrough; persona: `"junior"` / `"senior"` / `"experienced"` / `"pm"` / `"non-technical"` |
 | `sprang_domain` | `{ domain_name? }` | Business domain hierarchy |
-| `sprang_health` | `{}` | Smell summary, top-10 risky nodes, orphans, circular deps |
+| `sprang_health` | `{}` | Health grade (A–F), score, smell summary, security summary, top-10 risky nodes, orphans, circular deps, run history |
 | `sprang_why` | `{ node_id }` | Git history + decision context + annotation for a node |
 | `sprang_annotate` | `{ node_id, content, tags? }` | Write team annotation to `.sprang/annotations/<node>.md` |
-| `sprang_respond` | `{ response, question }` | Dashboard bridge — writes answer to `.sprang/cascade-response.json` |
+| `sprang_respond` | `{ response, question? }` | Dashboard bridge — writes answer to `.sprang/cascade-response.json` |
 
 ---
 
@@ -92,7 +97,7 @@ Before modifying any file:
 
 For architecture questions: check `.sprang/SPRANG_REPORT.md` first.
 
-### `cascade-messaging.md` (always active)
+### `cascade-messaging.md` (always active) — Dashboard chat bridge
 
 When you receive a message prefixed with `[SPRANG DASHBOARD MESSAGE]` (from the dashboard Ask Agent panel):
 1. **Run `cat .sprang/agent-conversation.md 2>/dev/null || echo "(no history yet)"`** — reads full conversation history (file is gitignored; the Read tool is blocked, use Bash instead)
@@ -167,22 +172,31 @@ This writes `.sprang/diff-overlay.json` which the dashboard highlights in amber.
 | `.sprang/annotations/` | Team knowledge tied to nodes (YAML frontmatter + markdown) |
 | `.sprang/diff-overlay.json` | Blast radius for dashboard highlight (can gitignore) |
 
+> **Note:** In the Sprang source repo itself, `knowledge-graph.json` and `SPRANG_REPORT.md` are gitignored (this repo uses Sprang but doesn't commit its own graph). In projects that _use_ Sprang, commit these files so the team shares the same graph.
+
 ---
 
 ## Dashboard
 
 Start the dashboard:
 ```bash
-pnpm --filter @sprang/dashboard dev
-# Opens at http://localhost:7338
+pnpm --filter @sprang/dashboard preview   # daily use (pre-built dist), http://localhost:7777
+pnpm --filter @sprang/dashboard dev        # hot-reload development, http://localhost:7338
+sprang open [path] [--auto-scan]           # point at any folder, no cd
 ```
 
+The dashboard is a polished React + Vite app (Sigma.js, framer-motion) with an OKLCH-tinted surface ramp, three themes (dark / light / high-contrast), Outfit + JetBrains Mono typography, spring-physics motion, and full `prefers-reduced-motion` support. Risk renders as an accessible heat scale.
+
+**Instant analysis (no agent needed):** if no graph exists, the dashboard shows a **landing screen** — type a local path or paste a GitHub URL (`github.com/owner/repo`) and the server runs Phase 1 (static, <60s; GitHub repos are cloned to a temp folder). `sprang open --auto-scan` triggers it without a click.
+
 Views:
-- **Graph** (`G` / `1`) — force-directed knowledge graph with risk heat overlay
-- **Health** (`H` / `2`) — smell table, top-10 risk nodes, orphan count
+- **Graph** (`G` / `1`) — force-directed knowledge graph with risk heat overlay; function call edges and import edges both rendered
+- **Health** (`H` / `2`) — letter grade A–F, smell table (incl. `layer_violation`), top-10 risk nodes, security findings, detected design patterns
 - **Domains** (`D` / `3`) — business domain hierarchy
 - **Architecture** (`A` / `4`) — layer card view (React Flow + ELK)
-- **Learn** (`L` / `5`) — guided tour player
+- **Treemap** (`T` / `5`) — D3 file/folder hierarchy sized by lines, colored by risk score
+- **Matrix** (`M` / `6`) — file-to-file adjacency matrix sorted by layer rank
+- **Learn** (`L` / `7`) — persona-adaptive guided tour player
 
 Keyboard shortcuts:
 - `Cmd/Ctrl K` — open node search
@@ -191,6 +205,28 @@ Keyboard shortcuts:
 - `Esc` — close panel / search
 
 The **Ask Agent** panel auto-detects the available bridge (Windsurf → Claude Code → Copilot CLI → none). When the Claude Code bridge is active, the Vite server spawns `claude -p` non-interactively and uses `--resume <session_id>` for conversation continuity. The session ID is persisted in `.sprang/claude-session.json`.
+
+---
+
+## CLI Commands
+
+Beyond the slash commands, the `sprang` CLI binary has these commands:
+
+```bash
+sprang scan [path] [--phase1-only] [--if-stale]   # build/refresh the graph
+sprang open [path] [--port 7777] [--no-browser] [--auto-scan]   # launch dashboard for any repo
+sprang diagram [path] [--output file]              # Mermaid architecture diagram
+sprang merge [path] [--intermediate dir]           # assemble graph from agent chunks
+sprang health [path]                               # print health report to terminal
+sprang query "text" [--semantic]                   # search the graph from CLI
+sprang watch [path]                                # incremental file watcher
+sprang status [path]                               # graph age / phase / node count
+sprang install-hooks [path]                        # install git post-commit hook
+```
+
+`sprang open` is the zero-friction entry point: point it at any folder and it serves the dashboard. If no graph exists yet, the dashboard shows a landing screen where you can type a local path or paste a GitHub URL — the server clones and scans automatically. Pass `--auto-scan` to skip the button click entirely.
+
+`sprang diagram` reads `.sprang/knowledge-graph.json` and outputs a Mermaid `flowchart TD` — useful for architecture docs or PR descriptions.
 
 ---
 
@@ -250,7 +286,7 @@ To disable both hooks, remove the `"hooks"` key from `.claude/settings.json`. To
 Both scripts have full unit test coverage in `packages/cli/tests/hooks-scripts.test.ts` (12 tests). Run with:
 
 ```bash
-pnpm --filter @sprang/cli test
+pnpm --filter sprang test
 ```
 
 ---
@@ -261,7 +297,7 @@ pnpm --filter @sprang/cli test
 /sprang-onboard
 ```
 
-This runs an adaptive guided tour based on your persona (junior/senior/PM). Also open the dashboard **Learn** tab (`L` / `5`) for a visual walkthrough.
+This runs an adaptive guided tour based on your persona (junior/senior/PM). Also open the dashboard **Learn** tab (`L` / `7`) for a visual walkthrough.
 
 ---
 

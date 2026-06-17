@@ -44,10 +44,10 @@ export function makeScanCommand(): Command {
         if (options.phase1Only) {
           const graph = await runPhase1Only(projectRoot, { skipLLM: true });
           const fileCount = graph.nodes.filter((n) => n.type === 'file').length;
-          spinner.succeed(`Scanned ${fileCount} files — ${graph.nodes.length} nodes (Phase 1 complete, Phase 2 ready for Cascade)`);
+          spinner.succeed(`Scanned ${fileCount} files — ${graph.nodes.length} nodes (Phase 1 complete, Phase 2 ready for your AI agent)`);
           process.stdout.write(`\nGraph:  ${projectRoot}/.sprang/knowledge-graph.json\n`);
           process.stdout.write(`Report: ${projectRoot}/.sprang/SPRANG_REPORT.md\n`);
-          process.stdout.write(`\nRun /sprang-onboard in Cascade to start Phase 2 enrichment.\n\n`);
+          process.stdout.write(`\nRun /sprang-onboard in your AI agent to start Phase 2 enrichment.\n\n`);
           return;
         }
 

@@ -92,6 +92,14 @@ def main():
             tours = to_array(json.load(open(p)))
             break
 
+    # ── Domains (try final-domains.json) ──────────────────────────────────────
+    domains_from_file = []
+    for fname in ["final-domains.json", "domains.json"]:
+        p = os.path.join(inter, fname)
+        if os.path.exists(p):
+            domains_from_file = to_array(json.load(open(p)))
+            break
+
     # ── Metadata ──────────────────────────────────────────────────────────────
     meta_path = os.path.join(inter, "assembled-graph.json")
     meta = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
@@ -104,19 +112,53 @@ def main():
     except Exception:
         git_hash = ""
 
+    # ── Apply risk scores + decision_context from risk-scores.json ───────────
+    risk_path = os.path.join(inter, "risk-scores.json")
+    if os.path.exists(risk_path):
+        try:
+            risk_data = json.load(open(risk_path))
+            if isinstance(risk_data, dict):
+                node_map_tmp = {n['id']: n for n in nodes if isinstance(n, dict) and 'id' in n}
+                for node_id, risk_info in risk_data.items():
+                    if node_id in node_map_tmp:
+                        node = node_map_tmp[node_id]
+                        if risk_info.get('risk_score') is not None:
+                            node['risk_score'] = risk_info['risk_score']
+                        if risk_info.get('risk_factors'):
+                            node['risk_factors'] = risk_info['risk_factors']
+                        if risk_info.get('decision_context'):
+                            node['decision_context'] = risk_info['decision_context']
+                        if risk_info.get('structural_warnings'):
+                            node['structural_warnings'] = risk_info['structural_warnings']
+                nodes = list(node_map_tmp.values())
+        except Exception as e:
+            print(f"Warning: could not load risk-scores.json: {e}", file=sys.stderr)
+
     # ── Risk summary ──────────────────────────────────────────────────────────
     risk = {"high": 0, "medium": 0, "low": 0}
     for n in nodes:
         r = n.get("risk_score", 0) if isinstance(n, dict) else 0
-        if r >= 0.7:
+        if r and r >= 0.7:
             risk["high"] += 1
-        elif r >= 0.4:
+        elif r and r >= 0.4:
             risk["medium"] += 1
         else:
             risk["low"] += 1
 
     now = datetime.now(timezone.utc).isoformat()
     project_name = meta.get("project_name") or os.path.basename(os.path.abspath(root))
+
+    # phase2_completed_at — use phase6-done.json timestamp if present (enrichment done)
+    phase2_completed_at = None
+    for marker in ["phase6-done.json", "phase5-done.json"]:
+        p = os.path.join(inter, marker)
+        if os.path.exists(p):
+            try:
+                phase2_completed_at = json.load(open(p)).get("timestamp")
+            except Exception:
+                pass
+            if phase2_completed_at:
+                break
 
     # ── Wrap flat tour steps into Tour object if needed ───────────────────────
     if tours and isinstance(tours[0], dict) and 'steps' not in tours[0]:
@@ -155,12 +197,13 @@ def main():
             "smell_summary": meta.get("smell_summary", {}),
             "generated_at": now,
             "gitCommitHash": git_hash,
+            **({"phase2_completed_at": phase2_completed_at} if phase2_completed_at else {}),
         },
         "nodes": nodes,
         "edges": edges,
         "layers": layers,
         "tours": tours,
-        "domains": meta.get("domains", []),
+        "domains": domains_from_file or meta.get("domains", []),
         "annotations": [],
         "health": meta.get("health", {}),
     }

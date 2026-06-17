@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { KnowledgeGraph } from '../schema/types.js';
-import type { LLMClient, LLMOptions } from '../llm/client.js';
+import type { LLMClient } from '../llm/client.js';
 import { writeFileAtomic, readJsonFileOrNull, ensureDir } from '../utils/fs.js';
 
 export interface AgentContext {

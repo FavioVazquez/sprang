@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import * as path from 'node:path';
+import { existsSync } from 'node:fs';
 import { fork } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { NullLLMClient } from '../llm/client.js';
@@ -77,8 +78,31 @@ export async function runSprangAnalysis(
 
   // Phase 2 — LLM enrichment
   if (options.background) {
+    // Locate the forked Phase 2 runner. In the source layout it is a sibling
+    // (src/orchestrator/phase2-runner.ts), but the bundled dist layout flattens
+    // runner.ts into dist/index.js (root) while phase2-runner stays at
+    // dist/orchestrator/phase2-runner.js. Resolve whichever actually exists.
+    const phase2Candidates = [
+      new URL('./phase2-runner.js', import.meta.url).pathname,
+      new URL('./orchestrator/phase2-runner.js', import.meta.url).pathname,
+    ];
+    const phase2ScriptPath = phase2Candidates.find((p) => existsSync(p));
+
+    if (!phase2ScriptPath) {
+      // Could not find the runner script — fall back to running Phase 2 inline
+      // so enrichment still happens rather than silently never running.
+      log('[sprang] Phase 2 runner not found on disk; running inline instead...');
+      try {
+        const { runPhase2 } = await import('./phase2.js');
+        await runPhase2(projectRoot, sprangDir, options, log);
+        log('[sprang] Phase 2 complete.');
+      } catch (err) {
+        log('[sprang] Phase 2 failed: ' + (err instanceof Error ? err.message : String(err)));
+      }
+      return;
+    }
+
     log('[sprang] Forking Phase 2 as background process...');
-    const phase2ScriptPath = new URL('./phase2-runner.js', import.meta.url).pathname;
     const child = fork(phase2ScriptPath, [], {
       detached: true,
       stdio: 'ignore',
@@ -91,6 +115,10 @@ export async function runSprangAnalysis(
         SPRANG_DIR: sprangDir,
         SPRANG_OPTIONS: JSON.stringify(options),
       },
+    });
+    // Surface spawn failures (e.g. ENOENT) instead of failing silently.
+    child.on('error', (err) => {
+      log('[sprang] Phase 2 fork failed to start: ' + err.message);
     });
     child.unref();
     log('[sprang] Phase 2 process forked (detached). PID: ' + (child.pid ?? 'unknown'));

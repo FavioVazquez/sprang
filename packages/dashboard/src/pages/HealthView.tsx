@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { AnimatedCount } from '../components/AnimatedCount';
 import {
   AlertTriangle,
   AlertCircle,
@@ -10,15 +12,20 @@ import {
   ArrowDown,
   Ghost,
   RefreshCw,
+  Shield,
+  CheckCircle,
 } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
 import { SmellBadge } from '../components/SmellBadge';
-import { getRiskColor, getRiskLabel } from '../api/graphApi';
-import type { KnowledgeGraph, SmellCategory, SprangNode } from '../types';
+import { HealthGrade } from '../components/HealthGrade';
+import { Sparkline } from '../components/Sparkline';
+import { getRiskColor } from '../api/graphApi';
+import type { KnowledgeGraph, SmellCategory, SprangNode, HistorySnapshot } from '../types';
 
 interface HealthViewProps {
   graph: KnowledgeGraph;
   onNodeSelect: (nodeId: string) => void;
+  history?: HistorySnapshot[];
 }
 
 type SortDir = 'asc' | 'desc';
@@ -37,7 +44,7 @@ function StatCard({
   sub?: string;
 }) {
   return (
-    <div className="p-4 rounded-xl bg-surface-900 border border-surface-800 space-y-3">
+    <div className="p-4 rounded-xl bg-surface-900 border border-surface-800 space-y-3 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 transition-all duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <div className="flex items-center gap-2">
         <Icon className="w-4 h-4 text-surface-500" />
         <span className="text-xs text-surface-500 font-medium">
@@ -49,7 +56,7 @@ function StatCard({
           className="text-2xl font-bold tabular-nums"
           style={accent ? { color: accent } : undefined}
         >
-          {value}
+          {typeof value === 'number' ? <AnimatedCount value={value} /> : value}
         </p>
         {sub && <p className="text-xs text-surface-500 mt-0.5">{sub}</p>}
       </div>
@@ -66,6 +73,8 @@ const SMELL_DESCRIPTIONS: Record<SmellCategory, string> = {
   duplicate_logic: 'Similar logic found in multiple places',
   orphan_node: 'Node with no connections to the rest of the graph',
   low_cohesion: 'Node whose responsibilities are loosely related',
+  name_duplicate: 'Same function/class name found in multiple files with similar logic',
+  layer_violation: 'A lower architectural layer imports from a higher one (dependencies should flow downward)',
 };
 
 const SMELL_SEVERITY: Record<SmellCategory, 'high' | 'medium' | 'low'> = {
@@ -77,6 +86,8 @@ const SMELL_SEVERITY: Record<SmellCategory, 'high' | 'medium' | 'low'> = {
   duplicate_logic: 'medium',
   orphan_node: 'low',
   low_cohesion: 'low',
+  name_duplicate: 'medium',
+  layer_violation: 'high',
 };
 
 const SEVERITY_ORDER = { high: 0, medium: 1, low: 2 };
@@ -99,7 +110,8 @@ function SortIcon({
   );
 }
 
-export function HealthView({ graph, onNodeSelect }: HealthViewProps) {
+export function HealthView({ graph, onNodeSelect, history = [] }: HealthViewProps) {
+  const shouldReduce = useReducedMotion();
   const [riskSort, setRiskSort] = useState<{ field: string; dir: SortDir }>({
     field: 'risk_score',
     dir: 'desc',
@@ -194,23 +206,65 @@ export function HealthView({ graph, onNodeSelect }: HealthViewProps) {
     return graph.nodes.filter((n) => !connectedIds.has(n.id));
   }, [graph.nodes, graph.edges]);
 
+  const healthGrade = useMemo(() => {
+    const orphanCount = orphanNodes.length;
+    const circularCount = circularNodes.length;
+    const godNodeCount = graph.stats.smell_summary['god_node'] ?? 0;
+    const totalNodes = graph.stats.node_count || 1;
+    const deadCodePct = (orphanCount / totalNodes) * 100;
+    const securityHighCount = graph.stats.security_summary?.by_severity.high ?? 0;
+
+    const deadPenalty = Math.min(20, deadCodePct);
+    const circularPenalty = Math.min(20, circularCount * 5);
+    const godNodePenalty = Math.min(15, godNodeCount * 3);
+    const securityPenalty = Math.min(20, securityHighCount * 5);
+    const score = Math.max(0, Math.min(100, 100 - deadPenalty - circularPenalty - godNodePenalty - securityPenalty));
+    const grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+    return { grade, score, breakdown: { dead_code_penalty: Math.round(deadPenalty), circular_penalty: Math.round(circularPenalty), god_node_penalty: Math.round(godNodePenalty), coupling_penalty: 0, security_penalty: Math.round(securityPenalty) } };
+  }, [graph, orphanNodes, circularNodes]);
+
+  const scoreHistory = useMemo(() => history.map(h => h.health_score), [history]);
+
   return (
     <div className="flex-1 overflow-y-auto bg-surface-950">
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
-        {/* Heading */}
-        <div>
-          <h1 className="text-xl font-bold text-surface-50">
-            Structural Health Report
-          </h1>
-          <p className="text-sm text-surface-500 mt-1">
-            {graph.project_name} — generated{' '}
-            {new Date(graph.stats.generated_at).toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}
-          </p>
+        {/* Heading with grade */}
+        <div className="flex items-start gap-6">
+          <HealthGrade
+            grade={healthGrade.grade}
+            score={healthGrade.score}
+            breakdown={healthGrade.breakdown}
+            size="lg"
+          />
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-surface-50">
+                Structural Health Report
+              </h1>
+              {scoreHistory.length >= 2 && (
+                <Sparkline
+                  data={scoreHistory}
+                  width={80}
+                  height={28}
+                  color={healthGrade.grade === 'A' ? '#22c55e' : healthGrade.grade === 'B' ? '#84cc16' : healthGrade.grade === 'C' ? '#f59e0b' : '#ef4444'}
+                />
+              )}
+            </div>
+            <p className="text-sm text-surface-500 mt-1">
+              {graph.project_name} — generated{' '}
+              {new Date(graph.stats.generated_at).toLocaleDateString('en-US', {
+                weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+              })}
+            </p>
+            {scoreHistory.length >= 2 && (
+              <p className="text-xs text-surface-600 mt-0.5">
+                {scoreHistory.length} runs tracked — trend: {
+                  scoreHistory[scoreHistory.length - 1]! > scoreHistory[scoreHistory.length - 2]! ? '↑ improving' :
+                  scoreHistory[scoreHistory.length - 1]! < scoreHistory[scoreHistory.length - 2]! ? '↓ declining' : '→ stable'
+                }
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Stats cards */}
@@ -349,11 +403,14 @@ export function HealthView({ graph, onNodeSelect }: HealthViewProps) {
                 </thead>
                 <tbody>
                   {smellStats.map((row, idx) => (
-                    <tr
+                    <motion.tr
                       key={row.category}
                       className={`border-b border-surface-800 last:border-0 ${
                         idx % 2 === 0 ? 'bg-surface-950' : 'bg-surface-900/40'
                       }`}
+                      initial={shouldReduce ? {} : { opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: shouldReduce ? 0 : Math.min(idx * 0.04, 0.4), duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                     >
                       <td className="px-4 py-3">
                         <Badge
@@ -387,7 +444,7 @@ export function HealthView({ graph, onNodeSelect }: HealthViewProps) {
                       <td className="px-4 py-3 text-surface-400 hidden md:table-cell">
                         {row.description}
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
                 </tbody>
               </table>
@@ -444,12 +501,15 @@ export function HealthView({ graph, onNodeSelect }: HealthViewProps) {
                 </thead>
                 <tbody>
                   {riskyNodes.map((node, idx) => (
-                    <tr
+                    <motion.tr
                       key={node.id}
                       className={`border-b border-surface-800 last:border-0 cursor-pointer transition-colors hover:bg-surface-800 ${
                         idx % 2 === 0 ? 'bg-surface-950' : 'bg-surface-900/40'
                       }`}
                       onClick={() => onNodeSelect(node.id)}
+                      initial={shouldReduce ? {} : { opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: shouldReduce ? 0 : Math.min(idx * 0.04, 0.4), duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                     >
                       <td className="px-4 py-3">
                         <p className="font-medium text-surface-200 truncate max-w-[200px]">
@@ -500,7 +560,7 @@ export function HealthView({ graph, onNodeSelect }: HealthViewProps) {
                           )}
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
                 </tbody>
               </table>
@@ -580,7 +640,7 @@ export function HealthView({ graph, onNodeSelect }: HealthViewProps) {
                 .map((node) => (
                   <div
                     key={node.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-surface-900 border border-surface-800 hover:border-surface-700 cursor-pointer transition-colors"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-surface-900 border border-surface-800 hover:border-surface-700 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 cursor-pointer transition-all duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                     onClick={() => onNodeSelect(node.id)}
                   >
                     <div className="flex-1 min-w-0">
@@ -595,6 +655,89 @@ export function HealthView({ graph, onNodeSelect }: HealthViewProps) {
                     </div>
                   </div>
                 ))}
+            </div>
+          </section>
+        )}
+
+        {/* Security warnings */}
+        {graph.stats.security_summary && graph.stats.security_summary.total > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-red-400" />
+              <h2 className="text-sm font-semibold text-surface-200">
+                Security Issues ({graph.stats.security_summary.total})
+              </h2>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(['high', 'medium', 'low'] as const).map((severity) => {
+                const count = graph.stats.security_summary!.by_severity[severity];
+                if (!count) return null;
+                return (
+                  <div key={severity} className={`p-3 rounded-xl border text-center ${
+                    severity === 'high' ? 'bg-red-950 border-red-900' :
+                    severity === 'medium' ? 'bg-amber-950 border-amber-900' :
+                    'bg-surface-900 border-surface-800'
+                  }`}>
+                    <p className={`text-2xl font-black tabular-nums ${
+                      severity === 'high' ? 'text-red-300' :
+                      severity === 'medium' ? 'text-amber-300' : 'text-surface-300'
+                    }`}>{count}</p>
+                    <p className="text-xs text-surface-500 mt-0.5 capitalize">{severity}</p>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="space-y-1.5">
+              {graph.nodes
+                .filter((n) => (n.security_warnings?.length ?? 0) > 0)
+                .slice(0, 10)
+                .map((node) => (
+                  <div
+                    key={node.id}
+                    className="flex items-start gap-3 p-3 rounded-lg bg-surface-900 border border-surface-800 hover:border-red-900 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 cursor-pointer transition-all duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                    onClick={() => onNodeSelect(node.id)}
+                  >
+                    <Shield className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-surface-200 truncate">{node.label}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {node.security_warnings?.slice(0, 3).map((w, i) => (
+                          <span key={i} className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                            w.severity === 'high' ? 'bg-red-950 text-red-300 border-red-900' :
+                            w.severity === 'medium' ? 'bg-amber-950 text-amber-300 border-amber-900' :
+                            'bg-surface-800 text-surface-400 border-surface-700'
+                          }`}>
+                            {w.category.replace(/_/g, ' ')}
+                            {w.line ? ` :${w.line}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </section>
+        )}
+
+        {/* Detected patterns (positive) */}
+        {graph.nodes.some(n => (n.detected_patterns?.length ?? 0) > 0) && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-green-400" />
+              <h2 className="text-sm font-semibold text-surface-200">Detected Patterns</h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Array.from(new Set(
+                graph.nodes.flatMap(n => n.detected_patterns ?? [])
+              )).map(pattern => {
+                const count = graph.nodes.filter(n => n.detected_patterns?.includes(pattern)).length;
+                return (
+                  <div key={pattern} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-950 border border-green-900 text-xs text-green-300">
+                    <CheckCircle className="w-3 h-3" />
+                    {pattern.replace(/_/g, ' ')} <span className="opacity-60">×{count}</span>
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}

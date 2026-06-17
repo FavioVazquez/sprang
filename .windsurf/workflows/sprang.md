@@ -12,8 +12,13 @@ description: Build or refresh the Sprang knowledge graph for this workspace
    - If both exist → ask the user which they want (codebase analysis or knowledge graph)
 
 4. **For codebase analysis** (delegates to `/sprang-analyze`):
-   - Run: `npx sprang scan .` to produce the skeleton graph (Phase 1, <60s)
-   - Then run `/sprang-analyze` for full semantic enrichment (Phases 2-6)
+   - Produce the skeleton graph first (try in order):
+     ```bash
+     npx sprang scan . 2>/dev/null \
+       || node packages/cli/dist/index.js scan . 2>/dev/null \
+       || echo "Skipping skeleton — /sprang-analyze will build from scratch"
+     ```
+   - Then run `/sprang-analyze` for full semantic enrichment (all 7 phases)
 
 5. **For knowledge base** (delegates to `/sprang-knowledge`):
    - Run `/sprang-knowledge` directly — no CLI prerequisite needed

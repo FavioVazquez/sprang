@@ -66,7 +66,7 @@ export function LearnPanel() {
             <BookOpen className="w-8 h-8 mx-auto text-surface-700" />
             <p className="text-sm font-medium text-surface-400">No tour available</p>
             <p className="text-xs text-surface-600 leading-relaxed">
-              Run <code className="text-sprang-400 bg-surface-800 px-1 rounded">/sprang-analyze</code> in Cascade to build the guided tour.
+              Run <code className="text-sprang-400 bg-surface-800 px-1 rounded">/sprang-analyze</code> in your AI agent to build the guided tour.
               If a graph already exists, use <code className="text-sprang-400 bg-surface-800 px-1 rounded">/sprang-analyze --full</code> to force a full rebuild including tour generation.
             </p>
           </div>
@@ -135,9 +135,13 @@ export function LearnPanel() {
   // Persona-adaptive content
   const personaHint =
     persona === 'non-technical'
-      ? '💡 High-level: focus on the purpose of this component in the overall system.'
+      ? '💡 Business view: focus on the purpose of this component in the overall system — ignore implementation details.'
+      : persona === 'pm'
+      ? '🗂 Product view: these are the domain and service nodes that map to business capabilities and feature areas.'
       : persona === 'junior'
-      ? '📖 Learning tip: pay attention to the language lesson below.'
+      ? '📖 Learning tip: pay attention to the language lesson below — it explains the pattern used here.'
+      : persona === 'senior' || persona === 'experienced'
+      ? '⚡ Senior view: introductory steps are skipped — focus on trade-offs, risk scores, and coupling.'
       : null;
 
   return (

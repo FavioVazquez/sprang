@@ -1,6 +1,6 @@
 {
   "name": "@sprang/core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.js",
@@ -10,6 +10,9 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "scripts": {
     "build": "tsup src/index.ts src/orchestrator/phase2-runner.ts --format esm --dts --sourcemap",

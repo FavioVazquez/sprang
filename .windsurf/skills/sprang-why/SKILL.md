@@ -1,6 +1,6 @@
 ---
 name: sprang-why
-description: Understand why a file or function exists. Pass a file path or function name as $ARGUMENTS to surface git history, decision context, and team annotations.
+description: Understand why a file or function exists — git history, decision context, team annotations. Use when the user says "/sprang-why", "why does this exist", "who wrote this", "history of this file", or "what decisions led to this".
 ---
 
 1. Call `sprang_query` with `$ARGUMENTS` to find the matching graph node ID (file path, function name, class name).

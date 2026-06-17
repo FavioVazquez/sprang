@@ -10,7 +10,7 @@ export function parseCSharp(source: string): ParsedSymbols {
     /^\s*(?:(?:public|private|protected|internal|static|abstract|sealed|partial|readonly)\s+)*(?:class|interface|struct|record|enum)\s+(\w+)/;
   // [access] [modifiers] ReturnType MethodName(
   const methodRe =
-    /^\s*(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|new|sealed)\s+)+(?!class\s|interface\s|struct\s|record\s|enum\s)(?:[\w<>\[\],\s.?]+\s+)?(\w+)\s*\(/;
+    /^\s*(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|new|sealed)\s+)+(?!class\s|interface\s|struct\s|record\s|enum\s)(?:[\w<>[\],\s.?]+\s+)?(\w+)\s*\(/;
 
   const SKIP = new Set([
     'if', 'for', 'foreach', 'while', 'switch', 'do', 'catch',
