@@ -265,16 +265,16 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
      SPRANG_DIR=$(realpath ~/tools/sprang)
      mkdir -p .devin
      cat > .devin/config.json << EOF
-     {
-       "mcpServers": {
-         "sprang": {
-           "command": "node",
-           "args": ["$SPRANG_DIR/packages/mcp/dist/server.js"],
-           "env": { "SPRANG_ROOT": "\${workspaceFolder}" }
-         }
-       }
-     }
-     EOF
+{
+  "mcpServers": {
+    "sprang": {
+      "command": "node",
+      "args": ["$SPRANG_DIR/packages/mcp/dist/server.js"],
+      "env": { "SPRANG_ROOT": "\${workspaceFolder}" }
+    }
+  }
+}
+EOF
 
    Workflows — all /sprang-* slash commands:
      mkdir -p .windsurf/workflows .devin/workflows
