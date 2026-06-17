@@ -240,33 +240,11 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
    pnpm install
    pnpm build
 
-3. Link the CLI globally so `sprang` works from any terminal.
-   Run these commands in ~/tools/sprang/packages/cli:
-     pnpm setup
-     export PNPM_HOME="$HOME/.local/share/pnpm"
-     export PATH="$PNPM_HOME:$PATH"
-     pnpm link --global
-   Verify: which sprang  (should print a path ending in /sprang)
+3. Install the CLI globally so `sprang` works from any terminal:
+   npm install -g @faviovazquez/sprang
+   Verify: sprang --version  (should print 0.2.3 or later)
 
-4. Determine the two absolute paths you need:
-   SPRANG_DIR = the absolute path where you cloned sprang (~/tools/sprang resolved)
-   PROJECT_DIR = the absolute path of the current workspace root
-
-   Write the MCP server config to ~/.codeium/windsurf/mcp_config.json.
-   If the file already exists and has other mcpServers entries, merge — do not overwrite.
-   The entry to add:
-   {
-     "mcpServers": {
-       "sprang": {
-         "command": "node",
-         "args": ["SPRANG_DIR/packages/mcp/dist/server.js"],
-         "env": { "SPRANG_ROOT": "PROJECT_DIR" }
-       }
-     }
-   }
-   Use the real resolved paths, not placeholders.
-
-5. Copy rules, workflows, skills, and hooks into the current project:
+4. Copy rules, workflows, skills, and hooks into the current project:
 
    Rules — tell Cascade/Devin to use Sprang automatically:
      mkdir -p .devin/rules .windsurf/rules
@@ -278,57 +256,46 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
      cp ~/tools/sprang/.windsurf/rules/cascade-messaging.md .windsurf/rules/
 
    Hooks — enable persistent dashboard chat (conversation history):
+     mkdir -p .devin .windsurf/hooks
      cp ~/tools/sprang/.devin/hooks.json .devin/hooks.json
-     mkdir -p .windsurf/hooks
-     cp ~/tools/sprang/.windsurf/hooks.json .windsurf/hooks.json
      cp ~/tools/sprang/.windsurf/hooks/save-conversation.py .windsurf/hooks/save-conversation.py
 
-   Devin Desktop MCP config — write .devin/config.json using the ACTUAL resolved SPRANG_DIR path
-   from step 4 (do NOT copy the repo template — it has a relative path that won't resolve):
-     cat > .devin/config.json << 'DEVIN_EOF'
+   Devin Desktop MCP config — write .devin/config.json using the ACTUAL resolved path to
+   ~/tools/sprang (do NOT copy the repo template — it has a relative path that won't resolve):
+     SPRANG_DIR=$(realpath ~/tools/sprang)
+     mkdir -p .devin
+     cat > .devin/config.json << EOF
      {
        "mcpServers": {
          "sprang": {
            "command": "node",
-           "args": ["SPRANG_DIR/packages/mcp/dist/server.js"],
-           "env": { "SPRANG_ROOT": "${workspaceFolder}" }
+           "args": ["$SPRANG_DIR/packages/mcp/dist/server.js"],
+           "env": { "SPRANG_ROOT": "\${workspaceFolder}" }
          }
        }
      }
-     DEVIN_EOF
-   Replace SPRANG_DIR in that file with the real absolute path (e.g. /home/yourname/tools/sprang).
+     EOF
 
-   Workflows — all /sprang-* slash commands for Windsurf / Cascade:
-     mkdir -p .windsurf/workflows
+   Workflows — all /sprang-* slash commands:
+     mkdir -p .windsurf/workflows .devin/workflows
      cp ~/tools/sprang/.windsurf/workflows/*.md .windsurf/workflows/
+     cp ~/tools/sprang/.windsurf/workflows/*.md .devin/workflows/
 
-   Skills — same /sprang-* commands for Devin Desktop:
-     mkdir -p .windsurf/skills
+   Skills:
+     mkdir -p .windsurf/skills .devin/skills
      cp -r ~/tools/sprang/.windsurf/skills/sprang* .windsurf/skills/
+     cp -r ~/tools/sprang/.windsurf/skills/sprang* .devin/skills/
 
-   Symlinks so both Windsurf and Devin find them:
-     ln -sf ../.windsurf/workflows .devin/workflows
-     ln -sf ../.windsurf/skills .devin/skills
-
-6. Run the initial scan of this project (Phase 1 — fully static, under 60s):
+5. Run the initial scan of this project (Phase 1 — fully static, under 60s):
    sprang scan . --phase1-only
-   (If `sprang` is not yet in PATH, use: node ~/tools/sprang/packages/cli/dist/index.js scan . --phase1-only)
 
-7. Start the dashboard:
-   SPRANG_ROOT="PROJECT_DIR" pnpm --filter @sprang/dashboard preview
+6. Start the dashboard:
+   sprang open .
    Dashboard will be at http://localhost:7777
 
-8. Install the cascade-messaging VS Code extension (enables persistent dashboard chat):
-   if ! windsurf --list-extensions 2>/dev/null | grep -q cascade-messaging; then
-     windsurf --install-extension ~/tools/sprang/cascade-messaging-0.1.0.vsix 2>/dev/null || \
-     code --install-extension ~/tools/sprang/cascade-messaging-0.1.0.vsix 2>/dev/null || \
-     echo "Manual install: Extensions → Install from VSIX → ~/tools/sprang/cascade-messaging-0.1.0.vsix"
-   fi
-
-9. Report what was installed and where. Then tell me:
-   "Please reload the window now (Cmd/Ctrl+Shift+P → Reload Window) so the MCP server
-   and cascade-messaging extension activate.
-   Dashboard is live at http://localhost:7777.
+7. Report what was installed and where. Then tell me:
+   "Setup complete. Please reload the window now (Cmd/Ctrl+Shift+P → Reload Window)
+   so the MCP server activates. Dashboard is live at http://localhost:7777.
    Once reloaded, type /sprang-onboard to begin."
 ```
 
