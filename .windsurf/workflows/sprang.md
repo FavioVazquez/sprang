@@ -14,7 +14,7 @@ description: Build or refresh the Sprang knowledge graph for this workspace
 4. **For codebase analysis** (delegates to `/sprang-analyze`):
    - Produce the skeleton graph first (try in order):
      ```bash
-     npx sprang scan . 2>/dev/null \
+     npx @faviovazquez/sprang scan . 2>/dev/null \
        || node packages/cli/dist/index.js scan . 2>/dev/null \
        || echo "Skipping skeleton — /sprang-analyze will build from scratch"
      ```

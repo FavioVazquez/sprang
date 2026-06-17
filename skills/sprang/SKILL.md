@@ -11,7 +11,7 @@ Build or refresh the Sprang knowledge graph for this workspace.
    - Source code (`.ts`, `.py`, `.go`, `.rs`, etc.) → run `/sprang-analyze`
    - Primarily markdown notes (Obsidian, Logseq, Zettelkasten) → run `/sprang-knowledge`
    - Both → ask the user which they want
-4. **For codebase analysis** → run `npx sprang scan .` to produce the skeleton graph, then run `/sprang-analyze` for full enrichment.
+4. **For codebase analysis** → run `npx @faviovazquez/sprang scan .` to produce the skeleton graph, then run `/sprang-analyze` for full enrichment.
 5. **For knowledge base** → run `/sprang-knowledge` directly.
 6. Once complete, call `sprang_health` to show the new graph summary.
 7. Report: nodes created, edges, top insights, any warnings flagged.

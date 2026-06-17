@@ -121,7 +121,7 @@ When editing a source file:
 {
   "permissions": {
     "allow": [
-      "Bash(npx sprang*)",
+      "Bash(npx @faviovazquez/sprang*)",
       "Bash(node packages/mcp/dist/server.js*)",
       "Bash(pnpm --filter @sprang/dashboard dev*)",
       "Bash(git diff*)",
@@ -235,13 +235,13 @@ sprang install-hooks [path]                        # install git post-commit hoo
 Install a git post-commit hook that refreshes the graph after each commit:
 
 ```bash
-npx sprang install-hooks
+npx @faviovazquez/sprang install-hooks
 ```
 
 Or run conditionally (only when graph is stale):
 
 ```bash
-npx sprang scan --if-stale
+npx @faviovazquez/sprang scan --if-stale
 ```
 
 ---

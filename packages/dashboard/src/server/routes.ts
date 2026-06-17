@@ -104,7 +104,7 @@ function cliScanInvocation(targetDir: string): { cmd: string; args: string[] } {
   const local = resolveLocalCli();
   if (local) return { cmd: process.execPath, args: [local, ...scanArgs] };
   if (findOnPath('sprang')) return { cmd: 'sprang', args: scanArgs };
-  return { cmd: 'npx', args: ['-y', 'sprang', ...scanArgs] };
+  return { cmd: 'npx', args: ['-y', '@faviovazquez/sprang', ...scanArgs] };
 }
 
 type RouteRegistrar = (path: string, handler: (req: IncomingMessage, res: ServerResponse) => void) => void;

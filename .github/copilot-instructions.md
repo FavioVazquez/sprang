@@ -41,7 +41,7 @@ cd <path-to-sprang-repo>   # e.g. ~/.sprang/repo or ~/tools/sprang
 pnpm install && pnpm build
 ```
 
-To build or refresh the knowledge graph: run `sprang scan .` (or `npx sprang scan .` if the CLI is not on your PATH).
+To build or refresh the knowledge graph: run `sprang scan .` (or `npx @faviovazquez/sprang scan .` if the CLI is not on your PATH).
 
 ## Dashboard Ask Agent
 

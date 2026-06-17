@@ -187,8 +187,8 @@ jobs:
           FIXTURE=$(ls /tmp/sprang-fixture* -d 2>/dev/null || mktemp -d)
 
           # Find MCP server (CJS standalone bundle)
-          MCP_SERVER="./node_modules/sprang/dist/mcp-server.cjs"
-          [ -f "$MCP_SERVER" ] || MCP_SERVER="$(find ./node_modules/sprang -name 'mcp-server.cjs' 2>/dev/null | head -1)"
+          MCP_SERVER="./node_modules/@faviovazquez/sprang/dist/mcp-server.cjs"
+          [ -f "$MCP_SERVER" ] || MCP_SERVER="$(find ./node_modules -name 'mcp-server.cjs' -path '*sprang*' 2>/dev/null | head -1)"
 
           if [ -z "$MCP_SERVER" ] || [ ! -f "$MCP_SERVER" ]; then
             echo "WARNING: MCP server not found in npm package (standalone server not built yet)"

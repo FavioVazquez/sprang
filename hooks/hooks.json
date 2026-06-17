@@ -9,7 +9,7 @@
             "command": "bash",
             "args": [
               "-c",
-              "printf '%s' \"${TOOL_INPUT:-}\" | grep -qE 'git[[:space:]]+(commit|merge|cherry-pick|rebase)' && [ -f .sprang/knowledge-graph.json ] && (npx sprang scan --phase1-only --if-stale >\"${TMPDIR:-/tmp}/sprang-autoupdate.log\" 2>&1 &); true"
+              "printf '%s' \"${TOOL_INPUT:-}\" | grep -qE 'git[[:space:]]+(commit|merge|cherry-pick|rebase)' && [ -f .sprang/knowledge-graph.json ] && (npx @faviovazquez/sprang scan --phase1-only --if-stale >\"${TMPDIR:-/tmp}/sprang-autoupdate.log\" 2>&1 &); true"
             ]
           }
         ]

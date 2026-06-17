@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="#installation"><img src="https://img.shields.io/badge/npm-install_--g_sprang-CB3837?style=flat-square&logo=npm" alt="npm install -g sprang"/></a>
+  <a href="#installation"><img src="https://img.shields.io/badge/npm-%40faviovazquez%2Fsprang-CB3837?style=flat-square&logo=npm" alt="npm install -g @faviovazquez/sprang"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
   <img src="https://img.shields.io/badge/unit_tests-656_passing-10B981?style=flat-square" alt="656 unit tests passing"/>
@@ -70,8 +70,10 @@ The same infrastructure works for knowledge bases: Obsidian vaults, Logseq datab
 Install once, then use the `sprang` command in any project:
 
 ```bash
-npm install -g sprang
+npm install -g @faviovazquez/sprang
 ```
+
+> The package is published under the scoped name **`@faviovazquez/sprang`**, but the command it installs is just **`sprang`**.
 
 ```bash
 cd my-project
@@ -82,7 +84,7 @@ sprang open            # launch the dashboard at http://localhost:7777
 
 The `sprang` npm package bundles the dashboard, MCP server, and CLI into a single tarball — no separate build step, no pnpm workspace, no Node version pinning beyond Node 22.
 
-> **`npm install -g` vs `npx`?** Every command also runs without installing — `npx sprang scan`, `npx sprang open`, etc. But prefer the global install for `sprang init`: it writes the bundled MCP server's **absolute path** into your project's `.mcp.json`, and a global install keeps that path stable, whereas the `npx` cache path can be pruned by npm and silently break your MCP config. Global install also gives you the short `sprang …` command everywhere.
+> **`npm install -g` vs `npx`?** Every command also runs without installing — `npx @faviovazquez/sprang scan`, `npx @faviovazquez/sprang open`, etc. But prefer the global install for `sprang init`: it writes the bundled MCP server's **absolute path** into your project's `.mcp.json`, and a global install keeps that path stable, whereas the `npx` cache path can be pruned by npm and silently break your MCP config. Global install also gives you the short `sprang …` command everywhere.
 
 ---
 
