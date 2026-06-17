@@ -286,7 +286,7 @@ To disable both hooks, remove the `"hooks"` key from `.claude/settings.json`. To
 Both scripts have full unit test coverage in `packages/cli/tests/hooks-scripts.test.ts` (12 tests). Run with:
 
 ```bash
-pnpm --filter @sprang/cli test
+pnpm --filter sprang test
 ```
 
 ---

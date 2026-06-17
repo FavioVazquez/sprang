@@ -6,7 +6,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.2.1] — 2026-06-08
+## [0.2.1] — 2026-06-17
 
 Security scanning, health grading, run history, architecture diagrams, on-demand dashboard analysis, a point-and-analyze landing screen, CodeFlow-parity static analysis (call graph, design patterns, layer violations), and three new visualization modes (3D graph, treemap, matrix) — all deterministic, no API key required.
 
