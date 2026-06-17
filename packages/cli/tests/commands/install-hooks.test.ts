@@ -49,6 +49,29 @@ describe('install-hooks command', () => {
     writeSpy.mockRestore();
   });
 
+  it('does not hardcode the monorepo path (v0.2.3 npm-install fix)', async () => {
+    mockedExecSync.mockReturnValue('.git\n' as unknown as Buffer);
+    const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+    mockedReadFile.mockRejectedValue(enoent);
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const { makeInstallHooksCommand } = await import('../../src/commands/install-hooks.js');
+    await makeInstallHooksCommand().parseAsync([], { from: 'user' });
+
+    const [, content] = mockedWriteFile.mock.calls[0]!;
+    const hook = String(content);
+    // The old hook expanded `$(git rev-parse --show-toplevel)/packages/cli/dist/index.js`
+    // in the USER's repo, which doesn't exist for npm installs — that must be gone.
+    expect(hook).not.toContain('git rev-parse --show-toplevel');
+    // It must reference a concrete, absolute CLI entry plus a `sprang` PATH
+    // fallback. (Under vitest `import.meta.url` resolves to the .ts source; the
+    // bundled CLI resolves to dist/index.js — either way it is absolute & real.)
+    expect(hook).toMatch(/SPRANG_BIN="\/.+\.(js|ts)"/);
+    expect(hook).toContain('command -v sprang');
+
+    writeSpy.mockRestore();
+  });
+
   it('appends to an existing hook file without duplication', async () => {
     mockedExecSync.mockReturnValue('.git\n' as unknown as Buffer);
     const existingHook = '#!/bin/sh\necho "existing hook"\n';

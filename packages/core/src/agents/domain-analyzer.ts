@@ -97,7 +97,12 @@ export class DomainAnalyzerAgent extends BaseAgent {
         role: 'user',
         content: `These files belong to the same cluster:\n${nodes.join('\n')}\n\nRespond with ONLY a 1-3 word domain name (e.g. "Authentication", "Payment Processing", "User Management"). No explanation.`,
       }]);
-      return response.trim().replace(/['"]/g, '');
+      const name = response.trim().replace(/['"]/g, '');
+      // The default NullLLMClient returns '' (not a throw), and an agent bridge
+      // can also return a blank line — fall back to the directory heuristic so a
+      // domain is never left with an empty id/label.
+      if (name === '') return this.heuristicDomainName(nodeIds, graph);
+      return name;
     } catch {
       return this.heuristicDomainName(nodeIds, graph);
     }

@@ -5,7 +5,7 @@ import { fork } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { NullLLMClient } from '../llm/client.js';
 import { runPhase1 } from './phase1.js';
-import { saveGraph } from '../graph/store.js';
+import { saveGraph, loadGraphOrNull, mergePhase1IntoEnriched } from '../graph/store.js';
 import type { KnowledgeGraph } from '../schema/types.js';
 import type { SprangOptions } from '../agents/base.js';
 import { SPRANG_DIR } from '../schema/constants.js';
@@ -48,6 +48,10 @@ export async function runSprangAnalysis(
 
   const log = (msg: string) => process.stdout.write(msg + '\n');
 
+  // Capture any existing enriched graph before runPhase1 overwrites it, so a
+  // phase1-only refresh can preserve Phase 2 work instead of resetting it.
+  const existingGraph = await loadGraphOrNull(sprangDir);
+
   log('[sprang] Starting Phase 1 analysis...');
   let skeletonGraph = await runPhase1(
     projectRoot,
@@ -57,6 +61,13 @@ export async function runSprangAnalysis(
     log
   );
 
+  // On a phase1-only scan (post-commit hook, watcher, --if-stale), keep the
+  // existing Phase 2 enrichment rather than downgrading the graph to skeleton.
+  if (options.skipLLM && existingGraph && existingGraph.phase !== 'skeleton') {
+    skeletonGraph = mergePhase1IntoEnriched(skeletonGraph, existingGraph);
+    log('[sprang] Preserved existing Phase 2 enrichment (layers, domains, tours, risk, security).');
+  }
+
   // Record the current git commit hash in the graph stats
   const gitHash = getCurrentGitHash(projectRoot);
   if (gitHash) {
@@ -64,8 +75,10 @@ export async function runSprangAnalysis(
       ...skeletonGraph,
       stats: { ...skeletonGraph.stats, gitCommitHash: gitHash },
     };
-    await saveGraph(sprangDir, skeletonGraph);
   }
+  // Persist the (possibly enrichment-merged) graph. runPhase1 already wrote a
+  // bare skeleton, so this re-save is what carries the preserved Phase 2 data.
+  await saveGraph(sprangDir, skeletonGraph);
 
   log(
     `[sprang] Phase 1 complete. Nodes: ${skeletonGraph.nodes.length}, Edges: ${skeletonGraph.edges.length}`

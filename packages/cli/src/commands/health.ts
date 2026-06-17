@@ -1,6 +1,6 @@
 import { resolve, join } from 'node:path';
 import { Command } from 'commander';
-import { loadGraphOrNull } from '@sprang/core';
+import { loadGraphOrNull, calcHealthGrade } from '@sprang/core';
 
 function riskBar(count: number, total: number, char: string): string {
   if (total === 0) return '';
@@ -61,6 +61,13 @@ export function makeHealthCommand(): Command {
       process.stdout.write(`  Project:      ${graph.project_name || graph.project_root}\n`);
       process.stdout.write('\n');
 
+      // Health grade (only meaningful once Phase 2 has scored the graph)
+      if (graph.phase !== 'skeleton') {
+        const grade = calcHealthGrade(stats);
+        process.stdout.write(`  Health Grade: ${grade.grade}  (${grade.score}/100)\n`);
+        process.stdout.write('\n');
+      }
+
       // Node/edge counts
       process.stdout.write(`  Nodes:  ${stats.node_count}\n`);
       process.stdout.write(`  Edges:  ${stats.edge_count}\n`);
@@ -112,6 +119,24 @@ export function makeHealthCommand(): Command {
         process.stdout.write('\n');
       } else {
         process.stdout.write('  Code Smells: none detected\n\n');
+      }
+
+      // Security findings
+      const sec = stats.security_summary;
+      if (sec && sec.total > 0) {
+        process.stdout.write('  Security Findings\n');
+        process.stdout.write('  ' + '-'.repeat(40) + '\n');
+        process.stdout.write(
+          `  High: ${sec.by_severity.high}   Medium: ${sec.by_severity.medium}   Low: ${sec.by_severity.low}   (total ${sec.total})\n`
+        );
+        for (const [category, count] of Object.entries(sec.by_category)) {
+          if (typeof count === 'number' && count > 0) {
+            process.stdout.write(`  ${pad(category, 30)} ${count}\n`);
+          }
+        }
+        process.stdout.write('\n');
+      } else if (graph.phase !== 'skeleton') {
+        process.stdout.write('  Security Findings: none detected\n\n');
       }
 
       process.stdout.write('='.repeat(60) + '\n\n');
