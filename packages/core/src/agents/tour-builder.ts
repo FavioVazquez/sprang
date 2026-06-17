@@ -22,14 +22,22 @@ export class TourBuilderAgent extends BaseAgent {
       const outEdges = this.buildOutEdgeMap(graph);
       const inDegree = this.computeInDegrees(graph);
 
-      // Find entry points
+      // Find entry points, then order candidate start nodes so the most
+      // connected ones come first — starting the tour at an orphan file (no
+      // out-edges) would otherwise yield a single-step tour and be discarded.
       const entryPoints = this.findEntryPoints(fileNodes, inDegree);
+      const outDegree = (id: string) => (outEdges.get(id) ?? []).length;
+      const candidateStarts = [
+        ...entryPoints,
+        ...[...fileNodes].sort((a, b) => outDegree(b.id) - outDegree(a.id)),
+      ];
 
-      // Generate tours (max 2: a default and an optional domain-focused one)
+      // Generate tours (max 2: a default and an optional risk-focused one)
       const tours: Tour[] = [];
 
-      // Tour 1: dependency-ordered full tour
-      const defaultTour = await this.buildDefaultTour(graph, fileNodes, entryPoints, outEdges, ctx);
+      // Tour 1: dependency-ordered full tour. Always produced when there are at
+      // least two file nodes (falls back to a flat layer-ordered tour).
+      const defaultTour = await this.buildDefaultTour(graph, fileNodes, candidateStarts, outEdges, ctx);
       if (defaultTour) tours.push(defaultTour);
 
       // Tour 2: risk-focused tour (highest risk nodes)
@@ -87,37 +95,36 @@ export class TourBuilderAgent extends BaseAgent {
   private async buildDefaultTour(
     graph: KnowledgeGraph,
     fileNodes: SprangNode[],
-    entryPoints: SprangNode[],
+    candidateStarts: SprangNode[],
     outEdges: Map<string, string[]>,
     ctx: AgentContext,
   ): Promise<Tour | null> {
-    const startNode = entryPoints[0] ?? fileNodes[0];
-    if (!startNode) return null;
+    if (fileNodes.length === 0) return null;
 
-    // BFS traversal to get dependency-ordered nodes
-    const visited = new Set<string>();
-    const queue: string[] = [startNode.id];
-    const orderedNodeIds: string[] = [];
-
-    while (queue.length > 0 && orderedNodeIds.length < 12) {
-      const nodeId = queue.shift()!;
-      if (visited.has(nodeId)) continue;
-      visited.add(nodeId);
-
-      const node = graph.nodes.find(n => n.id === nodeId);
-      if (!node || node.type !== 'file') continue;
-
-      orderedNodeIds.push(nodeId);
-
-      const targets = outEdges.get(nodeId) ?? [];
-      for (const t of targets) queue.push(t);
+    // Try each candidate start (most-connected first) and keep the first BFS
+    // walk that reaches at least two files. Starting at an orphan would yield a
+    // one-step walk, so we fall through to the next candidate.
+    let startNode: SprangNode | undefined;
+    let orderedNodeIds: string[] = [];
+    const seenStarts = new Set<string>();
+    for (const candidate of candidateStarts) {
+      if (seenStarts.has(candidate.id)) continue;
+      seenStarts.add(candidate.id);
+      const walk = this.bfsFileOrder(graph, candidate.id, outEdges);
+      if (walk.length > orderedNodeIds.length) {
+        orderedNodeIds = walk;
+        startNode = candidate;
+      }
+      if (orderedNodeIds.length >= 2) break;
     }
 
-    // Add any high-risk nodes not yet in tour
-    const highRisk = fileNodes
-      .filter(n => !visited.has(n.id) && (n.risk_score ?? 0) > 0.6)
-      .slice(0, 3);
-    for (const n of highRisk) orderedNodeIds.push(n.id);
+    // Last-resort fallback: a flat, layer-ordered walk over the file nodes so a
+    // graph with ≥2 files always yields a tour (e.g. fully disconnected files).
+    if (orderedNodeIds.length < 2) {
+      startNode = fileNodes[0];
+      orderedNodeIds = fileNodes.map(n => n.id);
+    }
+    if (orderedNodeIds.length < 2 || !startNode) return null;
 
     const steps: TourStep[] = orderedNodeIds.slice(0, 10).map((nodeId, i) => {
       const node = graph.nodes.find(n => n.id === nodeId)!;
@@ -141,6 +148,27 @@ export class TourBuilderAgent extends BaseAgent {
       entry_point: startNode.id,
       steps,
     };
+  }
+
+  /** BFS over import/call edges from a start file, returning ordered file node ids. */
+  private bfsFileOrder(
+    graph: KnowledgeGraph,
+    startId: string,
+    outEdges: Map<string, string[]>,
+  ): string[] {
+    const visited = new Set<string>();
+    const queue: string[] = [startId];
+    const ordered: string[] = [];
+    while (queue.length > 0 && ordered.length < 12) {
+      const nodeId = queue.shift()!;
+      if (visited.has(nodeId)) continue;
+      visited.add(nodeId);
+      const node = graph.nodes.find(n => n.id === nodeId);
+      if (!node || node.type !== 'file') continue;
+      ordered.push(nodeId);
+      for (const t of outEdges.get(nodeId) ?? []) queue.push(t);
+    }
+    return ordered;
   }
 
   private async attachLanguageLessons(
@@ -205,7 +233,7 @@ export class TourBuilderAgent extends BaseAgent {
 
   private buildRiskTour(graph: KnowledgeGraph, fileNodes: SprangNode[]): Tour | null {
     const riskyNodes = fileNodes
-      .filter(n => n.risk_score !== undefined && n.risk_score > 0.5)
+      .filter(n => n.risk_score !== undefined && n.risk_score > 0.4)
       .sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0))
       .slice(0, 8);
 

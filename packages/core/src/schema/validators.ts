@@ -34,6 +34,30 @@ export const structuralWarningSchema = z.object({
   heuristic: z.string(),
 });
 
+export const securityCategorySchema = z.enum([
+  'hardcoded_secret', 'sql_injection', 'xss_risk', 'unsafe_eval',
+  'unsafe_exec', 'unsafe_deserialization', 'path_traversal', 'weak_crypto',
+]);
+
+export const securityWarningSchema = z.object({
+  category: securityCategorySchema,
+  severity: z.enum(['low', 'medium', 'high']),
+  description: z.string(),
+  line: z.number().int().optional(),
+  pattern: z.string(),
+  snippet: z.string().optional(),
+});
+
+export const securitySummarySchema = z.object({
+  total: z.number().int().min(0),
+  by_severity: z.object({
+    high: z.number().int().min(0),
+    medium: z.number().int().min(0),
+    low: z.number().int().min(0),
+  }),
+  by_category: z.record(z.number().int().min(0)),
+});
+
 export const sprangNodeSchema = z.object({
   id: z.string().min(1),
   type: nodeTypeSchema,
@@ -58,6 +82,7 @@ export const sprangNodeSchema = z.object({
   knowledgeMeta: z.record(z.unknown()).optional(),
   decision_context: decisionContextSchema.optional(),
   structural_warnings: z.array(structuralWarningSchema).optional(),
+  security_warnings: z.array(securityWarningSchema).optional(),
   risk_score: z.number().min(0).max(1).optional(),
   risk_factors: z.array(z.enum([
     'high_coupling', 'no_test_coverage', 'frequent_changes',
@@ -150,6 +175,7 @@ export const knowledgeGraphSchema = z.object({
       low: z.number().int().min(0),
     }),
     smell_summary: z.record(z.number().int().min(0)),
+    security_summary: securitySummarySchema.optional(),
     llm_token_usage: z.number().optional(),
     generated_at: z.string(),
     phase2_completed_at: z.string().optional(),

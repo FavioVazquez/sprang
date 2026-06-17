@@ -98,6 +98,9 @@ export function makeQueryCommand(): Command {
 
       // ── Text mode (default) ────────────────────────────────────────────────
       const lowerQuery = question.toLowerCase();
+      // Tokenize so multi-word queries ("validate input") match on any word
+      // instead of requiring the whole phrase as a substring.
+      const tokens = lowerQuery.split(/\s+/).filter(Boolean);
 
       type ScoredNode = {
         id: string;
@@ -118,18 +121,26 @@ export function makeQueryCommand(): Command {
         const labelLower = node.label.toLowerCase();
         const summaryLower = node.summary?.toLowerCase() ?? '';
 
-        const labelMatch = labelLower.includes(lowerQuery);
-        const summaryMatch = summaryLower.includes(lowerQuery);
+        // Phrase match (whole query) ranks highest; token matches (any word)
+        // provide the fallback for multi-word queries.
+        const labelPhrase = labelLower.includes(lowerQuery);
+        const summaryPhrase = summaryLower.includes(lowerQuery);
+        const labelTokens = tokens.filter((t) => labelLower.includes(t)).length;
+        const summaryTokens = tokens.filter((t) => summaryLower.includes(t)).length;
 
-        if (!labelMatch && !summaryMatch) continue;
+        if (!labelPhrase && !summaryPhrase && labelTokens === 0 && summaryTokens === 0) continue;
 
         let score = 0;
         if (labelLower === lowerQuery) {
+          score = 4;
+        } else if (labelPhrase) {
           score = 3;
-        } else if (labelMatch) {
+        } else if (labelTokens === tokens.length && tokens.length > 0) {
+          score = 2.5; // every query word appears in the label
+        } else if (labelTokens > 0) {
           score = 2;
         } else {
-          score = 1;
+          score = 1; // summary-only (phrase or token) match
         }
 
         scored.push({

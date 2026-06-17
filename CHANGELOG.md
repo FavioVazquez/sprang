@@ -6,6 +6,39 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.3] — 2026-06-17
+
+Patch release: seven correctness fixes found during an end-to-end agent UAT (driving Claude Code, and applicable equally to Cascade/Devin Desktop and Copilot, which share the same MCP server and core). All fixes ship in `@sprang/core` + the MCP server, so every agent benefits.
+
+### Fixed (MCP dropped all security data — high impact)
+
+- **The MCP server silently discarded every security finding on load.** `GraphLoader` validates the graph with Zod `safeParse`, and Zod strips keys the schema doesn't declare — but `stats.security_summary` and node-level `security_warnings` were never added to `validators.ts`. So a graph with real findings on disk loaded with **zero** security data: `sprang_health` reported `security_summary.total: 0`, the health grade lost its security penalty (inflated by up to 20 points), and `sprang_node` hid the warnings. In a UAT, an agent asked to audit a file holding two hardcoded secrets + `eval()` confidently reported "0 findings at every severity level." Added `securityWarningSchema` / `securitySummarySchema` and wired them into the node and stats schemas. Now `sprang_health` reports the real counts and the grade reflects them (a deliberately-vulnerable fixture went from a false **B/86** to a correct **C/77** with a 15-point security penalty). Regression tests assert both fields survive `safeParse`.
+
+### Fixed (deterministic tours & domain names — agent-free tier)
+
+- **Domains came back with empty `id`/`label`.** A full `sprang scan` runs `domain-analyzer` with `skipLLM:false`, so it called `llm.complete()`. The default `NullLLMClient` returns `''` (not a throw), and the agent only fell back to the directory-name heuristic on a *thrown* error — so it kept the empty string. Now any empty/whitespace LLM result falls back to the heuristic, so domains are always named (e.g. `data`, `utils`). (The richer semantic names still come from an agent running `/sprang-analyze`; this only fixes the agent-free baseline.)
+- **Clean/small codebases produced zero tours.** `tour-builder` is fully deterministic, but `buildDefaultTour` only tried `entryPoints[0]` — if that was an orphan file (in/out-degree 0) the BFS yielded one step and the tour was discarded, while `buildRiskTour` required risk > 0.6. So a tidy project got **no** tours and `sprang_tour` returned `NO_TOURS` (empty onboarding / Learn tab). Now the builder tries every entry point (most-connected first) and falls back to a flat layer-ordered walk, guaranteeing a tour whenever there are ≥2 files; the risk tour threshold was relaxed to the "medium" band (> 0.4).
+
+### Fixed (incremental scans wiped Phase 2)
+
+- **`--phase1-only` reset an enriched graph to skeleton.** The post-commit hook, `watch`, and `--if-stale` all run a Phase 1 scan, which overwrote the graph and discarded layers/domains/tours/risk/security until a full re-scan — so every commit silently degraded the graph. Added `mergePhase1IntoEnriched`: a phase1-only scan now keeps the existing Phase 2 work (top-level structures + per-node enrichment) while taking the fresh structural skeleton. Verified a commit-triggered hook leaves the graph fully enriched.
+
+### Fixed (install-hooks broken for npm users)
+
+- **`sprang install-hooks` wrote a hook that threw `Cannot find module` on every commit.** The snippet hardcoded `$(git rev-parse --show-toplevel)/packages/cli/dist/index.js` — a path that only exists inside the Sprang monorepo, not in an npm-installed user's project. Now it resolves the actual running CLI entry (via `import.meta.url`) and emits a guarded hook that prefers that absolute path and falls back to a `sprang` binary on `PATH`, so it never errors.
+
+### Fixed (CLI polish)
+
+- **`sprang health` now prints the letter grade (A–F + score) and a Security Findings section** (severity breakdown + per-category counts). Previously the grade and security data existed via the MCP tool but were invisible from the terminal.
+- **`sprang query` tokenizes multi-word queries.** A phrase like `"validate input"` used to match only as a whole substring and returned nothing; it now matches on any word (phrase matches still rank highest), aligning CLI keyword search with the MCP `sprang_query` tool.
+
+### Notes
+
+- All four packages and the two versioned plugin manifests bumped to `0.2.3`; the MCP `serverInfo.version` continues to track `package.json` automatically.
+- Test suite: **671 unit tests** (was 656) — +15 regression tests across schema round-trip, enrichment preservation, tour robustness, domain naming, install-hooks path, and query tokenization. Lint/typecheck clean. Re-validated end-to-end against a fresh `npm pack` tarball through the CLI, all 9 MCP tools, and live `claude -p` agent flows.
+
+---
+
 ## [0.2.2] — 2026-06-17
 
 Patch release: keep the MCP server's advertised version in lockstep with the package version.

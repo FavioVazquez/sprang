@@ -211,6 +211,64 @@ describe('knowledgeGraphSchema', () => {
     }
   });
 
+  // Regression for v0.2.3: the MCP GraphLoader runs safeParse, and Zod strips
+  // undeclared keys. Before the fix the schema omitted security_summary /
+  // security_warnings, so all security data was silently dropped on load
+  // (sprang_health reported 0 findings and the grade lost its security penalty).
+  it('preserves stats.security_summary through safeParse (does not strip it)', () => {
+    const now = new Date().toISOString();
+    const graph = {
+      version: '1.0.0', generated_at: now,
+      project_root: '/p', project_name: 'p', phase: 'complete',
+      nodes: [{ id: 'file:config.ts', type: 'file', label: 'config.ts' }],
+      edges: [], layers: [], tours: [], domains: [],
+      stats: {
+        node_count: 1, edge_count: 0,
+        risk_summary: { high: 0, medium: 0, low: 1 },
+        smell_summary: {},
+        security_summary: {
+          total: 4,
+          by_severity: { high: 3, medium: 0, low: 1 },
+          by_category: { hardcoded_secret: 2, weak_crypto: 1, unsafe_eval: 1 },
+        },
+        generated_at: now,
+      },
+    };
+    const result = knowledgeGraphSchema.safeParse(graph);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.stats.security_summary).toBeDefined();
+      expect(result.data.stats.security_summary?.total).toBe(4);
+      expect(result.data.stats.security_summary?.by_severity.high).toBe(3);
+      expect(result.data.stats.security_summary?.by_category['hardcoded_secret']).toBe(2);
+    }
+  });
+
+  it('preserves node.security_warnings through safeParse (does not strip them)', () => {
+    const node = {
+      id: 'file:src/data/config.ts',
+      type: 'file',
+      label: 'config.ts',
+      security_warnings: [
+        {
+          category: 'hardcoded_secret',
+          severity: 'high',
+          description: 'Hardcoded credential detected',
+          line: 2,
+          pattern: 'password\\s*=',
+          snippet: 'const DB_PASSWORD = "..."',
+        },
+      ],
+    };
+    const result = sprangNodeSchema.safeParse(node);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.security_warnings).toHaveLength(1);
+      expect(result.data.security_warnings?.[0]?.category).toBe('hardcoded_secret');
+      expect(result.data.security_warnings?.[0]?.severity).toBe('high');
+    }
+  });
+
   it('accepts kind: codebase', () => {
     const now = new Date().toISOString();
     const graph = {
