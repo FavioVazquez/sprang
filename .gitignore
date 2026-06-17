@@ -23,6 +23,10 @@ packages/dashboard/dist/
 # npm pack artifacts
 *.tgz
 
+# LICENSE/README copied into the CLI package by pack-assets.mjs (source of truth is repo root)
+packages/cli/LICENSE
+packages/cli/README.md
+
 # Local env
 .env
 .env.local

@@ -54,4 +54,17 @@ const mcpTarget = join(cliDist, 'mcp-server.cjs');
 copyFileSync(mcpServer, mcpTarget);
 process.stdout.write(`Copied MCP server → dist/mcp-server.cjs\n`);
 
+// Copy LICENSE and README from the monorepo root so the published package
+// includes them (the cli package.json `files` whitelist references both, but
+// they live at the repo root as the single source of truth).
+for (const name of ['LICENSE', 'README.md']) {
+  const src = join(MONO_ROOT, name);
+  if (existsSync(src)) {
+    copyFileSync(src, join(CLI_ROOT, name));
+    process.stdout.write(`Copied ${name} → packages/cli/${name}\n`);
+  } else {
+    process.stderr.write(`pack-assets: WARNING ${name} not found at repo root\n`);
+  }
+}
+
 process.stdout.write('pack-assets: done\n');
