@@ -16,7 +16,6 @@
   },
   "files": [
     "dist/",
-    "bin/",
     ".claude/",
     ".windsurf/",
     ".devin/",

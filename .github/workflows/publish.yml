@@ -82,14 +82,17 @@ jobs:
       - name: Verify plugin manifests match version
         run: |
           PKG_VERSION=$(node -e "const p=JSON.parse(require('fs').readFileSync('packages/cli/package.json','utf-8')); console.log(p.version)")
-          for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json .copilot-plugin/plugin.json .devin/config.json; do
+          # Only the versioned plugin manifests are checked here. marketplace.json
+          # (a Claude marketplace listing) and .devin/config.json (an mcpServers
+          # block) intentionally carry no version field, so they are excluded.
+          for f in .claude-plugin/plugin.json .copilot-plugin/plugin.json; do
             if [ -f "$f" ]; then
               V=$(node -e "
                 const d=JSON.parse(require('fs').readFileSync('$f','utf-8'));
                 console.log(d.version || d.manifest?.version || d.server?.version || '?');
               ")
               echo "$f: $V"
-              [ "$V" = "$PKG_VERSION" ] || (echo "WARNING: $f version $V does not match $PKG_VERSION" && true)
+              [ "$V" = "$PKG_VERSION" ] || (echo "ERROR: $f version $V does not match $PKG_VERSION" && exit 1)
             fi
           done
 
