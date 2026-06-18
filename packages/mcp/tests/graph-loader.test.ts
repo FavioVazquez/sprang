@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { GraphLoader } from '../src/graph-loader.js';
+import { GraphLoader, summarizeZodIssues } from '../src/graph-loader.js';
+import { knowledgeGraphSchema } from '@sprang/core';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -83,5 +84,42 @@ describe('GraphLoader', () => {
 
     const second = await loader.getGraph();
     expect(second?.project_name).toBe('second');
+  });
+
+  it('returns null on a schema-invalid graph (does not throw)', async () => {
+    const dir = join(tmpdir(), `sprang-mcp-invalid-${Date.now()}`);
+    const sprangDir = join(dir, '.sprang');
+    await mkdir(sprangDir, { recursive: true });
+    // Domain missing `label` and tours missing required step fields — the exact
+    // class of drift that produced GRAPH_NOT_FOUND before the v0.2.4 merge fix.
+    const invalid = {
+      version: '1.0.0', generated_at: new Date().toISOString(), project_root: dir,
+      project_name: 'bad', phase: 'complete', nodes: [], edges: [], layers: [],
+      tours: [], domains: [{ id: 'd', flows: [] }],
+      stats: { node_count: 0, edge_count: 0, risk_summary: { high: 0, medium: 0, low: 0 }, smell_summary: {}, generated_at: new Date().toISOString() },
+    };
+    await writeFile(join(sprangDir, 'knowledge-graph.json'), JSON.stringify(invalid), 'utf-8');
+    const loader = new GraphLoader(dir);
+    await expect(loader.getGraph()).resolves.toBeNull();
+  });
+});
+
+describe('summarizeZodIssues', () => {
+  it('collapses many array-index issues into a concise count', () => {
+    const bad = {
+      version: '1', generated_at: 'x', project_root: '/x', project_name: 'p', phase: 'complete',
+      nodes: [], edges: [], layers: [], tours: [],
+      // three malformed domains → repeated `domains.[].label` Required issues
+      domains: [{ id: 'a', flows: [] }, { id: 'b', flows: [] }, { id: 'c', flows: [] }],
+      stats: { node_count: 0, edge_count: 0, risk_summary: { high: 0, medium: 0, low: 0 }, smell_summary: {}, generated_at: 'x' },
+    };
+    const res = knowledgeGraphSchema.safeParse(bad);
+    expect(res.success).toBe(false);
+    if (res.success) return;
+    const summary = summarizeZodIssues(res.error);
+    expect(summary).toMatch(/issue\(s\)/);
+    expect(summary).toContain('domains.[].label');
+    // the three identical issues collapse to a single "(×3)" group
+    expect(summary).toMatch(/×3/);
   });
 });

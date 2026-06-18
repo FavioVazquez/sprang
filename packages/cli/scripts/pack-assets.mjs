@@ -67,4 +67,30 @@ for (const name of ['LICENSE', 'README.md']) {
   }
 }
 
+// Copy the per-platform agent-integration files into dist/agent-assets/ so the
+// published package is self-sufficient: `sprang init --platform <p>` scaffolds
+// the slash commands, rules, workflows, skills, and merge.py from here. These
+// live at the repo root as the single source of truth; they used to be listed
+// in the `files` whitelist but were silently omitted (they don't exist under
+// packages/cli/), so the npm package shipped without any agent integration.
+const assetsTarget = join(cliDist, 'agent-assets');
+rmSync(assetsTarget, { recursive: true, force: true });
+mkdirSync(assetsTarget, { recursive: true });
+const AGENT_ASSETS = [
+  '.claude', '.windsurf', '.devin', '.github', '.vscode',
+  '.copilot-plugin', '.claude-plugin', 'skills', 'CLAUDE.md', 'AGENTS.md',
+];
+// Skip dev-only artifacts that must never reach the published package.
+const EXCLUDE = new Set(['worktrees', 'node_modules', '.git', 'dist', 'cache']);
+const assetFilter = (src) => !EXCLUDE.has(src.split('/').pop());
+for (const name of AGENT_ASSETS) {
+  const src = join(MONO_ROOT, name);
+  if (!existsSync(src)) {
+    process.stderr.write(`pack-assets: note — ${name} not found at repo root, skipping\n`);
+    continue;
+  }
+  cpSync(src, join(assetsTarget, name), { recursive: true, filter: assetFilter });
+}
+process.stdout.write(`Copied agent assets → dist/agent-assets/ (${AGENT_ASSETS.length} entries)\n`);
+
 process.stdout.write('pack-assets: done\n');

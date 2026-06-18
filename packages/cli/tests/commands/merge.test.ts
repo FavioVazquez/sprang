@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { knowledgeGraphSchema } from '@sprang/core';
 
 const CLI = join(import.meta.dirname, '../../dist/index.js');
 
@@ -124,7 +125,7 @@ describe('sprang merge', () => {
     writeFileSync(join(inter, 'final-nodes-chunk-1.json'), JSON.stringify([
       { id: 'file:a.ts', type: 'file', label: 'a.ts', summary: 's', risk_score: 0 },
     ]));
-    const tours = [{ id: 'tour-1', title: 'My Tour', steps: [] }];
+    const tours = [{ id: 'tour-1', title: 'My Tour', description: 'd', steps: [{ step_title: 'Start', explanation: 'here', node_ids: ['file:a.ts'] }] }];
     writeFileSync(join(inter, 'final-tour.json'), JSON.stringify(tours));
     const result = runMerge([root, '--intermediate', inter]);
     expect(result.status).toBe(0);
@@ -188,7 +189,7 @@ describe('sprang merge', () => {
 
   it('includes layers and tours in output', () => {
     const layers = [{ id: 'layer-1', name: 'Core', node_ids: [] }];
-    const tours = [{ id: 'tour-1', title: 'Architecture', steps: [] }];
+    const tours = [{ id: 'tour-1', title: 'Architecture', description: 'overview', steps: [{ step_title: 'Start', explanation: 'entry', node_ids: ['file:a.ts'] }] }];
     root = makeProject({ layers, tours });
     const result = runMerge([root, '--intermediate', join(root, 'intermediate')]);
     expect(result.status).toBe(0);
@@ -197,5 +198,38 @@ describe('sprang merge', () => {
     expect(graph.layers[0].id).toBe('layer-1');
     expect(graph.tours).toHaveLength(1);
     expect(graph.tours[0].id).toBe('tour-1');
+  });
+
+  it('normalises drifted agent output to a schema-valid graph and applies risk-scores.json (v0.2.4)', () => {
+    // Same drift classes that broke /sprang-analyze: tour step using
+    // title/description, domain using `name` + flat, risk-scores.json with an
+    // off-enum risk_factor and a bare-string structural_warning.
+    root = makeProject({
+      nodeChunks: [[{ id: 'file:a.ts', type: 'file', label: 'a.ts', summary: 's' }]],
+      tours: [{ id: 't', title: 'T', description: 'd', steps: [{ title: 'Entry', description: 'start', node_ids: ['file:a.ts'] }] }],
+    });
+    const inter = join(root, 'intermediate');
+    writeFileSync(join(inter, 'final-domains.json'), JSON.stringify([{ id: 'd', name: 'Payments', node_ids: ['file:a.ts'] }]));
+    writeFileSync(join(inter, 'risk-scores.json'), JSON.stringify({
+      'file:a.ts': {
+        risk_score: 0.82,
+        risk_factors: ['critical_path', 'made_up_factor'],
+        structural_warnings: ['too big', { category: 'god_node', severity: 'high', description: 'x', related_node_ids: [], heuristic: '' }],
+      },
+    }));
+
+    const result = runMerge([root, '--intermediate', inter]);
+    expect(result.status).toBe(0);
+    const graph = JSON.parse(readFileSync(join(root, '.sprang', 'knowledge-graph.json'), 'utf-8'));
+
+    expect(knowledgeGraphSchema.safeParse(graph).success).toBe(true);
+    expect(graph.domains[0].label).toBe('Payments');          // name → label
+    expect(graph.domains[0].flows[0].steps[0].node_ids).toContain('file:a.ts'); // flat → flow/step
+    expect(graph.tours[0].steps[0].step_title).toBeTruthy();  // title → step_title
+    const node = graph.nodes.find((n: { id: string }) => n.id === 'file:a.ts');
+    expect(node.risk_score).toBeCloseTo(0.82);                 // risk-scores.json applied
+    expect(node.risk_factors).toEqual(['critical_path']);      // off-enum dropped
+    expect(node.structural_warnings).toHaveLength(1);          // bare string dropped, object kept
+    expect(graph.stats.smell_summary).toEqual({ god_node: 1 });
   });
 });

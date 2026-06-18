@@ -484,9 +484,11 @@ cat > "$SPRANG_ROOT/intermediate/risk-scores.json" << 'EOF'
 EOF
 ```
 
-Valid `category` values: `god_node`, `circular_dependency`, `orphan_node`, `unclear_coupling`, `duplicate_logic`, `low_cohesion`, `unstable_interface`, `over_connected`
+Valid `category` values (10): `god_node`, `circular_dependency`, `orphan_node`, `unclear_coupling`, `duplicate_logic`, `low_cohesion`, `unstable_interface`, `over_connected`, `name_duplicate`, `layer_violation`
 Valid `severity` values: `low`, `medium`, `high`
-Valid `risk_factors` values: `high_coupling`, `no_test_coverage`, `frequent_changes`, `large_blast_radius`, `critical_path`, `single_author`, `recent_churn`, `has_structural_warnings`
+Valid `risk_factors` values (8): `high_coupling`, `no_test_coverage`, `frequent_changes`, `large_blast_radius`, `critical_path`, `single_author`, `recent_churn`, `has_structural_warnings`
+
+> **Stick to these exact values.** `merge.py` normalises the assembled graph against the canonical schema before writing it: `structural_warnings` with an off-list `category` (or written as bare strings) and `risk_factors` outside the list above are **dropped** so the graph still validates. Using the canonical values is the only way your structural insights survive into the final graph. (Domain `label`/`flows`/`steps` and tour `step_title`/`explanation` are likewise normalised — but matching the templates above keeps your richer wording.)
 
 > ⛔ Do NOT write knowledge-graph.json. Risk data is merged by merge.py in Phase 7.
 
@@ -515,27 +517,33 @@ By now you have written in `$SPRANG_ROOT/intermediate/`:
 - `final-domains.json` — business domains (from Phase 5)
 - `risk-scores.json` — risk scores + decision_context (from Phase 6)
 
-**Run the merge script** (Python 3 stdlib only — works on any machine, no install needed):
+**Assemble the graph.** Both paths normalise the agent-assembled data against the
+canonical schema and validate it before writing, so the result always loads in
+the MCP server and dashboard. Prefer the CLI — it ships with the package, needs
+no Python, and is identical on every platform:
 
 ```bash
-# Find merge.py — try two install locations
-MERGE_SCRIPT=""
-for p in \
-  "$PROJECT_ROOT/.windsurf/skills/sprang-analyze/scripts/merge.py" \
-  "$PROJECT_ROOT/skills/sprang-analyze/scripts/merge.py"; do
-  [[ -f "$p" ]] && MERGE_SCRIPT="$p" && break
-done
-
-if [[ -z "$MERGE_SCRIPT" ]]; then
-  echo "ERROR: merge.py not found at .windsurf/skills/sprang-analyze/scripts/merge.py" >&2
-  echo "Make sure Sprang is installed in this project." >&2
-  exit 1
+# Preferred: the Sprang CLI (normalises + validates; available after `npm i -g @faviovazquez/sprang`)
+if command -v sprang >/dev/null 2>&1; then
+  sprang merge "$PROJECT_ROOT"
+else
+  # Fallback: the bundled Python script (stdlib only) for installs without the CLI on PATH
+  MERGE_SCRIPT=""
+  for p in \
+    "$PROJECT_ROOT/.windsurf/skills/sprang-analyze/scripts/merge.py" \
+    "$PROJECT_ROOT/skills/sprang-analyze/scripts/merge.py"; do
+    [[ -f "$p" ]] && MERGE_SCRIPT="$p" && break
+  done
+  if [[ -z "$MERGE_SCRIPT" ]]; then
+    echo "ERROR: neither the 'sprang' CLI nor merge.py was found." >&2
+    echo "Install the CLI (npm i -g @faviovazquez/sprang) or copy skills/ into the project." >&2
+    exit 1
+  fi
+  PROJECT_ROOT="$PROJECT_ROOT" python3 "$MERGE_SCRIPT"
 fi
-
-PROJECT_ROOT="$PROJECT_ROOT" python3 "$MERGE_SCRIPT"
 ```
 
-The script outputs: `OK: <N> nodes, <E> edges, <L> layers, <T> tours` then `Written: <path>`.
+Both report something like `Graph written: <N> nodes, <E> edges, <L> layers, <T> tours, <D> domains`. `sprang merge` and `merge.py` apply the identical normalisation (`@sprang/core`'s `normalizeAssembledGraph` / its Python twin).
 
 **Write `$SPRANG_ROOT/SPRANG_REPORT.md`:**
 ```markdown

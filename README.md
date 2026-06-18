@@ -16,7 +16,7 @@
   <a href="#installation"><img src="https://img.shields.io/badge/npm-%40faviovazquez%2Fsprang-CB3837?style=flat-square&logo=npm" alt="npm install -g @faviovazquez/sprang"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-656_passing-10B981?style=flat-square" alt="656 unit tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-689_passing-10B981?style=flat-square" alt="689 unit tests passing"/>
   <img src="https://img.shields.io/badge/e2e_tests-72_passing-10B981?style=flat-square" alt="72 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
@@ -65,24 +65,30 @@ The same infrastructure works for knowledge bases: Obsidian vaults, Logseq datab
 
 > **Note:** Windsurf AI and Devin Desktop are the same product — Windsurf was rebranded as Devin Desktop. All instructions, skills, and workflows are identical for both. Both names appear in this README.
 
-### Quick install (npm)
+### Quick install (npm) — the easiest path for every platform
 
-Install once, then use the `sprang` command in any project:
+Two commands set up any project for any agent — no clone, no build, no manual file copying:
 
 ```bash
 npm install -g @faviovazquez/sprang
+cd my-project
+sprang init --platform claude     # or: copilot | windsurf | all
 ```
 
-> The package is published under the scoped name **`@faviovazquez/sprang`**, but the command it installs is just **`sprang`**.
+`sprang init --platform <agent>` does everything in one step:
+- writes the MCP config where your agent reads it — `.mcp.json` (Claude Code), `.vscode/mcp.json` (Copilot), or `.devin/config.json` (Windsurf/Devin) — with the **absolute path** to the bundled MCP server already filled in;
+- copies that agent's slash commands, rules, workflows, skills, and `merge.py` into the project.
+
+Then build the graph and open the dashboard:
 
 ```bash
-cd my-project
-sprang init            # writes .mcp.json → reopen Claude Code / Copilot to pick it up
 sprang scan            # build the knowledge graph (Phase 1, ~15 s)
 sprang open            # launch the dashboard at http://localhost:7777
 ```
 
-The `sprang` npm package bundles the dashboard, MCP server, and CLI into a single tarball — no separate build step, no pnpm workspace, no Node version pinning beyond Node 22.
+> The package is published under the scoped name **`@faviovazquez/sprang`**, but the command it installs is just **`sprang`**. Run `sprang init` with no `--platform` to write only `.mcp.json` (no slash commands).
+
+The `sprang` npm package bundles the dashboard, MCP server, CLI, **and every platform's agent-integration files** into a single tarball — no separate build step, no pnpm workspace, no Node version pinning beyond Node 22.
 
 > **`npm install -g` vs `npx`?** Every command also runs without installing — `npx @faviovazquez/sprang scan`, `npx @faviovazquez/sprang open`, etc. But prefer the global install for `sprang init`: it writes the bundled MCP server's **absolute path** into your project's `.mcp.json`, and a global install keeps that path stable, whereas the `npx` cache path can be pruned by npm and silently break your MCP config. Global install also gives you the short `sprang …` command everywhere.
 
@@ -144,9 +150,12 @@ cp "$SPRANG_DIR/.mcp.json" .
 cp "$SPRANG_DIR/CLAUDE.md" .
 cp "$SPRANG_DIR/AGENTS.md" .
 cp -r "$SPRANG_DIR/.claude" .
+cp -r "$SPRANG_DIR/skills" .   # merge.py for /sprang-analyze (the plugin install bundles this automatically)
 ```
 
 Then update `.mcp.json` → `args` to point to the absolute server path: `"$SPRANG_DIR/packages/mcp/dist/server.js"`.
+
+> **`/sprang-analyze` needs `skills/sprang-analyze/scripts/merge.py`** to assemble the final graph. The plugin install bundles it; for a manual copy, the `cp -r "$SPRANG_DIR/skills" .` line above brings it in. Without it the analyze run can't write a valid `knowledge-graph.json`.
 
 **What Claude does automatically** (once rules are active):
 
@@ -242,7 +251,7 @@ Run all steps sequentially using terminal commands. Do not ask me for input betw
 
 3. Install the CLI globally so `sprang` works from any terminal:
    npm install -g @faviovazquez/sprang
-   Verify: sprang --version  (should print 0.2.3 or later)
+   Verify: sprang --version  (should print 0.2.4 or later)
 
 4. Copy rules, workflows, skills, and hooks into the current project:
 
@@ -625,7 +634,7 @@ pnpm link --global
 cd ../..
 
 which sprang        # verify: should print $PNPM_HOME/sprang
-sprang --version    # 0.2.3
+sprang --version    # 0.2.4
 ```
 
 ```bash
@@ -863,21 +872,22 @@ Available in Windsurf / Cascade, Devin Desktop, and Claude Code:
 flowchart TB
     subgraph Phase1 ["Phase 1 — Skeleton (< 60s, fully static)"]
         PS[project-scanner] --> FA[file-analyzer]
-        FA --> SD[smell-detector]
-        FA --> RS[risk-scorer]
-        SD --> SG[skeleton graph written]
-        RS --> SG
+        FA --> SG[skeleton graph written]
     end
-    subgraph Phase2 ["Phase 2 — Enrichment (via /sprang-analyze)"]
+    subgraph Phase2 ["Phase 2 — Enrichment (deterministic agents, or via /sprang-analyze)"]
+        SM[smell-detector] --> FG[final graph + SPRANG_REPORT.md]
+        SEC[security-scanner] --> FG
+        G3[git-layer] --> RS[risk-scorer]
         G1[architecture-analyzer] --> TB[tour-builder]
         G2[domain-analyzer] --> TB
-        G3[git-layer] --> RS2[risk-scorer update]
-        RS2 --> TB
+        RS --> FG
         TB --> GR[graph-reviewer]
-        GR --> FG[final graph + SPRANG_REPORT.md]
+        GR --> FG
     end
     SG -->|"forks Phase 2"| Phase2
 ```
+
+> **Phase 1 is just `project-scanner` + `file-analyzer`** — the structural skeleton (files, functions, import/call edges). All structural warnings, risk scores, security findings, layers, tours, and domains are populated in **Phase 2** (so a `--phase1-only` scan produces none of them yet). Phase 2's agents are deterministic and run without an API key; `/sprang-analyze` additionally layers in your agent's semantic summaries.
 
 **Your AI agent is the intelligence layer.** Phase 2 enrichment is performed by the agent using its own context window — it reads the graph, writes summaries, and calls `sprang_annotate` to record what it learns. No external API.
 
@@ -902,7 +912,7 @@ node.decision_context: { commits, primary_authors, last_changed,
                           change_frequency, rationale_snippets, pr_references }
 ```
 
-### `smell-detector` — 8 deterministic heuristics, no LLM calls
+### `smell-detector` — 10 deterministic heuristics, no LLM calls
 
 | Smell | Trigger |
 |---|---|
@@ -914,6 +924,8 @@ node.decision_context: { commits, primary_authors, last_changed,
 | `unstable_interface` | change_frequency > 10/90d AND in_degree > 5 |
 | `orphan_node` | in_degree=0 AND out_degree=0 AND not entry point |
 | `over_connected` | total_degree (in + out) > 30 |
+| `name_duplicate` | Same symbol name defined in ≥2 files |
+| `layer_violation` | Lower layer imports from a higher one (e.g. data → ui) — from `architecture-analyzer` |
 
 ### `risk-scorer` — Composite formula
 
@@ -985,7 +997,7 @@ risk_score = clamp(
 health_score = 100 − Σ(penalties)   → A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, F < 60
 ```
 
-`security_summary` groups findings by severity (high / medium / low) and by category (`hardcoded_secret`, `sql_injection`, `xss_risk`, `path_traversal`, `command_injection`, `weak_crypto`, `insecure_random`, `sensitive_data_exposure`). All 20 detection patterns are deterministic regex — no LLM calls.
+`security_summary` groups findings by severity (high / medium / low) and by category (`hardcoded_secret`, `sql_injection`, `xss_risk`, `unsafe_eval`, `unsafe_exec`, `unsafe_deserialization`, `path_traversal`, `weak_crypto`). All 20 detection patterns are deterministic regex — no LLM calls.
 
 `history` returns the last 30 `sprang_health` snapshots from `.sprang/intermediate/health-history.jsonl` so you can track whether code quality is improving or degrading over time.
 
@@ -1167,7 +1179,7 @@ interface SprangNode {
   };
 
   structural_warnings?: Array<{
-    category: SmellCategory;     // 8 categories
+    category: SmellCategory;     // 10 categories
     severity: 'low' | 'medium' | 'high';
     description: string;
     related_node_ids: string[];
@@ -1206,7 +1218,7 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 656 unit tests across core/dashboard/mcp/cli
+pnpm test              # 689 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
 pnpm --filter @sprang/dashboard test:e2e          # 64 Playwright UI e2e tests
@@ -1217,11 +1229,11 @@ pnpm --filter @sprang/dashboard test:e2e:bridge   # 8 platform-bridge e2e tests 
 
 | Package | Runner | Tests | What is tested |
 |---|---|---|---|
-| `@sprang/core` | Vitest | 449 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity, call graph, layer violations, Phase 2 security-scanner wiring |
+| `@sprang/core` | Vitest | 464 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity, call graph, layer violations, Phase 2 security-scanner wiring, enrichment preservation, tour robustness, domain naming |
 | `@sprang/dashboard` | Vitest | 85 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6), bridge detection (30) |
-| `@sprang/mcp` | Vitest | 65 | GraphLoader (3), sprang_node + sprang_annotate (11), 6 MCP tools (40), sprang_respond (8), sprang_query enhancements (3) |
-| `sprang` (CLI) | Vitest | 57 | `--if-stale` scan flag (3), `install-hooks` command (3), hook scripts end-to-end (12), `merge` command (9), platform parity — manifests/skills/rules/hooks across Claude Code, Windsurf/Devin, Copilot (22), Windsurf `save-conversation.py` hook real execution (8) |
-| **Total unit** | | **656** | |
+| `@sprang/mcp` | Vitest | 67 | GraphLoader + invalid-graph diagnostic (5), sprang_node + sprang_annotate (11), 6 MCP tools (40), sprang_respond (8), sprang_query enhancements (3) |
+| `sprang` (CLI) | Vitest | 73 | `init --platform` scaffolding for all 3 agents (5), `--if-stale` scan flag (3), `install-hooks` command (4), `query` tokenization (3), `merge.py` schema normalization (6), `merge` command + `sprang merge` normalization (10), hook scripts end-to-end (12), platform parity across Claude Code, Windsurf/Devin, Copilot (22), Windsurf `save-conversation.py` hook real execution (8) |
+| **Total unit** | | **689** | |
 | `@sprang/dashboard` | Playwright | 64 | Full UI e2e — loading, landing screen (path/GitHub URL), nav, keyboard shortcuts (all 1–7/g/h/d/a/t/m/l), architecture tab, treemap/matrix tabs + empty states, cascade bridge, health grade (A–F), security findings, risk overlay, analyze endpoint, tour player, persona selector |
 | `@sprang/dashboard` | Playwright (bridge) | 8 | Platform bridge e2e with mock `claude`/`copilot` CLIs on PATH — real spawn → parse → session persist → response file for all 3 bridges: detection priority (windsurf marker > claude > copilot), `--resume` session continuity, `--allowedTools` MCP allowlist, Windsurf `.cascade-trigger-session` protocol, session clearing |
 
@@ -1231,13 +1243,15 @@ pnpm --filter @sprang/dashboard test:e2e:bridge   # 8 platform-bridge e2e tests 
 ```
 packages/core/tests/
 ├── schema/
-│   └── validators.test.ts                  21 tests — Zod schema, round-trip serialization
+│   └── validators.test.ts                  23 tests — Zod schema, round-trip serialization, security round-trip
 ├── agents/
 │   ├── project-scanner.test.ts              6 tests — file discovery, language detection
 │   ├── project-scanner-fingerprint.test.ts  6 tests — fingerprint stats, skip/structural detection
 │   ├── file-analyzer.test.ts                5 tests — AST parsing, edge extraction
 │   ├── smell-detector.test.ts              14 tests — circular-deps, god-node, clean baseline
 │   ├── risk-scorer.test.ts                 15 tests — formula weights, factor tags
+│   ├── tour-builder.test.ts                 3 tests — entry-point fallback, flat-tour robustness
+│   ├── domain-analyzer.test.ts              3 tests — heuristic naming when the LLM returns empty
 │   ├── git-layer.test.ts                    6 tests — commit association, PR refs
 │   ├── architecture-analyzer.test.ts        8 tests — layer clustering
 │   ├── language-lessons.test.ts            51 tests — 12 pattern detectors, positive + negative
@@ -1246,7 +1260,9 @@ packages/core/tests/
 │   └── multi-lang-symbols.test.ts          34 tests — per-language symbol parsing
 ├── graph/
 │   ├── normalize.test.ts                   17 tests — all 6 normalization steps
-│   └── merge-subgraphs.test.ts              9 tests — pnpm workspace, prefix namespacing
+│   ├── merge-subgraphs.test.ts              9 tests — pnpm workspace, prefix namespacing
+│   ├── preserve-enrichment.test.ts          3 tests — phase1-only keeps Phase 2 enrichment
+│   └── normalize-assembled.test.ts          4 tests — coerce drifted agent output to schema-valid (shared by sprang merge + merge.py)
 ├── utils/
 │   ├── fingerprint.test.ts                 28 tests — SHA-256, TS/Python/Go extraction, classifyChange
 │   └── embedding-search.test.ts            26 tests — cosine similarity, TF-IDF, vocabulary
@@ -1290,7 +1306,7 @@ packages/dashboard/e2e/
     └── nav bar (logo + all 7 tabs persistent)
 
 packages/mcp/tests/
-├── graph-loader.test.ts          3 tests — load, null-on-missing, hot-reload
+├── graph-loader.test.ts          5 tests — load, null-on-missing, hot-reload, invalid-graph null, summarizeZodIssues diagnostic
 ├── sprang-node.test.ts          11 tests — sprang_node enrichment, sprang_annotate
 └── mcp-tools.test.ts            38 tests — 6 MCP tools (health, tour, query, diff_impact, domain, why):
     ├── sprang_health  (7)  — counts, risk summary, smells, orphan detection
@@ -1302,9 +1318,12 @@ packages/mcp/tests/
 
 packages/cli/tests/
 ├── commands/
+│   ├── init.test.ts              5 tests — init --platform scaffolding (claude/copilot/windsurf MCP config + file copy, no worktree leak)
 │   ├── scan-if-stale.test.ts     3 tests — hash-match skip, hash-mismatch scan, missing graph
-│   ├── install-hooks.test.ts     3 tests — fresh creation, append-to-existing, duplicate guard
-│   └── merge.test.ts             9 tests — chunk assembly, dict-as-array normalization, envelope backfill
+│   ├── install-hooks.test.ts     4 tests — fresh creation, no-monorepo-path, append-to-existing, duplicate guard
+│   ├── query.test.ts             3 tests — multi-word tokenization, single keyword, no-match
+│   └── merge.test.ts            10 tests — chunk assembly, dict-as-array normalization, sprang merge schema normalization + risk-scores
+├── merge-normalize.test.ts       6 tests — merge.py coerces drifted agent output to a schema-valid graph
 ├── hooks-scripts.test.ts        12 tests — session-start.sh and post-tool-use.sh via bash:
 │   ├── session-start.sh (5): no-graph warning, fresh silence, stale hash display,
 │   │                         missing-gitCommitHash silence, non-git-repo silence

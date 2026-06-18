@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 
 import { execSync } from 'node:child_process';
 import { Command } from 'commander';
 import ora from 'ora';
+import { normalizeAssembledGraph, knowledgeGraphSchema, summarizeZodIssues } from '@sprang/core';
 
 /**
  * Normalize a value that should be an array but agents sometimes write as a dict.
@@ -153,25 +154,74 @@ export function makeMergeCommand(): Command {
           ? toArray(JSON.parse(readFileSync(domainsPath, 'utf-8')))
           : toArray(assembled['domains']);
 
+        // --- Validate minimum requirements ---
+        if (nodes.length === 0) {
+          spinner.fail('No nodes found in chunk files or assembled-graph.json. Cannot write empty graph.');
+          process.exit(1);
+        }
+
+        // --- Apply risk-scores.json (risk_score, risk_factors, decision_context, warnings) ---
+        const riskPath = join(inter, 'risk-scores.json');
+        if (existsSync(riskPath)) {
+          try {
+            const riskData = JSON.parse(readFileSync(riskPath, 'utf-8')) as Record<string, Record<string, unknown>>;
+            const byId = new Map<string, Record<string, unknown>>();
+            for (const n of nodes) {
+              const node = n as Record<string, unknown>;
+              if (typeof node['id'] === 'string') byId.set(node['id'], node);
+            }
+            for (const [id, info] of Object.entries(riskData)) {
+              const node = byId.get(id);
+              if (!node || typeof info !== 'object' || info === null) continue;
+              for (const key of ['risk_score', 'risk_factors', 'decision_context', 'structural_warnings', 'security_warnings'] as const) {
+                if (info[key] != null) node[key] = info[key];
+              }
+            }
+          } catch { spinner.warn('Could not read risk-scores.json; skipping risk enrichment'); }
+        }
+
         // --- Get git hash ---
         let gitHash = '';
         try {
           gitHash = execSync('git rev-parse HEAD', { cwd: projectRoot, encoding: 'utf-8' }).trim();
         } catch { /* not a git repo */ }
 
-        // --- Build risk summary from nodes ---
-        const riskSummary = { high: 0, medium: 0, low: 0 };
+        // --- Backfill node.layer from layer membership (GraphCanvas colours by node.layer) ---
+        const nodeById = new Map<string, Record<string, unknown>>();
         for (const n of nodes) {
           const node = n as Record<string, unknown>;
-          const r = typeof node['risk_score'] === 'number' ? node['risk_score'] : 0;
-          if (r >= 0.7) riskSummary.high++;
-          else if (r >= 0.4) riskSummary.medium++;
-          else riskSummary.low++;
+          if (typeof node['id'] === 'string') nodeById.set(node['id'], node);
         }
+        for (const l of layers) {
+          const layer = l as Record<string, unknown>;
+          for (const nid of (layer['node_ids'] as unknown[]) ?? []) {
+            const node = nodeById.get(String(nid));
+            if (node && !node['layer']) node['layer'] = layer['id'];
+          }
+        }
+
+        // --- Normalise agent-assembled pieces to the canonical schema (shared with merge.py) ---
+        const norm = normalizeAssembledGraph({
+          nodes,
+          layers,
+          tours,
+          domains,
+          metaSmellSummary: assembled['smell_summary'],
+        });
 
         const now = new Date().toISOString();
 
         // --- Assemble complete valid graph ---
+        const stats: Record<string, unknown> = {
+          node_count: norm.nodes.length,
+          edge_count: edges.length,
+          risk_summary: norm.risk_summary,
+          smell_summary: norm.smell_summary,
+          generated_at: now,
+          gitCommitHash: gitHash,
+        };
+        if (norm.security_summary) stats['security_summary'] = norm.security_summary;
+
         const graph = {
           version: '0.2.0',
           kind: 'codebase',
@@ -182,27 +232,21 @@ export function makeMergeCommand(): Command {
           languages: toArray(assembled['languages'] as unknown),
           frameworks: toArray(assembled['frameworks'] as unknown),
           phase: 'complete',
-          stats: {
-            node_count: nodes.length,
-            edge_count: edges.length,
-            risk_summary: riskSummary,
-            smell_summary: (assembled['smell_summary'] as Record<string, unknown> | undefined) ?? {},
-            generated_at: now,
-            gitCommitHash: gitHash,
-          },
-          nodes,
+          stats,
+          nodes: norm.nodes,
           edges,
-          layers,
-          tours,
-          domains,
+          layers: norm.layers,
+          tours: norm.tours,
+          domains: norm.domains,
           annotations: [],
           health: (assembled['health'] as Record<string, unknown> | undefined) ?? {},
         };
 
-        // --- Validate minimum requirements ---
-        if (nodes.length === 0) {
-          spinner.fail('No nodes found in chunk files or assembled-graph.json. Cannot write empty graph.');
-          process.exit(1);
+        // --- Validate against the canonical schema before writing ---
+        const validation = knowledgeGraphSchema.safeParse(graph);
+        if (!validation.success) {
+          // Normalisation should make this unreachable; surface it loudly if not.
+          spinner.warn(`Assembled graph still has schema issues — ${summarizeZodIssues(validation.error)}`);
         }
 
         // --- Write output ---
@@ -210,7 +254,7 @@ export function makeMergeCommand(): Command {
         writeFileSync(outPath, JSON.stringify(graph, null, 2), 'utf-8');
 
         spinner.succeed(
-          `Graph written: ${nodes.length} nodes, ${edges.length} edges, ${layers.length} layers, ${tours.length} tours → ${outPath}`
+          `Graph written: ${norm.nodes.length} nodes, ${edges.length} edges, ${norm.layers.length} layers, ${norm.tours.length} tours, ${norm.domains.length} domains → ${outPath}`
         );
       } catch (err) {
         spinner.fail(`merge failed: ${String(err)}`);

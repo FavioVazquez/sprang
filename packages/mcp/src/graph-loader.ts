@@ -1,7 +1,10 @@
 import { stat, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { KnowledgeGraph } from '@sprang/core';
-import { knowledgeGraphSchema } from '@sprang/core';
+import { knowledgeGraphSchema, summarizeZodIssues } from '@sprang/core';
+
+// Re-export so existing importers (and tests) can keep importing it from here.
+export { summarizeZodIssues };
 
 export class GraphLoader {
   private graphCache: KnowledgeGraph | null = null;
@@ -52,7 +55,8 @@ export class GraphLoader {
       const raw = await readFile(filePath, 'utf-8');
       const result = knowledgeGraphSchema.safeParse(JSON.parse(raw));
       if (!result.success) {
-        process.stderr.write(`[sprang] Graph validation failed: ${result.error.message}\n`);
+        process.stderr.write(`[sprang] Graph validation failed — ${summarizeZodIssues(result.error)}\n`);
+        process.stderr.write('[sprang] Re-run "/sprang-analyze" or "sprang scan" to regenerate a valid graph.\n');
         this.graphCache = null;
         this.lastMtime = 0;
         return;
