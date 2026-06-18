@@ -28,8 +28,8 @@ Phases (see workflow for full details):
 5. **Guided tour** — 5-8 BFS-ordered steps → **write `final-tours.json` directly** as a Tour object array (not a flat step array)
 6. **Domain mapping** — cluster into business domains → **write `final-domains.json`** with domain/flow/step hierarchy
 7. **Risk + smells** — git history per node → **write `risk-scores.json`** with `risk_score`, `risk_factors`, `structural_warnings`, AND `decision_context` (commits, authors, rationale_snippets)
-8. **Assemble** — run `PROJECT_ROOT="$PROJECT_ROOT" python3 .windsurf/skills/sprang-analyze/scripts/merge.py` (fallback: `skills/sprang-analyze/scripts/merge.py`). Then write `SPRANG_REPORT.md`.
+8. **Assemble** — prefer the CLI `sprang merge "$PROJECT_ROOT"` (normalises + validates the graph against the schema, no Python needed); if `sprang` is not on PATH, fall back to `PROJECT_ROOT="$PROJECT_ROOT" python3 .windsurf/skills/sprang-analyze/scripts/merge.py` (or `skills/sprang-analyze/scripts/merge.py`). Then write `SPRANG_REPORT.md`.
 
-> ⚠️ merge.py reads: `final-nodes-chunk-*.json`, `final-edges.json`, `final-layers.json`, `final-tours.json`, `final-domains.json`, `risk-scores.json`, `assembled-graph.json`. All must exist before running it.
+> ⚠️ Both readers consume: `final-nodes-chunk-*.json`, `final-edges.json`, `final-layers.json`, `final-tours.json`, `final-domains.json`, `risk-scores.json`, `assembled-graph.json`. All must exist before assembling.
 
 $ARGUMENTS

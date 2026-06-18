@@ -16,7 +16,7 @@
   <a href="#installation"><img src="https://img.shields.io/badge/npm-%40faviovazquez%2Fsprang-CB3837?style=flat-square&logo=npm" alt="npm install -g @faviovazquez/sprang"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#slash-commands"><img src="https://img.shields.io/badge/slash_commands-11-3B82F6?style=flat-square" alt="11 slash commands"/></a>
-  <img src="https://img.shields.io/badge/unit_tests-679_passing-10B981?style=flat-square" alt="679 unit tests passing"/>
+  <img src="https://img.shields.io/badge/unit_tests-689_passing-10B981?style=flat-square" alt="689 unit tests passing"/>
   <img src="https://img.shields.io/badge/e2e_tests-72_passing-10B981?style=flat-square" alt="72 e2e tests passing"/>
   <img src="https://img.shields.io/badge/typecheck-zero_errors-10B981?style=flat-square" alt="zero typecheck errors"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
@@ -65,24 +65,30 @@ The same infrastructure works for knowledge bases: Obsidian vaults, Logseq datab
 
 > **Note:** Windsurf AI and Devin Desktop are the same product — Windsurf was rebranded as Devin Desktop. All instructions, skills, and workflows are identical for both. Both names appear in this README.
 
-### Quick install (npm)
+### Quick install (npm) — the easiest path for every platform
 
-Install once, then use the `sprang` command in any project:
+Two commands set up any project for any agent — no clone, no build, no manual file copying:
 
 ```bash
 npm install -g @faviovazquez/sprang
+cd my-project
+sprang init --platform claude     # or: copilot | windsurf | all
 ```
 
-> The package is published under the scoped name **`@faviovazquez/sprang`**, but the command it installs is just **`sprang`**.
+`sprang init --platform <agent>` does everything in one step:
+- writes the MCP config where your agent reads it — `.mcp.json` (Claude Code), `.vscode/mcp.json` (Copilot), or `.devin/config.json` (Windsurf/Devin) — with the **absolute path** to the bundled MCP server already filled in;
+- copies that agent's slash commands, rules, workflows, skills, and `merge.py` into the project.
+
+Then build the graph and open the dashboard:
 
 ```bash
-cd my-project
-sprang init            # writes .mcp.json → reopen Claude Code / Copilot to pick it up
 sprang scan            # build the knowledge graph (Phase 1, ~15 s)
 sprang open            # launch the dashboard at http://localhost:7777
 ```
 
-The `sprang` npm package bundles the dashboard, MCP server, and CLI into a single tarball — no separate build step, no pnpm workspace, no Node version pinning beyond Node 22.
+> The package is published under the scoped name **`@faviovazquez/sprang`**, but the command it installs is just **`sprang`**. Run `sprang init` with no `--platform` to write only `.mcp.json` (no slash commands).
+
+The `sprang` npm package bundles the dashboard, MCP server, CLI, **and every platform's agent-integration files** into a single tarball — no separate build step, no pnpm workspace, no Node version pinning beyond Node 22.
 
 > **`npm install -g` vs `npx`?** Every command also runs without installing — `npx @faviovazquez/sprang scan`, `npx @faviovazquez/sprang open`, etc. But prefer the global install for `sprang init`: it writes the bundled MCP server's **absolute path** into your project's `.mcp.json`, and a global install keeps that path stable, whereas the `npx` cache path can be pruned by npm and silently break your MCP config. Global install also gives you the short `sprang …` command everywhere.
 
@@ -1212,7 +1218,7 @@ Annotations are stored as `.sprang/annotations/<node-id>.md` with YAML frontmatt
 ```bash
 pnpm install
 pnpm build             # build all packages
-pnpm test              # 679 unit tests across core/dashboard/mcp/cli
+pnpm test              # 689 unit tests across core/dashboard/mcp/cli
 pnpm typecheck         # strict TypeScript, zero errors
 pnpm --filter @sprang/dashboard dev        # dashboard at http://localhost:7338
 pnpm --filter @sprang/dashboard test:e2e          # 64 Playwright UI e2e tests
@@ -1223,11 +1229,11 @@ pnpm --filter @sprang/dashboard test:e2e:bridge   # 8 platform-bridge e2e tests 
 
 | Package | Runner | Tests | What is tested |
 |---|---|---|---|
-| `@sprang/core` | Vitest | 460 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity, call graph, layer violations, Phase 2 security-scanner wiring, enrichment preservation, tour robustness, domain naming |
+| `@sprang/core` | Vitest | 464 | Schema, agents, pipeline, fingerprinting, language lessons, normalization, semantic search, worktree, health-grade, similarity, call graph, layer violations, Phase 2 security-scanner wiring, enrichment preservation, tour robustness, domain naming |
 | `@sprang/dashboard` | Vitest | 85 | Zustand store (26), BFS pathfinder (7), ArchitectureView logic (9), edge-aggregation (7), elk-layout (6), bridge detection (30) |
 | `@sprang/mcp` | Vitest | 67 | GraphLoader + invalid-graph diagnostic (5), sprang_node + sprang_annotate (11), 6 MCP tools (40), sprang_respond (8), sprang_query enhancements (3) |
-| `sprang` (CLI) | Vitest | 67 | `--if-stale` scan flag (3), `install-hooks` command (4), `query` tokenization (3), `merge.py` schema normalization (6), hook scripts end-to-end (12), `merge` command (9), platform parity across Claude Code, Windsurf/Devin, Copilot (22), Windsurf `save-conversation.py` hook real execution (8) |
-| **Total unit** | | **679** | |
+| `sprang` (CLI) | Vitest | 73 | `init --platform` scaffolding for all 3 agents (5), `--if-stale` scan flag (3), `install-hooks` command (4), `query` tokenization (3), `merge.py` schema normalization (6), `merge` command + `sprang merge` normalization (10), hook scripts end-to-end (12), platform parity across Claude Code, Windsurf/Devin, Copilot (22), Windsurf `save-conversation.py` hook real execution (8) |
+| **Total unit** | | **689** | |
 | `@sprang/dashboard` | Playwright | 64 | Full UI e2e — loading, landing screen (path/GitHub URL), nav, keyboard shortcuts (all 1–7/g/h/d/a/t/m/l), architecture tab, treemap/matrix tabs + empty states, cascade bridge, health grade (A–F), security findings, risk overlay, analyze endpoint, tour player, persona selector |
 | `@sprang/dashboard` | Playwright (bridge) | 8 | Platform bridge e2e with mock `claude`/`copilot` CLIs on PATH — real spawn → parse → session persist → response file for all 3 bridges: detection priority (windsurf marker > claude > copilot), `--resume` session continuity, `--allowedTools` MCP allowlist, Windsurf `.cascade-trigger-session` protocol, session clearing |
 
@@ -1255,7 +1261,8 @@ packages/core/tests/
 ├── graph/
 │   ├── normalize.test.ts                   17 tests — all 6 normalization steps
 │   ├── merge-subgraphs.test.ts              9 tests — pnpm workspace, prefix namespacing
-│   └── preserve-enrichment.test.ts          3 tests — phase1-only keeps Phase 2 enrichment
+│   ├── preserve-enrichment.test.ts          3 tests — phase1-only keeps Phase 2 enrichment
+│   └── normalize-assembled.test.ts          4 tests — coerce drifted agent output to schema-valid (shared by sprang merge + merge.py)
 ├── utils/
 │   ├── fingerprint.test.ts                 28 tests — SHA-256, TS/Python/Go extraction, classifyChange
 │   └── embedding-search.test.ts            26 tests — cosine similarity, TF-IDF, vocabulary
@@ -1311,10 +1318,11 @@ packages/mcp/tests/
 
 packages/cli/tests/
 ├── commands/
+│   ├── init.test.ts              5 tests — init --platform scaffolding (claude/copilot/windsurf MCP config + file copy, no worktree leak)
 │   ├── scan-if-stale.test.ts     3 tests — hash-match skip, hash-mismatch scan, missing graph
 │   ├── install-hooks.test.ts     4 tests — fresh creation, no-monorepo-path, append-to-existing, duplicate guard
 │   ├── query.test.ts             3 tests — multi-word tokenization, single keyword, no-match
-│   └── merge.test.ts             9 tests — chunk assembly, dict-as-array normalization, envelope backfill
+│   └── merge.test.ts            10 tests — chunk assembly, dict-as-array normalization, sprang merge schema normalization + risk-scores
 ├── merge-normalize.test.ts       6 tests — merge.py coerces drifted agent output to a schema-valid graph
 ├── hooks-scripts.test.ts        12 tests — session-start.sh and post-tool-use.sh via bash:
 │   ├── session-start.sh (5): no-graph warning, fresh silence, stale hash display,

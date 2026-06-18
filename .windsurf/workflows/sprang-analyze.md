@@ -517,27 +517,33 @@ By now you have written in `$SPRANG_ROOT/intermediate/`:
 - `final-domains.json` — business domains (from Phase 5)
 - `risk-scores.json` — risk scores + decision_context (from Phase 6)
 
-**Run the merge script** (Python 3 stdlib only — works on any machine, no install needed):
+**Assemble the graph.** Both paths normalise the agent-assembled data against the
+canonical schema and validate it before writing, so the result always loads in
+the MCP server and dashboard. Prefer the CLI — it ships with the package, needs
+no Python, and is identical on every platform:
 
 ```bash
-# Find merge.py — try two install locations
-MERGE_SCRIPT=""
-for p in \
-  "$PROJECT_ROOT/.windsurf/skills/sprang-analyze/scripts/merge.py" \
-  "$PROJECT_ROOT/skills/sprang-analyze/scripts/merge.py"; do
-  [[ -f "$p" ]] && MERGE_SCRIPT="$p" && break
-done
-
-if [[ -z "$MERGE_SCRIPT" ]]; then
-  echo "ERROR: merge.py not found at .windsurf/skills/sprang-analyze/scripts/merge.py" >&2
-  echo "Make sure Sprang is installed in this project." >&2
-  exit 1
+# Preferred: the Sprang CLI (normalises + validates; available after `npm i -g @faviovazquez/sprang`)
+if command -v sprang >/dev/null 2>&1; then
+  sprang merge "$PROJECT_ROOT"
+else
+  # Fallback: the bundled Python script (stdlib only) for installs without the CLI on PATH
+  MERGE_SCRIPT=""
+  for p in \
+    "$PROJECT_ROOT/.windsurf/skills/sprang-analyze/scripts/merge.py" \
+    "$PROJECT_ROOT/skills/sprang-analyze/scripts/merge.py"; do
+    [[ -f "$p" ]] && MERGE_SCRIPT="$p" && break
+  done
+  if [[ -z "$MERGE_SCRIPT" ]]; then
+    echo "ERROR: neither the 'sprang' CLI nor merge.py was found." >&2
+    echo "Install the CLI (npm i -g @faviovazquez/sprang) or copy skills/ into the project." >&2
+    exit 1
+  fi
+  PROJECT_ROOT="$PROJECT_ROOT" python3 "$MERGE_SCRIPT"
 fi
-
-PROJECT_ROOT="$PROJECT_ROOT" python3 "$MERGE_SCRIPT"
 ```
 
-The script outputs: `OK: <N> nodes, <E> edges, <L> layers, <T> tours` then `Written: <path>`.
+Both report something like `Graph written: <N> nodes, <E> edges, <L> layers, <T> tours, <D> domains`. `sprang merge` and `merge.py` apply the identical normalisation (`@sprang/core`'s `normalizeAssembledGraph` / its Python twin).
 
 **Write `$SPRANG_ROOT/SPRANG_REPORT.md`:**
 ```markdown

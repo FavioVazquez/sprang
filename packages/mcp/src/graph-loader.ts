@@ -1,27 +1,10 @@
 import { stat, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { ZodError } from 'zod';
 import type { KnowledgeGraph } from '@sprang/core';
-import { knowledgeGraphSchema } from '@sprang/core';
+import { knowledgeGraphSchema, summarizeZodIssues } from '@sprang/core';
 
-/**
- * Turn a (potentially huge) ZodError into a concise, actionable one-liner:
- * total issue count plus the few most common distinct "path :: message" shapes.
- * Array indices collapse to `[]` so e.g. 64 bad domain steps read as one line.
- */
-export function summarizeZodIssues(error: ZodError): string {
-  const counts = new Map<string, number>();
-  for (const issue of error.issues) {
-    const path = issue.path.map((p) => (typeof p === 'number' ? '[]' : p)).join('.');
-    const key = `${path || '<root>'}: ${issue.message}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  const top = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([k, c]) => (c > 1 ? `${k} (×${c})` : k));
-  return `${error.issues.length} issue(s): ${top.join('; ')}${counts.size > 3 ? ' …' : ''}`;
-}
+// Re-export so existing importers (and tests) can keep importing it from here.
+export { summarizeZodIssues };
 
 export class GraphLoader {
   private graphCache: KnowledgeGraph | null = null;

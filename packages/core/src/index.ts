@@ -1,9 +1,12 @@
 export * from './schema/types.js';
 export * from './schema/constants.js';
 export * from './schema/validators.js';
+export { summarizeZodIssues } from './schema/diagnostics.js';
 export * from './graph/store.js';
 export * from './graph/query.js';
 export { normalizeGraph } from './graph/normalize.js';
+export { normalizeAssembledGraph } from './graph/normalize-assembled.js';
+export type { NormalizedAssembly } from './graph/normalize-assembled.js';
 export { mergeSubgraphs } from './graph/merge-subgraphs.js';
 export type { NormalizationReport } from './graph/normalize.js';
 export type { MergeResult } from './graph/merge-subgraphs.js';
