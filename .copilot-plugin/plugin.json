@@ -1,7 +1,7 @@
 {
   "name": "sprang",
   "description": "Knowledge graph platform for instant codebase comprehension — git history, structural health, risk scoring, and architectural tours for any project",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "author": {
     "name": "FavioVazquez"
   },

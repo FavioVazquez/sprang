@@ -484,9 +484,11 @@ cat > "$SPRANG_ROOT/intermediate/risk-scores.json" << 'EOF'
 EOF
 ```
 
-Valid `category` values: `god_node`, `circular_dependency`, `orphan_node`, `unclear_coupling`, `duplicate_logic`, `low_cohesion`, `unstable_interface`, `over_connected`
+Valid `category` values (10): `god_node`, `circular_dependency`, `orphan_node`, `unclear_coupling`, `duplicate_logic`, `low_cohesion`, `unstable_interface`, `over_connected`, `name_duplicate`, `layer_violation`
 Valid `severity` values: `low`, `medium`, `high`
-Valid `risk_factors` values: `high_coupling`, `no_test_coverage`, `frequent_changes`, `large_blast_radius`, `critical_path`, `single_author`, `recent_churn`, `has_structural_warnings`
+Valid `risk_factors` values (8): `high_coupling`, `no_test_coverage`, `frequent_changes`, `large_blast_radius`, `critical_path`, `single_author`, `recent_churn`, `has_structural_warnings`
+
+> **Stick to these exact values.** `merge.py` normalises the assembled graph against the canonical schema before writing it: `structural_warnings` with an off-list `category` (or written as bare strings) and `risk_factors` outside the list above are **dropped** so the graph still validates. Using the canonical values is the only way your structural insights survive into the final graph. (Domain `label`/`flows`/`steps` and tour `step_title`/`explanation` are likewise normalised — but matching the templates above keeps your richer wording.)
 
 > ⛔ Do NOT write knowledge-graph.json. Risk data is merged by merge.py in Phase 7.
 

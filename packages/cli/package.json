@@ -1,6 +1,6 @@
 {
   "name": "@faviovazquez/sprang",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "type": "module",
   "license": "MIT",
   "description": "Knowledge graph dashboard for any codebase — scan, visualize, and chat about your code.",

@@ -6,6 +6,38 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.4] — 2026-06-18
+
+Patch release: fixes a high-impact bug in the flagship `/sprang-analyze` command found by running it end-to-end (uncapped) against a real external repo, plus documentation-accuracy corrections. The analyze fix lives entirely in `merge.py` (shared by every platform) so it applies equally to Claude Code, Devin Desktop / Windsurf, and GitHub Copilot.
+
+### Fixed (`/sprang-analyze` produced a graph the MCP server and dashboard couldn't read — high impact)
+
+- **The agent-assembled graph failed schema validation, so every consumer got `GRAPH_NOT_FOUND`.** Running `/sprang-analyze` to completion against `alexzhang13/rlm` (181 files) produced a graph with genuinely rich content — 1223/1223 node summaries, 13 layers, 2 tours, 5 named domains, a regenerated `SPRANG_REPORT.md` — but the file failed `knowledgeGraphSchema.safeParse()` with **216 issues**, so `GraphLoader` returned null and `sprang_health` / `sprang_node` / `sprang_domain` / `sprang_tour` (and the dashboard, which uses the same schema) all reported "graph not found." The command reported success while writing a broken artifact. Root cause: over a long multi-phase run the agent inevitably drifts from the JSON templates — domains using `name` instead of `label` (and flat, without `flows`/`steps`), tour steps using `title`/`description` instead of `step_title`/`explanation`, `risk_factors` outside the canonical enum, `structural_warnings` written as bare strings, and an incomplete `decision_context` with a string `change_frequency`. `merge.py` passed all of this through untouched. The deterministic `sprang scan` path was unaffected (it always produced a valid graph).
+- **`merge.py` now defensively normalises the assembled graph to the canonical schema** — the single deterministic chokepoint before the graph is written. It maps domain `name` → `label` and wraps flat domains into schema-complete `flows`/`steps`; coerces tour steps to `step_title`/`explanation` and clamps tours to 1–15 steps; drops `risk_factors` and `structural_warnings` categories outside the enum (and bare-string warnings); completes or drops partial `decision_context`; and recomputes `smell_summary` / `security_summary` from the normalised node warnings. Re-running the exact failing data through the new `merge.py` now yields **0 schema issues**; the MCP server loads it (`sprang_health` → B/87, all tools functional). The analyze workflow doc gained the two missing smell categories (`name_duplicate`, `layer_violation`) and a note that off-schema values are dropped, so the agent's structural insights survive.
+
+### Improved
+
+- **`GraphLoader` now logs a concise, actionable reason when a graph fails to validate** instead of silently returning null (which surfaced only as `GRAPH_NOT_FOUND`). It writes a one-line summary — issue count plus the few most common `path :: message` shapes, with repeats collapsed (e.g. `domains.[].label: Required (×3)`) — and a hint to re-run `/sprang-analyze` or `sprang scan`.
+
+### Documentation
+
+- **README test counts corrected** — the badges, Development section, and per-package table still showed `656` (they were stale even for 0.2.3, which shipped 671); now `679` to match this release (core 460, dashboard 85, mcp 67, cli 67).
+- **Security categories corrected** — the `security_summary` list named three categories that do not exist (`command_injection`, `insecure_random`, `sensitive_data_exposure`); replaced with the real enum members (`unsafe_eval`, `unsafe_exec`, `unsafe_deserialization`). The "20 patterns / 8 categories" counts were already correct.
+- **Smell-category count corrected** — `smell-detector` and the node schema are documented as 10 categories (was "8"), adding `name_duplicate` and `layer_violation`, both of which the detectors already emit.
+- **Two-phase pipeline diagram corrected** — `smell-detector` and `risk-scorer` were shown inside Phase 1, but Phase 1 runs only `project-scanner` + `file-analyzer`; structural warnings, risk, security, layers, tours and domains are all Phase 2 (a `--phase1-only` scan produces none of them).
+- Test-structure breakdown updated for the new and grown test files.
+
+### Tests
+
+- **+8 unit tests → 679** (was 671): `merge-normalize.test.ts` (6) runs `merge.py` on drifted agent output and asserts the result validates against `knowledgeGraphSchema` and preserves data, plus a byte-identical check across the two distributed `merge.py` copies; `graph-loader.test.ts` (+2) covers the invalid-graph null path and the `summarizeZodIssues` diagnostic. Lint/typecheck clean; full UI + bridge e2e green. Re-validated by re-running `/sprang-analyze` via live `claude -p` and confirming the produced graph loads through all 9 MCP tools.
+
+### Notes
+
+- All four packages and the two versioned plugin manifests bumped to `0.2.4`; the MCP `serverInfo.version` continues to track `package.json` automatically.
+- The fix is in `merge.py` + `@sprang/core`'s schema and the shared MCP loader, so Claude Code, Devin Desktop / Windsurf (Cascade), and Copilot all benefit identically — the skills, workflows, commands, rules, and manifests stay in cross-platform parity (enforced by `platform-parity.test.ts`).
+
+---
+
 ## [0.2.3] — 2026-06-17
 
 Patch release: seven correctness fixes found during an end-to-end agent UAT (driving Claude Code, and applicable equally to Cascade/Devin Desktop and Copilot, which share the same MCP server and core). All fixes ship in `@sprang/core` + the MCP server, so every agent benefits.
