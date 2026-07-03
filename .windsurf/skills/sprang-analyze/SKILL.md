@@ -1,7 +1,7 @@
 ---
 name: sprang-analyze
 description: Analyze a codebase to produce a rich semantic knowledge graph — file summaries, architecture layers, guided tour, domain map, risk scores. Use when the user says "/sprang-analyze", "analyze the codebase", "full analysis", or "run sprang-analyze".
-argument-hint: ["[path] [--full] [--language <lang>] [--chunk <N>]"]
+argument-hint: "[path] [--full] [--language <lang>] [--chunk <N>]"
 ---
 
 Analyze the codebase and produce `.sprang/knowledge-graph.json` with full semantic enrichment.
