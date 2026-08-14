@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [0.3.0] — 2026-08-14
 
+- Dashboard questions now use `swe-1.7-lightning` (override with `SPRANG_DEVIN_MODEL`).
+  Benchmarked through the bridge, it answers in ~23s against ~115s for the default
+  model, with no loss of quality on questions that require MCP tool use.
+- The Devin CLI bridge strips `ACP_BACKEND` before spawning. The dashboard is
+  usually launched from a terminal inside Devin Desktop, which exports it; the CLI
+  then treats the ACP host as the only credential source and reports "Not logged
+  in" despite valid stored credentials.
+- The bridge grants exactly `mcp__sprang__*` via a generated config instead of
+  `--permission-mode dangerous`, so MCP calls succeed without auto-approving every
+  tool.
+- A failed session resume retries once as a fresh session rather than surfacing as
+  a failed question.
+
 Modernization release. Sprang now targets exactly three platforms — **Devin (CLI + Desktop), Claude Code, and Copilot CLI** — the Windsurf/Cascade era is removed entirely, the per-platform agent assets are generated from a single source instead of hand-copied, and a batch of correctness bugs found by running the full pipeline end-to-end against real projects are fixed. Several of those bugs silently produced wrong answers rather than errors.
 
 ### Fixed

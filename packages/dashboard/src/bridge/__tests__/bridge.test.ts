@@ -24,7 +24,7 @@ vi.mock('node:child_process', () => ({
 
 // Now import the modules under test (they will use the mocked child_process)
 import { isDevinLocalAvailable } from '../devin-local.js';
-import { cleanDevinOutput } from '../devin.js';
+import { cleanDevinOutput, askDevin } from '../devin.js';
 import {
   isDevinCLIAvailable,
   isClaudeCLIAvailable,
@@ -77,6 +77,82 @@ beforeEach(() => {
 });
 
 // ─── detect.ts ───────────────────────────────────────────────────────────────
+
+describe('devin model selection', () => {
+  let tmpDir: string;
+  beforeEach(() => { tmpDir = makeTmp(); });
+  afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
+
+  it('uses a fast model by default — the default model is 5x slower for no gain', () => {
+    stubExecFileSync(false);
+    stubSpawnSync({ status: 0, stdout: 'ok' });
+    askDevin('q', tmpDir);
+    const argv = mockSpawnSync.mock.calls[0]![1] as string[];
+    expect(argv).toContain('--model');
+    expect(argv[argv.indexOf('--model') + 1]).toBe('swe-1.7-lightning');
+  });
+
+  it('honours SPRANG_DEVIN_MODEL for accounts without that model', () => {
+    const prev = process.env['SPRANG_DEVIN_MODEL'];
+    process.env['SPRANG_DEVIN_MODEL'] = 'claude-sonnet-4.5';
+    try {
+      stubExecFileSync(false);
+      stubSpawnSync({ status: 0, stdout: 'ok' });
+      askDevin('q', tmpDir);
+      const argv = mockSpawnSync.mock.calls[0]![1] as string[];
+      expect(argv[argv.indexOf('--model') + 1]).toBe('claude-sonnet-4.5');
+    } finally {
+      if (prev === undefined) delete process.env['SPRANG_DEVIN_MODEL'];
+      else process.env['SPRANG_DEVIN_MODEL'] = prev;
+    }
+  });
+});
+
+describe('devin stale-session recovery', () => {
+  let tmpDir: string;
+  beforeEach(() => { tmpDir = makeTmp(); });
+  afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
+
+  const seedSession = () => {
+    fs.mkdirSync(path.join(tmpDir, '.sprang'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.sprang', 'devin-session.json'),
+      JSON.stringify({ started_at: '2020-01-01T00:00:00.000Z', turns: 9 }));
+  };
+
+  it('retries without --continue when resuming fails, and answers', () => {
+    // Observed for real: "failed to start ACP agent session" on resume. The
+    // thread is worth less than the answer.
+    seedSession();
+    stubExecFileSync(false);
+    let call = 0;
+    mockSpawnSync.mockImplementation(() => {
+      call += 1;
+      return call === 1
+        ? { status: 1, stdout: '', stderr: 'Error: failed to start ACP agent session' }
+        : { status: 0, stdout: 'WORKING', stderr: '' };
+    });
+
+    const res = askDevin('q', tmpDir);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.response).toBe('WORKING');
+
+    expect(mockSpawnSync.mock.calls[0]![1]).toContain('--continue');
+    expect(mockSpawnSync.mock.calls[1]![1]).not.toContain('--continue');
+    // the poisoned session must be replaced by a fresh one, not left to fail again
+    const saved = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, '.sprang', 'devin-session.json'), 'utf-8'),
+    ) as { turns: number };
+    expect(saved.turns).toBe(1);
+  });
+
+  it('does not retry when there was no session to resume', () => {
+    stubExecFileSync(false);
+    stubSpawnSync({ status: 1, stdout: '', stderr: 'boom' });
+    const res = askDevin('q', tmpDir);
+    expect(res.ok).toBe(false);
+    expect(mockSpawnSync).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('cleanDevinOutput', () => {
   it('strips the CLI welcome banner that precedes the answer', () => {

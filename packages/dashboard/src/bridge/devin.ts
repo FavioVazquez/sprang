@@ -38,6 +38,30 @@ function cliEnv(): NodeJS.ProcessEnv {
 }
 
 const SESSION_FILE = '.sprang/devin-session.json';
+
+/**
+ * Model used for dashboard questions.
+ *
+ * Benchmarked on a real question ("call sprang_health, reply with the grade"),
+ * measured end to end through this bridge:
+ *
+ *   claude-sonnet-4.5 (default)  115s
+ *   swe-1.7-lightning             23s   ← chosen
+ *   swe-1.6-fast                  23s
+ *   claude-haiku-4.5              23s   (prepends chatter)
+ *   gemini-3.7-flash              26s
+ *   gpt-5.4-mini                  27s
+ *   kimi-k3                       28s
+ *
+ * swe-1.7-lightning was also the best of the fast models on a harder question
+ * (naming the files behind a specific change and summarising it), so speed here
+ * costs nothing in answer quality. Dashboard questions are short lookups
+ * against the knowledge graph — the default model is five times slower for no
+ * benefit.
+ *
+ * Override with SPRANG_DEVIN_MODEL if an account lacks this model.
+ */
+const DEFAULT_MODEL = 'swe-1.7-lightning';
 const DEVIN_TIMEOUT_MS = 180_000; // 3 min max per call
 
 interface DevinSessionData {
@@ -151,6 +175,8 @@ function writePermissionConfig(sprangRoot: string): string | null {
 
 function buildArgs(question: string, continueSession: boolean, configPath: string | null): string[] {
   const args = ['--respect-workspace-trust', 'false', '--permission-mode', 'auto'];
+  const model = process.env['SPRANG_DEVIN_MODEL'] ?? DEFAULT_MODEL;
+  if (model) args.push('--model', model);
   if (configPath) args.push('--config', configPath);
   if (continueSession) args.push('--continue');
   args.push('-p', buildPrompt(question));
@@ -193,11 +219,10 @@ export function askDevin(question: string, sprangRoot: string): DevinAskResult {
   if (!bin) return { ok: false, error: 'devin CLI not found on PATH' };
 
   const previous = loadSession(sprangRoot);
-  const args = buildArgs(question, previous !== null, writePermissionConfig(sprangRoot));
+  const configPath = writePermissionConfig(sprangRoot);
 
-  let result: ReturnType<typeof spawnSync>;
-  try {
-    result = spawnSync(bin, args, {
+  const run = (withContinue: boolean): ReturnType<typeof spawnSync> =>
+    spawnSync(bin, buildArgs(question, withContinue, configPath), {
       cwd: sprangRoot,
       timeout: DEVIN_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024,
@@ -206,6 +231,23 @@ export function askDevin(question: string, sprangRoot: string): DevinAskResult {
       // See STDIN note in askDevinBackground.
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+
+  let result: ReturnType<typeof spawnSync>;
+  // Tracks the thread the answer actually came from. A dropped resume starts a
+  // new thread, so the turn counter must restart with it rather than carry the
+  // abandoned session's history forward.
+  let resumed = previous;
+  try {
+    result = run(previous !== null);
+    // Resuming can fail for reasons that have nothing to do with the question —
+    // a session recorded against a different model, a stale lock, an
+    // interrupted turn ("failed to start ACP agent session"). Continuity is a
+    // nicety; answering is the point. Drop the thread and retry once clean.
+    if (previous !== null && result.status !== 0) {
+      clearDevinSession(sprangRoot);
+      resumed = null;
+      result = run(false);
+    }
   } catch (err) {
     return { ok: false, error: `devin CLI error: ${err instanceof Error ? err.message : String(err)}` };
   }
@@ -219,7 +261,7 @@ export function askDevin(question: string, sprangRoot: string): DevinAskResult {
   }
   if (!stdout) return { ok: false, error: 'devin returned empty output' };
 
-  recordTurn(sprangRoot, previous);
+  recordTurn(sprangRoot, resumed);
   return { ok: true, response: stdout };
 }
 
@@ -240,10 +282,12 @@ export function askDevinBackground(
   }
 
   const previous = loadSession(sprangRoot);
+  // A failed resume must not cost the user their answer — see askDevin.
+  const usedContinue = previous !== null;
   // Close stdin: these CLIs block waiting for piped input when stdin is
   // inherited from a server process, then exit non-zero ("no stdin data
   // received in 3s"). The prompt is passed as an argument, not on stdin.
-  const child = spawn(bin, buildArgs(question, previous !== null, writePermissionConfig(sprangRoot)), {
+  const child = spawn(bin, buildArgs(question, usedContinue, writePermissionConfig(sprangRoot)), {
     cwd: sprangRoot,
     timeout: DEVIN_TIMEOUT_MS,
     env: cliEnv(),
@@ -259,6 +303,13 @@ export function askDevinBackground(
   child.on('close', (code) => {
     const text = cleanDevinOutput(stdout);
     if (code !== 0 || !text) {
+      if (usedContinue) {
+        // Retry once without --continue; a stale session should not surface as
+        // a failed question. Clearing the session makes the retry a fresh one.
+        clearDevinSession(sprangRoot);
+        askDevinBackground(question, sprangRoot, responsePath, onFailure);
+        return;
+      }
       onFailure?.(`devin exited with code ${code}: ${(stderr || text).trim().slice(0, 300)}`);
       return;
     }
