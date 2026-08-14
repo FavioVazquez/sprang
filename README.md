@@ -571,20 +571,32 @@ Relay is always available, so there is no "no bridge detected" state. And if a C
 
 ### Devin local (Devin Desktop)
 
-Devin local is already signed in, but it is **not** a spawnable process: its credentials live in the IDE, not in the CLI credential store, so `devin auth status` reports *Not logged in* while the IDE works fine. Driving it requires the editor command `devin.sendChatActionMessage`, which nothing outside the editor can invoke — so this bridge ships as a small extension:
+Devin local is already signed in, but it is **not** a spawnable process — its credentials live in the IDE, not in the CLI credential store, so `devin auth status` reports *Not logged in* while the IDE works fine.
 
-```bash
-devin-desktop --install-extension sprang-devin-bridge-0.3.0.vsix --force
-# then reload the window
-```
+Sprang reaches it with **lifecycle hooks**, which run *inside* your Devin session:
 
-The extension watches `.sprang/agent-question.md`, pushes it into the Devin chat, and writes `.sprang/.devin-bridge-active` while it is running. Detection requires that marker — being inside Devin Desktop is not sufficient, because without the extension nothing is listening. A marker older than 24h (a crashed window) is ignored.
+| Hook | Delivers the pending question when |
+|---|---|
+| `Stop` | Devin finishes a turn |
+| `UserPromptSubmit` | you send any message |
 
-Only the `.vsix` is committed. Because a `.vsix` is a zip containing `extension/src/`, the source travels inside the artifact and can be recovered with `unzip` at any time.
+The dashboard writes `.sprang/agent-question.md`; the first hook to fire consumes it (renaming to `.delivered.md`, so it is delivered exactly once and can never cause a stop-loop) and hands it to the agent. Devin answers with its full context and MCP tools, calls `sprang_respond`, and the answer appears in the dashboard.
 
-> Devin local and Relay use exactly the same mechanism — the same staged file, the same prompt, the same `sprang_respond` reply path. The extension only changes *who* performs the paste, so uninstalling it degrades gracefully instead of breaking anything.
+Installed by `sprang init --platform devin`. No extension required.
 
-Every bridge converges on the same file: `.sprang/cascade-response.json`, which the dashboard polls. `sprang_respond` also appends each exchange to `.sprang/agent-conversation.md`, so the conversation survives across bridges and sessions.
+> **Limitation:** a hook only runs when something happens. A question asked while the session is completely idle waits for the next turn or keystroke. Reaching a genuinely idle IDE session is not possible with the APIs Devin exposes.
+
+<details><summary>Why not an editor extension?</summary>
+
+An earlier version shipped one that called `devin.sendChatActionMessage`. Measured behaviour:
+
+- `explainAndFixProblem` — opens a **new** conversation answered by **Cascade**, with none of your session's context.
+- `codeBlockMention` / `fileMention` — do land in the current conversation, but only *insert* text. No command exists to submit the chat input, so it cannot be automatic.
+
+Worse, with both routes installed the extension won the race every time — it fires instantly while a hook waits for a turn boundary — so dashboard questions were silently answered by the wrong agent. The extension was removed.
+
+</details>
+
 
 ### Session files (gitignored)
 

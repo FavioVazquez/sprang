@@ -161,15 +161,33 @@ describe('manifests', () => {
     }
   });
 
-  it('ships the Devin Bridge extension, with its source inside the artifact', () => {
-    // Only the .vsix is committed. A .vsix is a zip, and vsce packs src/ into
-    // it, so the source stays recoverable without a package in the monorepo —
-    // which is how the previous extension's "lost" source was recovered.
-    const vsix = join(REPO_ROOT, 'sprang-devin-bridge-0.3.0.vsix');
-    expect(existsSync(vsix), 'sprang-devin-bridge-0.3.0.vsix should be committed').toBe(true);
-    const listing = execFileSync('unzip', ['-l', vsix], { encoding: 'utf-8' });
-    expect(listing).toContain('extension/dist/extension.js');
-    expect(listing).toContain('extension/src/extension.ts');
+  it('wires the dashboard-question hooks that deliver into a live Devin session', () => {
+    // This replaced the bridge extension. The extension could only reach the
+    // chat panel — a new Cascade conversation with none of the session's
+    // context — and, being instant, it beat the hook every time when both were
+    // installed, so questions were silently answered by the wrong agent.
+    const cfg = readJson('.devin/hooks.v1.json');
+    const wired = ['Stop', 'UserPromptSubmit'].filter((event) =>
+      (cfg[event] ?? []).some((entry: any) =>
+        (entry.hooks ?? []).some((h: any) => String(h.command).includes('dashboard-question')),
+      ),
+    );
+    expect(wired, 'both Stop and UserPromptSubmit should deliver questions').toEqual([
+      'Stop',
+      'UserPromptSubmit',
+    ]);
+    for (const script of ['stop-dashboard-question.sh', 'user-prompt-dashboard-question.sh']) {
+      const path = join(REPO_ROOT, '.devin/hooks', script);
+      expect(existsSync(path), `${script} should exist`).toBe(true);
+      expect(statSync(path).mode & 0o111, `${script} should be executable`).not.toBe(0);
+    }
+  });
+
+  it('ships no chat-injection extension', () => {
+    // Deliberately removed: see the hook test above.
+    for (const gone of ['sprang-devin-bridge-0.3.0.vsix', 'cascade-messaging-0.1.0.vsix']) {
+      expect(existsSync(join(REPO_ROOT, gone)), `${gone} should not be committed`).toBe(false);
+    }
   });
 });
 
@@ -283,14 +301,14 @@ describe('rules', () => {
 });
 
 describe('hooks wiring', () => {
-  const HOOK_SCRIPTS = ['session-start.sh', 'post-tool-use.sh'];
+  const HOOK_SCRIPTS = ['session-start.sh', 'post-tool-use.sh', 'stop-dashboard-question.sh', 'user-prompt-dashboard-question.sh'];
 
   it('.devin/hooks.v1.json registers SessionStart and PostToolUse', () => {
     // The pre-0.3 file used `post_cascade_response_with_transcript`, an event no
     // current runtime fires — so the hook silently never ran.
     const config = readJson('.devin/hooks.v1.json');
     expect(config.post_cascade_response_with_transcript).toBeUndefined();
-    for (const event of ['SessionStart', 'PostToolUse']) {
+    for (const event of ['SessionStart', 'PostToolUse', 'Stop', 'UserPromptSubmit']) {
       expect(Array.isArray(config[event]), `${event} array`).toBe(true);
       expect(config[event][0].hooks[0].command, `${event} command`).toContain('.devin/hooks/');
     }

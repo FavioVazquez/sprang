@@ -1,44 +1,63 @@
 /**
- * Devin local bridge — pushes a question into the authenticated Devin session
- * running in the surrounding IDE (Devin Desktop).
+ * Devin local bridge — delivers a dashboard question into the Devin session
+ * already running in your editor, with all of its context.
  *
- * This is the *only* bridge that reaches an IDE-hosted agent. The others spawn
- * a CLI, which Devin local is not: its credentials live in the IDE, not in the
- * CLI credential store (`devin auth status` reports "Not logged in" even while
- * Devin Desktop is signed in and working). The only entry point is the VS Code
- * command `devin.sendChatActionMessage`, which nothing outside the editor can
- * invoke — hence the companion extension.
+ * How it works, and why it is done this way:
  *
- * Protocol, deliberately identical to the manual relay:
- *   dashboard → .sprang/agent-question.md → extension → Devin chat
- *   Devin → sprang_respond MCP tool → .sprang/cascade-response.json → dashboard
+ * The dashboard is an HTTP server; it cannot inject a message into a running
+ * IDE conversation. Two routes were measured:
  *
- * So the only thing the extension changes is who performs the paste. If it is
- * not installed, detection falls through and the user pastes the same file.
+ *   1. An editor extension calling `devin.sendChatActionMessage`. Reaches the
+ *      chat *panel*, not this session. `explainAndFixProblem` opens a NEW
+ *      conversation answered by Cascade; `codeBlockMention` does land in the
+ *      current conversation but only inserts text — no command exists to submit
+ *      the chat input, so it cannot be automatic. Worse, when both routes were
+ *      live the extension won the race every time (it fires instantly, the hook
+ *      waits for a turn boundary), so questions were silently answered by the
+ *      wrong agent. The extension is therefore not used.
+ *
+ *   2. Devin lifecycle hooks, which run *inside* this session. A `Stop` hook
+ *      returning `decision: "block"` hands the question to the agent when a turn
+ *      ends; a `UserPromptSubmit` hook injects it the moment you type. Verified
+ *      end-to-end: dashboard → question file → hook → this conversation →
+ *      sprang_respond → dashboard.
+ *
+ * Route 2 wins on every axis: no install, full context, working MCP.
+ *
+ * Known limitation: a hook only runs when something happens. A question asked
+ * while the session is completely idle waits for the next turn or keystroke.
+ * Reaching a truly idle session is not possible with the APIs that exist.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** Written by the extension on activation, removed on deactivation. */
-const MARKER = path.join('.sprang', '.devin-bridge-active');
+const HOOKS_FILE = path.join('.devin', 'hooks.v1.json');
 
-/** A marker left behind by a crashed window shouldn't strand every question. */
-const MARKER_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** Hook scripts that consume `.sprang/agent-question.md`. */
+const QUESTION_HOOK_EVENTS = ['Stop', 'UserPromptSubmit'] as const;
+
+interface HookEntry {
+  hooks?: Array<{ command?: string }>;
+}
 
 /**
- * True when a Devin local session is present *and* can be pushed to.
+ * True when this project wires at least one hook that delivers dashboard
+ * questions into the running Devin session.
  *
- * Both halves matter: `WINDSURF_IDE_TYPE` proves the dashboard was launched
- * from inside Devin Desktop, but without the extension there is nothing
- * listening, so we would select a bridge that can never answer. The marker is
- * therefore required; the env var alone is not enough.
+ * Deliberately checks the hook *configuration* rather than "am I inside Devin
+ * Desktop": being in the IDE proves nothing if no hook is listening, and
+ * selecting a bridge that cannot answer is worse than falling through to relay.
  */
 export function isDevinLocalAvailable(sprangRoot: string): boolean {
-  const marker = path.join(sprangRoot, MARKER);
   try {
-    const stat = fs.statSync(marker);
-    return Date.now() - stat.mtimeMs < MARKER_MAX_AGE_MS;
+    const cfg = JSON.parse(fs.readFileSync(path.join(sprangRoot, HOOKS_FILE), 'utf-8')) as
+      Record<string, HookEntry[] | undefined>;
+    return QUESTION_HOOK_EVENTS.some((event) =>
+      (cfg[event] ?? []).some((entry) =>
+        (entry.hooks ?? []).some((h) => (h.command ?? '').includes('dashboard-question')),
+      ),
+    );
   } catch {
     return false;
   }

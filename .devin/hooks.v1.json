@@ -34,5 +34,17 @@
         }
       ]
     }
+  ],
+  "UserPromptSubmit": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/user-prompt-dashboard-question.sh",
+          "timeout": 10
+        }
+      ]
+    }
   ]
 }

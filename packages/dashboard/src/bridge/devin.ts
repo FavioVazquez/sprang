@@ -43,11 +43,30 @@ export function resolveDevinBinary(): string | null {
   }
 }
 
-/** True when a `devin` CLI is present *and* logged in. Both are required: an
- *  unauthenticated CLI exits immediately with "Login canceled". */
+/**
+ * Devin Desktop signs the CLI in over ACP rather than through the CLI's own
+ * credential store, so `devin auth status` reports "Not logged in" while the IDE
+ * works perfectly. The CLI does however accept the same credential directly:
+ *
+ *   ACP server credential policy: ACP_BACKEND not set. Will accept host
+ *   credentials if provided, otherwise fall back to env vars and stored CLI
+ *   credentials.
+ *
+ * So exporting WINDSURF_API_KEY (copy it from the IDE with the
+ * "Devin: Copy API Key" command) authenticates the CLI against the account you
+ * are already signed into — no second login, and no browser flow.
+ */
+export function hasWindsurfApiKey(): boolean {
+  return Boolean(process.env['WINDSURF_API_KEY']);
+}
+
+/** True when a `devin` CLI is present *and* can authenticate — either through
+ *  its own credential store or an inherited WINDSURF_API_KEY. */
 export function isDevinCLIAvailable(): boolean {
   const bin = resolveDevinBinary();
   if (!bin) return false;
+  // An inherited key is sufficient; `auth status` does not know about it.
+  if (hasWindsurfApiKey()) return true;
   try {
     const out = execFileSync(bin, ['auth', 'status'], {
       timeout: 8000,

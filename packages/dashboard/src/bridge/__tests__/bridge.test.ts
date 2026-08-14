@@ -82,25 +82,27 @@ describe('isDevinLocalAvailable', () => {
   beforeEach(() => { tmpDir = makeTmp(); });
   afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
 
-  const marker = (root: string) => path.join(root, '.sprang', '.devin-bridge-active');
+  function writeHooks(root: string, cfg: unknown) {
+    fs.mkdirSync(path.join(root, '.devin'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.devin', 'hooks.v1.json'), JSON.stringify(cfg));
+  }
 
-  it('is false without the bridge extension marker', () => {
+  it('is false with no hooks configured', () => {
     expect(isDevinLocalAvailable(tmpDir)).toBe(false);
   });
 
-  it('is true while the bridge extension is active', () => {
-    fs.writeFileSync(marker(tmpDir), new Date().toISOString());
+  it('is false when hooks exist but none deliver dashboard questions', () => {
+    // Selecting this bridge with nothing listening is worse than falling
+    // through to relay — the question would never be answered.
+    writeHooks(tmpDir, { SessionStart: [{ hooks: [{ command: 'bash .devin/hooks/session-start.sh' }] }] });
+    expect(isDevinLocalAvailable(tmpDir)).toBe(false);
+  });
+
+  it.each(['Stop', 'UserPromptSubmit'])('is true when the %s question hook is wired', (event) => {
+    writeHooks(tmpDir, {
+      [event]: [{ hooks: [{ command: 'bash .devin/hooks/stop-dashboard-question.sh' }] }],
+    });
     expect(isDevinLocalAvailable(tmpDir)).toBe(true);
-  });
-
-  it('ignores a marker left behind by a crashed window', () => {
-    // Otherwise a stale marker would strand every question on a bridge that
-    // has nothing listening, instead of falling through to a working one.
-    const file = marker(tmpDir);
-    fs.writeFileSync(file, 'old');
-    const twoDaysAgo = Date.now() - 48 * 60 * 60 * 1000;
-    fs.utimesSync(file, twoDaysAgo / 1000, twoDaysAgo / 1000);
-    expect(isDevinLocalAvailable(tmpDir)).toBe(false);
   });
 });
 
@@ -176,7 +178,9 @@ describe('detectBridge priority', () => {
     // Devin local is already authenticated; the CLI needs a second, separate
     // login, so preferring the CLI would push users through pointless friction.
     stubProbes(() => Buffer.from('ok'));
-    fs.writeFileSync(path.join(tmpDir, '.sprang', '.devin-bridge-active'), new Date().toISOString());
+    fs.mkdirSync(path.join(tmpDir, '.devin'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.devin', 'hooks.v1.json'),
+      JSON.stringify({ Stop: [{ hooks: [{ command: 'bash .devin/hooks/stop-dashboard-question.sh' }] }] }));
     expect(detectBridge(tmpDir).kind).toBe('devin-local');
   });
 
@@ -385,7 +389,9 @@ describe('askAgent', () => {
 
   it('stages the question for the bridge extension when Devin local is active', () => {
     stubExecFileSync(true);
-    fs.writeFileSync(path.join(tmpDir, '.sprang', '.devin-bridge-active'), new Date().toISOString());
+    fs.mkdirSync(path.join(tmpDir, '.devin'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.devin', 'hooks.v1.json'),
+      JSON.stringify({ Stop: [{ hooks: [{ command: 'bash .devin/hooks/stop-dashboard-question.sh' }] }] }));
     const result = askAgent('what does auth.ts do?', tmpDir);
     expect(result.bridge).toBe('devin-local');
     expect(result.mode).toBe('async');

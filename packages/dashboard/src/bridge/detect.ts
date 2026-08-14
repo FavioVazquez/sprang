@@ -2,10 +2,10 @@
  * Bridge detection — determines how the dashboard can reach an AI agent.
  *
  * Priority order:
- *  1. devin-local — a Devin session in the surrounding IDE, reachable through
- *                   the Sprang Devin Bridge extension. First because it is
- *                   already authenticated: it needs no second login, unlike the
- *                   CLI, whose credential store is separate from the IDE's.
+ *  1. devin-local — the Devin session already running in your editor, reached
+ *                   through the Stop / UserPromptSubmit hooks. First because it
+ *                   is already authenticated and already has your context: no
+ *                   second login, no extension, no new conversation.
  *  2. devin       — `devin` CLI on PATH and authenticated
  *  3. claude      — `claude` CLI available (Claude Code)
  *  4. copilot     — `copilot` CLI available (GitHub Copilot CLI)
@@ -52,10 +52,18 @@ export { isDevinCLIAvailable, isDevinLocalAvailable };
 /** Detect the best available bridge. */
 export function detectBridge(sprangRoot: string): BridgeStatus {
   if (isDevinLocalAvailable(sprangRoot)) {
-    return { kind: 'devin-local', detail: 'Devin local session (Sprang Devin Bridge extension active)' };
+    return {
+      kind: 'devin-local',
+      detail: 'Devin session in your editor — delivered by the Sprang lifecycle hooks',
+    };
   }
   if (isDevinCLIAvailable()) {
-    return { kind: 'devin', detail: 'devin CLI available' };
+    return {
+      kind: 'devin',
+      detail: process.env['WINDSURF_API_KEY']
+        ? 'devin CLI authenticated via WINDSURF_API_KEY (same account as the IDE)'
+        : 'devin CLI available',
+    };
   }
   if (isClaudeCLIAvailable()) {
     return { kind: 'claude', detail: 'claude CLI available' };
@@ -66,9 +74,9 @@ export function detectBridge(sprangRoot: string): BridgeStatus {
   return {
     kind: 'relay',
     detail: isInsideDevinDesktop()
-      ? 'Running inside Devin Desktop, but the Sprang Devin Bridge extension is not active — ' +
-        'install it to push questions straight into Devin, or copy the question across manually. ' +
-        'Either way Devin answers via the sprang_respond MCP tool.'
+      ? 'Running inside Devin Desktop, but no dashboard-question hook is configured — ' +
+        'run `sprang init --platform devin` to install it, or copy the question across ' +
+        'manually. Either way Devin answers via the sprang_respond MCP tool.'
       : 'No agent CLI detected. Copy the question into your agent (Devin Desktop, Cursor, …) — ' +
         'it will answer via the sprang_respond MCP tool and the reply appears here.',
   };
