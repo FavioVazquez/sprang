@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { knowledgeGraphSchema, summarizeZodIssues } from '@sprang/core';
+import { bridgeLog } from '../bridge/log.js';
 import { detectBridge, listBridges, clearAgentSession } from '../bridge/index.js';
 import { askClaudeBackground } from '../bridge/claude.js';
 import { askCopilotBackground } from '../bridge/copilot.js';
@@ -318,6 +319,11 @@ export function registerRoutes(
         // devin-local and relay both work by staging the question file. With the
         // Sprang Devin Bridge extension installed it is picked up automatically
         // and pushed into the Devin chat; without it the user pastes the prompt.
+        bridgeLog(sprangRoot, 'ask', {
+          bridge: bridge.kind,
+          requested: requested ?? '(auto)',
+          question: userMessage,
+        });
         const staged = bridge.kind === 'devin-local' || bridge.kind === 'relay';
         const prompt = staged ? writeRelayQuestion(userMessage, sprangRoot) : undefined;
         res.statusCode = 200;
@@ -328,6 +334,7 @@ export function registerRoutes(
         // token), so the only reliable signal is the call itself failing. When
         // it does, degrade to the relay rather than leaving the panel spinning.
         const degradeToRelay = (kind: string) => (error: string) => {
+          bridgeLog(sprangRoot, 'degrade', { from: kind, error });
           const relayPrompt = writeRelayQuestion(userMessage, sprangRoot);
           writeAgentResponse(responsePath, {
             response:

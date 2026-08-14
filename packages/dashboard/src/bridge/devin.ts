@@ -20,6 +20,7 @@
 import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { bridgeLog } from './log.js';
 
 /**
  * Environment the `devin` CLI must NOT inherit.
@@ -287,6 +288,12 @@ export function askDevinBackground(
   // Close stdin: these CLIs block waiting for piped input when stdin is
   // inherited from a server process, then exit non-zero ("no stdin data
   // received in 3s"). The prompt is passed as an argument, not on stdin.
+  bridgeLog(sprangRoot, 'devin.spawn', {
+    bin,
+    model: process.env['SPRANG_DEVIN_MODEL'] ?? DEFAULT_MODEL,
+    resume: usedContinue,
+  });
+  const started = Date.now();
   const child = spawn(bin, buildArgs(question, usedContinue, writePermissionConfig(sprangRoot)), {
     cwd: sprangRoot,
     timeout: DEVIN_TIMEOUT_MS,
@@ -302,6 +309,12 @@ export function askDevinBackground(
 
   child.on('close', (code) => {
     const text = cleanDevinOutput(stdout);
+    bridgeLog(sprangRoot, 'devin.exit', {
+      code,
+      secs: Math.round((Date.now() - started) / 1000),
+      chars: text.length,
+      stderr: stderr.trim().slice(0, 160),
+    });
     if (code !== 0 || !text) {
       if (usedContinue) {
         // Retry once without --continue; a stale session should not surface as
