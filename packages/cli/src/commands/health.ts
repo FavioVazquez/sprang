@@ -1,6 +1,7 @@
 import { resolve, join } from 'node:path';
 import { Command } from 'commander';
-import { loadGraphOrNull, calcHealthGrade } from '@sprang/core';
+import { loadGraphResult, calcHealthGrade } from '@sprang/core';
+import { reportGraphFailure } from '../graph-error.js';
 
 function riskBar(count: number, total: number, char: string): string {
   if (total === 0) return '';
@@ -34,15 +35,15 @@ export function makeHealthCommand(): Command {
       const projectRoot = resolve(pathArg ?? process.cwd());
       const sprangDir = join(projectRoot, '.sprang');
 
-      const graph = await loadGraphOrNull(sprangDir);
-
-      if (!graph) {
-        process.stdout.write(
-          'No graph found — run sprang scan first.\n\n' +
-            `Expected: ${sprangDir}/knowledge-graph.json\n`
-        );
+      const loaded = await loadGraphResult(sprangDir);
+      if (!loaded.ok) {
+        // Exit non-zero: `sprang health && deploy` must not proceed when there
+        // is nothing to report on.
+        reportGraphFailure(loaded.error);
+        process.exitCode = 1;
         return;
       }
+      const graph = loaded.graph;
 
       const { stats } = graph;
       const riskTotal = stats.risk_summary.high + stats.risk_summary.medium + stats.risk_summary.low;

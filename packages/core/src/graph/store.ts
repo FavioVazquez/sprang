@@ -31,6 +31,85 @@ export async function loadGraphOrNull(sprangDir: string): Promise<KnowledgeGraph
   return result.data;
 }
 
+/** Why the graph could not be loaded. Mirrors the MCP server's `GraphErrorCode`
+ *  so both surfaces name the same condition the same way. */
+export type LoadGraphFailure =
+  | { code: 'GRAPH_NOT_FOUND'; path: string; message: string; remedy: string }
+  | { code: 'GRAPH_READ_ERROR'; path: string; message: string; remedy: string }
+  | {
+      code: 'GRAPH_INVALID';
+      path: string;
+      message: string;
+      remedy: string;
+      /** First few Zod issues, condensed — enough to locate the problem. */
+      validation_issues: string;
+    };
+
+export type LoadGraphResult =
+  | { ok: true; graph: KnowledgeGraph }
+  | { ok: false; error: LoadGraphFailure };
+
+/**
+ * Load the graph, distinguishing *missing* from *present but invalid*.
+ *
+ * `loadGraphOrNull` returns `null` for both, which made every CLI command tell
+ * the user "No graph found — run sprang scan first" when the graph existed and
+ * had merely failed validation. That advice is actively harmful: a re-scan
+ * overwrites the evidence and cannot fix an enrichment bug. The MCP server was
+ * given this distinction in 0.3.0; the CLI kept the old behaviour.
+ */
+export async function loadGraphResult(sprangDir: string): Promise<LoadGraphResult> {
+  const filePath = join(sprangDir, GRAPH_FILE);
+  let raw: unknown;
+  try {
+    raw = await readJsonFileOrNull<unknown>(filePath);
+  } catch (err) {
+    // A truncated or corrupt file throws here. Callers are reporting on a
+    // broken graph, so this must be a diagnosable result, not an exception
+    // that takes the process down with a stack trace.
+    return {
+      ok: false,
+      error: {
+        code: 'GRAPH_READ_ERROR',
+        path: filePath,
+        message: `The knowledge graph could not be read: ${err instanceof Error ? err.message : String(err)}`,
+        remedy: 'Check the file is valid JSON and readable, then re-run `sprang merge`.',
+      },
+    };
+  }
+  if (raw === null) {
+    return {
+      ok: false,
+      error: {
+        code: 'GRAPH_NOT_FOUND',
+        path: filePath,
+        message: 'No knowledge graph found.',
+        remedy: 'Run `sprang scan` (or /sprang) to build it.',
+      },
+    };
+  }
+  const result = knowledgeGraphSchema.safeParse(raw);
+  if (!result.success) {
+    const issues = result.error.issues
+      .slice(0, 5)
+      .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('; ');
+    const extra = result.error.issues.length > 5 ? ` (+${result.error.issues.length - 5} more)` : '';
+    return {
+      ok: false,
+      error: {
+        code: 'GRAPH_INVALID',
+        path: filePath,
+        message: 'The knowledge graph exists but failed schema validation.',
+        validation_issues: `${issues}${extra}`,
+        remedy:
+          'Re-run `sprang merge` or /sprang-analyze. A re-scan will not fix this and would overwrite the evidence.',
+      },
+    };
+  }
+  return { ok: true, graph: result.data };
+}
+
 export async function saveGraph(sprangDir: string, graph: KnowledgeGraph): Promise<void> {
   const filePath = join(sprangDir, GRAPH_FILE);
   await writeFileAtomic(filePath, JSON.stringify(graph, null, 2));

@@ -6,6 +6,30 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.1] — 2026-08-14
+
+Patch release. Smoke-testing the published 0.3.0 tarball surfaced a set of CLI
+failures that all shared one shape: **the command reported success, or blamed the
+wrong thing, instead of failing usefully.** None were introduced by 0.3.0 — the
+oldest predates 0.2.4 — but the 0.3.0 smoke test only ran `--version` and `scan`,
+so none were caught.
+
+### Fixed
+
+- **`sprang init` silently did nothing without a TTY.** `init` prompts for a project root unless given a path or `-y`. With no TTY — CI, Docker, a script, an agent — `rl.question` never fires its callback on EOF, so the promise never settled, the event loop emptied, and Node exited **0 having written nothing**. `sprang init --platform devin`, the exact command the README documents, reported success and scaffolded nothing. It now prompts only when `process.stdin.isTTY`, defaulting to the working directory otherwise (what pressing Enter would have done), and also resolves on `close` so it can never hang on Ctrl-D. Present in 0.2.4 and 0.3.0.
+- **`sprang health` and `sprang query` exited 0 when there was no graph**, so `sprang health && deploy` shipped on a missing graph. `sprang diagram` already exited 1 for the same condition. All three now agree: a command that cannot do its job exits non-zero.
+- **The CLI reported a schema-invalid graph as a missing one.** `loadGraphOrNull` returns `null` for both "no file" and "file fails validation", so every CLI command answered *"No graph found — run sprang scan first"* when the graph existed and was merely invalid — advice that overwrites the evidence and cannot fix an enrichment bug. The MCP server was given this distinction in 0.3.0; the CLI kept the old behaviour. New `loadGraphResult()` in `@sprang/core` returns a discriminated result (`GRAPH_NOT_FOUND` / `GRAPH_INVALID` / `GRAPH_READ_ERROR`) mirroring the MCP error codes, carrying the condensed Zod issues and the correct remedy.
+- **`sprang status` and `sprang diagram` crashed on a malformed graph.** Both cast parsed JSON straight to `KnowledgeGraph`, so a graph missing `edges` died with `TypeError: Cannot read properties of undefined (reading 'length')` — a stack trace from the very command you run to diagnose a broken graph. `status` now reports "malformed" as a state and still exits 0 (it is a diagnostic, like `git status`); `diagram` validates first and exits 1 with a diagnosable message.
+- **A truncated or corrupt graph file threw out of the loader** instead of returning a failure, taking the process down with it. Found by a test written for the fix above. Now reported as `GRAPH_READ_ERROR`.
+- **`publish.yml` verified a plugin manifest that no longer exists.** The version-consistency guard listed `.copilot-plugin/plugin.json`, removed in 0.3.0 when the Copilot manifest moved to the repo root. The loop is guarded by `[ -f "$f" ]`, so it silently matched nothing — while `.devin-plugin/plugin.json` and the root `plugin.json` were never checked at all.
+
+### Added
+
+- **CI smoke steps that would have caught all of this**: `sprang init` run with no TTY against the packed tarball (asserting 11 skills and an MCP config are actually written), and a failure-mode step asserting `health` exits non-zero on both a missing and an invalid graph, that an invalid graph is not misreported as missing, and that `status` never crashes on one.
+- **`loadGraphResult()`** exported from `@sprang/core`, with `LoadGraphResult` / `LoadGraphFailure` types. `loadGraphOrNull()` is unchanged for existing callers.
+
+---
+
 ## [0.3.0] — 2026-08-14
 
 Modernization release. Sprang now targets exactly three platforms — **Devin (CLI + Desktop), Claude Code, and Copilot CLI** — the Windsurf/Cascade era is removed entirely, the per-platform agent assets are generated from a single source instead of hand-copied, and a batch of correctness bugs found by running the full pipeline end-to-end against real projects are fixed. Several of those bugs silently produced wrong answers rather than errors.

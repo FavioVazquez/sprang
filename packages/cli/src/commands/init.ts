@@ -150,13 +150,23 @@ export function makeInitCommand(): Command {
       process.stdout.write(`\n${CYAN}Sprang${RESET} — Knowledge Graph Dashboard\n\n`);
 
       let projectRoot = resolve(pathArg ?? process.cwd());
-      if (!pathArg && !options.yes) {
+      // Only prompt when there is a human to answer. Without a TTY — CI, Docker,
+      // a script, an agent — `rl.question` never fires its callback on EOF, so
+      // the promise never settled, the event loop emptied, and Node exited 0
+      // having written nothing. `sprang init --platform devin` reported success
+      // and did nothing at all, which is exactly what the README tells people to
+      // run. Defaulting to cwd is what pressing Enter would have done anyway.
+      if (!pathArg && !options.yes && process.stdin.isTTY) {
         const rl = createInterface({ input: process.stdin, output: process.stdout });
         projectRoot = await new Promise<string>((res) => {
-          rl.question(`  ${DIM}Project root${RESET} [${process.cwd()}]: `, (ans) => {
+          const finish = (value: string) => {
             rl.close();
-            res(ans.trim() || process.cwd());
-          });
+            res(value.trim() || process.cwd());
+          };
+          // 'close' covers Ctrl-D and a stdin that ends mid-prompt; without it
+          // the promise can still hang.
+          rl.on('close', () => res(process.cwd()));
+          rl.question(`  ${DIM}Project root${RESET} [${process.cwd()}]: `, finish);
         });
         projectRoot = resolve(projectRoot);
       }

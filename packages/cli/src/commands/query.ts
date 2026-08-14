@@ -1,6 +1,7 @@
 import { resolve, join } from 'node:path';
 import { Command } from 'commander';
-import { loadGraphOrNull, readJsonFileOrNull, semanticSearch } from '@sprang/core';
+import { loadGraphResult, readJsonFileOrNull, semanticSearch } from '@sprang/core';
+import { reportGraphFailure } from '../graph-error.js';
 import type { EmbeddingStore } from '@sprang/core';
 
 function truncate(str: string, len: number): string {
@@ -26,14 +27,13 @@ export function makeQueryCommand(): Command {
       const projectRoot = resolve(options.path ?? pathArg ?? process.cwd());
       const sprangDir = join(projectRoot, '.sprang');
 
-      const graph = await loadGraphOrNull(sprangDir);
-      if (!graph) {
-        process.stdout.write(
-          'No graph found — run sprang scan first.\n\n' +
-            `Expected: ${sprangDir}/knowledge-graph.json\n`
-        );
+      const loaded = await loadGraphResult(sprangDir);
+      if (!loaded.ok) {
+        reportGraphFailure(loaded.error);
+        process.exitCode = 1;
         return;
       }
+      const graph = loaded.graph;
 
       const rawLimit = parseInt(options.limit, 10);
       const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(rawLimit, 1000)) : 20;

@@ -1,8 +1,9 @@
 import { resolve, join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { Command } from 'commander';
-import { generateMermaid } from '@sprang/core';
+import { reportGraphFailure } from '../graph-error.js';
+import { loadGraphResult, generateMermaid } from '@sprang/core';
 import type { KnowledgeGraph } from '@sprang/core';
 
 export function makeDiagramCommand(): Command {
@@ -22,14 +23,15 @@ export function makeDiagramCommand(): Command {
         process.exit(1);
       }
 
-      let graph: KnowledgeGraph;
-      try {
-        const raw = await readFile(graphPath, 'utf-8');
-        graph = JSON.parse(raw) as KnowledgeGraph;
-      } catch (err) {
-        process.stderr.write(`Failed to parse knowledge graph: ${err instanceof Error ? err.message : String(err)}\n`);
+      // Casting parsed JSON to KnowledgeGraph without validating meant a
+      // structurally wrong graph reached generateMermaid and crashed there with
+      // an unhandled TypeError instead of a diagnosable message.
+      const loaded = await loadGraphResult(join(projectRoot, '.sprang'));
+      if (!loaded.ok) {
+        reportGraphFailure(loaded.error);
         process.exit(1);
       }
+      const graph: KnowledgeGraph = loaded.graph;
 
       const diagram = generateMermaid(graph);
       const output = '```mermaid\n' + diagram + '\n```\n';
