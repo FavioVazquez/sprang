@@ -1,37 +1,26 @@
 /**
- * Bridge detection — determines which agent bridge is available at runtime.
+ * Bridge detection — determines how the dashboard can reach an AI agent.
  *
  * Priority order:
- *  1. windsurf  — cascade-messaging extension watching .cascade-trigger-session
- *  2. claude    — `claude` CLI available (Claude Code)
- *  3. copilot   — `copilot` CLI available (GitHub Copilot CLI)
- *  4. none      — no bridge; user must ask their agent directly
+ *  1. devin    — `devin` CLI on PATH and authenticated
+ *  2. claude   — `claude` CLI available (Claude Code)
+ *  3. copilot  — `copilot` CLI available (GitHub Copilot CLI)
+ *  4. relay    — no drivable CLI; the user relays the question to their agent,
+ *                which answers via the `sprang_respond` MCP tool
+ *
+ * `relay` is always reachable, so there is no "no bridge" state: an IDE-hosted
+ * agent (Devin Desktop, Cursor, …) has no CLI for the server to spawn but can
+ * still answer through MCP.
  */
 
 import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
+import { isDevinCLIAvailable } from './devin.js';
 
-export type BridgeKind = 'windsurf' | 'claude' | 'copilot' | 'none';
+export type BridgeKind = 'devin' | 'claude' | 'copilot' | 'relay';
 
 export interface BridgeStatus {
   kind: BridgeKind;
   detail: string;
-}
-
-/** Returns true if running inside Windsurf / Devin Desktop.
- *
- *  Detection signals (any one is sufficient):
- *  1. WINDSURF_CASCADE_TERMINAL_KIND env var — present when Vite is launched from a
- *     Windsurf/Devin Desktop terminal (the most reliable signal when available).
- *  2. .sprang/.cascade-bridge-active marker — written by the cascade-messaging extension
- *     on activation, deleted on deactivation. Works even when the server was started
- *     outside the IDE terminal (e.g. via a script or system service).
- *  3. .cascade-trigger-session exists — legacy fallback (extension wrote it previously). */
-export function isWindsurfBridgeActive(sprangRoot: string): boolean {
-  if (process.env['WINDSURF_CASCADE_TERMINAL_KIND'] !== undefined) return true;
-  if (fs.existsSync(path.join(sprangRoot, '.sprang', '.cascade-bridge-active'))) return true;
-  return fs.existsSync(path.join(sprangRoot, '.cascade-trigger-session'));
 }
 
 /** Returns true if the `claude` CLI is available on PATH and responds. */
@@ -54,24 +43,23 @@ export function isCopilotCLIAvailable(): boolean {
   }
 }
 
+export { isDevinCLIAvailable };
+
 /** Detect the best available bridge. */
-export function detectBridge(sprangRoot: string): BridgeStatus {
-  // 1. Windsurf extension (real-time, no CLI needed)
-  if (isWindsurfBridgeActive(sprangRoot)) {
-    return { kind: 'windsurf', detail: 'cascade-messaging extension active' };
+export function detectBridge(_sprangRoot: string): BridgeStatus {
+  if (isDevinCLIAvailable()) {
+    return { kind: 'devin', detail: 'devin CLI available' };
   }
-  // 2. Claude Code CLI
   if (isClaudeCLIAvailable()) {
     return { kind: 'claude', detail: 'claude CLI available' };
   }
-  // 3. GitHub Copilot CLI
   if (isCopilotCLIAvailable()) {
     return { kind: 'copilot', detail: 'copilot CLI available' };
   }
-  // 4. No bridge
   return {
-    kind: 'none',
+    kind: 'relay',
     detail:
-      'No agent bridge found. Windsurf: install cascade-messaging extension. Claude Code: install claude CLI. Copilot: install GitHub Copilot CLI.',
+      'No agent CLI detected. Copy the question into your agent (Devin Desktop, Cursor, …) — ' +
+      'it will answer via the sprang_respond MCP tool and the reply appears here.',
   };
 }

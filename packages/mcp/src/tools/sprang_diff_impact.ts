@@ -1,4 +1,4 @@
-import type { GraphLoader } from '../graph-loader.js';
+import type { GraphLoader, GraphError } from '../graph-loader.js';
 import type { SprangNode, RiskFactor } from '@sprang/core';
 
 export interface SprangDiffImpactInput {
@@ -24,10 +24,10 @@ export interface SprangDiffImpactResult {
 export async function sprangDiffImpact(
   loader: GraphLoader,
   input: SprangDiffImpactInput
-): Promise<SprangDiffImpactResult | { error: string; code: string }> {
+): Promise<SprangDiffImpactResult | GraphError | { error: string; code: string }> {
   const graph = await loader.getGraph();
   if (!graph) {
-    return { error: 'Knowledge graph not found', code: 'GRAPH_NOT_FOUND' };
+    return loader.getError();
   }
 
   if (!Array.isArray(input.files) || input.files.length === 0) {

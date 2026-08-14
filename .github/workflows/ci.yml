@@ -39,14 +39,24 @@ jobs:
       - name: Run unit tests
         run: pnpm test -- --coverage
 
+      - name: Check generated agent assets are in sync
+        # skills/, .devin/rules/ and .devin/hooks/ are canonical; the .devin/skills,
+        # .claude/skills, .claude/rules and .claude/hooks trees are generated. Before
+        # v0.3.0 these were hand-maintained and had silently diverged, shipping
+        # different instructions to different agents.
+        run: pnpm check:agents
+
       - name: Validate plugin manifests
         run: |
           node -e "
             const files = [
+              '.devin-plugin/plugin.json',
               '.claude-plugin/plugin.json',
               '.claude-plugin/marketplace.json',
-              '.copilot-plugin/plugin.json',
-              '.devin/config.json',
+              'plugin.json',
+              '.devin/mcp_config.json',
+              '.devin/hooks.v1.json',
+              '.claude/settings.json',
               '.mcp.json',
               '.vscode/mcp.json',
             ];

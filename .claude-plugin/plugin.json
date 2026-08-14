@@ -2,10 +2,8 @@
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "sprang",
   "description": "Knowledge graph platform for instant codebase comprehension — git history, structural health, risk scoring, and architectural tours for any project",
-  "version": "0.2.4",
-  "author": {
-    "name": "FavioVazquez"
-  },
+  "version": "0.3.0",
+  "author": { "name": "FavioVazquez" },
   "homepage": "https://github.com/faviovazquez/sprang",
   "repository": "https://github.com/faviovazquez/sprang",
   "license": "MIT",
@@ -18,16 +16,11 @@
     "onboarding",
     "dashboard"
   ],
-  "skills": [
-    "./skills"
-  ],
   "mcpServers": {
     "sprang": {
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/packages/mcp/dist/server.js"],
-      "env": {
-        "SPRANG_ROOT": "."
-      }
+      "env": { "SPRANG_ROOT": "." }
     }
   }
 }

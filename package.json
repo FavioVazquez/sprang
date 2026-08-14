@@ -11,11 +11,13 @@
   },
   "scripts": {
     "build": "pnpm -r --filter './packages/*' build",
-    "test": "pnpm -r --filter './packages/*' test",
+    "test": "pnpm -r --filter './packages/*' test && pnpm check:agents",
     "typecheck": "pnpm -r --filter './packages/*' typecheck",
     "lint": "eslint .",
     "dev:dashboard": "pnpm --filter @sprang/dashboard dev",
-    "clean": "pnpm -r --filter './packages/*' exec rm -rf dist *.tsbuildinfo"
+    "clean": "pnpm -r --filter './packages/*' exec rm -rf dist *.tsbuildinfo",
+    "sync:agents": "node scripts/sync-agent-assets.mjs",
+    "check:agents": "node scripts/sync-agent-assets.mjs --check"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -30,5 +32,6 @@
       "hono@<4.12.25": ">=4.12.25",
       "got@<11.8.5": ">=11.8.5"
     }
-  }
+  },
+  "version": "0.3.0"
 }

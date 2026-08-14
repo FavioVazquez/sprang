@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export interface SprangRespondInput {
@@ -38,6 +38,16 @@ export async function sprangRespond(
 
   await mkdir(sprangDir, { recursive: true });
   await writeFile(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+
+  // Append to the running conversation log. This used to be produced by a
+  // Windsurf-era `post_cascade_response_with_transcript` hook, an event no
+  // current runtime fires — so the log silently stopped updating. Writing it
+  // here makes it deterministic and identical on every platform.
+  await appendFile(
+    join(sprangDir, 'agent-conversation.md'),
+    `\n## ${writtenAt}\n\n**Q:** ${payload.question ?? '(not recorded)'}\n\n**A:** ${payload.response}\n`,
+    'utf-8',
+  ).catch(() => { /* the log is best-effort; never fail the response on it */ });
 
   return {
     success: true,

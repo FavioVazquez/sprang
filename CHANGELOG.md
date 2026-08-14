@@ -6,6 +6,51 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.0] — 2026-08-14
+
+Modernization release. Sprang now targets exactly three platforms — **Devin (CLI + Desktop), Claude Code, and Copilot CLI** — the Windsurf/Cascade era is removed entirely, the per-platform agent assets are generated from a single source instead of hand-copied, and a batch of correctness bugs found by running the full pipeline end-to-end against real projects are fixed. Several of those bugs silently produced wrong answers rather than errors.
+
+### Fixed
+
+- **`/sprang-analyze` could emit a schema-invalid graph.** The analyze templates instructed agents to write `"layer": null` on nodes and to emit a `tests` edge. Neither is valid — `layer` is an optional string (not nullable) and `tests` is not one of the 35 canonical edge types — so a completed analyze run could produce a `knowledge-graph.json` the MCP server refused to load. Fixed in the templates *and* defensively in both assemblers: `sprang merge` (`normalizeAssembledGraph`) and `merge.py` now strip every `null` field before validation and map 54 drifted edge-type aliases onto the canonical 35 — including `tests` → `tested_by` **with source and target swapped**, `dependsOn` → `depends_on`, `references` → `related`. An edge whose type cannot be mapped is dropped with a warning instead of poisoning the whole graph.
+- **`sprang merge --intermediate` defaulted to a directory nothing writes to.** The default was `<root>/intermediate`, but every skill writes chunks to `<root>/.sprang/intermediate` — so the documented `sprang merge` invocation always failed with "no chunk files found". The default is now `.sprang/intermediate`, with a fallback to the old location so pre-0.3 layouts still assemble.
+- **Validation failures were invisible and mis-diagnosed.** When the graph existed but failed schema validation, `GraphLoader` returned null and every MCP tool answered `GRAPH_NOT_FOUND` — telling the user to "run `sprang scan` first", which cannot fix an enrichment bug and would overwrite the evidence. Tools now distinguish the two: `GRAPH_INVALID` carries the condensed Zod issues, the graph path, and the correct remedy (re-run `sprang merge` / `/sprang-analyze`). The dashboard gained a `GET /graph-status` endpoint and the landing screen renders the validation errors instead of showing the "analyze a project" prompt.
+- **Health grades got better after analysis without the code changing.** Phase 1 computes per-node `structural_warnings` and `security_warnings` but persisted only the aggregate summaries, so when an agent reassembled the graph in Phase 2 the per-node findings were gone — and the grade improved for identical code. Measured on a real project: **F/49 → B/82**, security findings **7 → 0**, purely from running `/sprang-analyze`. Phase 1 now writes `.sprang/intermediate/node-warnings.json` and both merge paths re-attach it (agent-supplied values still win). Verified on a fixture: with the fix a merge preserves 2 security findings and grade 90; without it, 0 findings and grade 100.
+- **The SessionStart / PostToolUse hooks had never fired.** Both scripts read the hook payload from a `$TOOL_INPUT` environment variable, but Devin and Claude Code both deliver it as **JSON on stdin** — so `$TOOL_INPUT` was always empty and the git-commit auto-refresh never once ran. Both scripts now parse stdin, and `session-start.sh` emits a proper `hookSpecificOutput.additionalContext` payload so its warning actually reaches the agent's context.
+- **`risk-scores.json` shape mismatch discarded all Phase 1 risk data.** Phase 1 writes `{ "nodes": [{ "nodeId", … }] }` while the merge path only read the `{ "<node-id>": { … } }` map form, so risk scores, risk factors, decision context and warnings from Phase 1 were silently dropped during assembly. Both shapes are now accepted.
+
+### Changed
+
+- **Supported platforms are now exactly three: Devin (CLI + Desktop), Claude Code, and Copilot CLI.** Each reads its assets from a different place: Devin `.devin/skills/`, `.devin/rules/` (`trigger:` frontmatter), `.devin/hooks.v1.json`, `.devin/mcp_config.json` (where `${workspaceFolder}` resolves) and `.devin-plugin/plugin.json`; Claude Code `.claude/skills/`, `.claude/rules/`, `.claude/settings.json` `"hooks"`, `.mcp.json` and `.claude-plugin/plugin.json`; Copilot CLI the plugin `skills/` tree, `AGENTS.md` + `.github/copilot-instructions.md`, and `~/.copilot/mcp-config.json` or a workspace `.mcp.json`. Devin has skills and rules only — there is no "workflows" concept.
+- **`sprang init --platform` now takes `devin | claude | copilot | all`** (was `windsurf | claude | copilot | all`) and installs **one** tree per platform. Devin also reads `.claude/skills/`, and when both trees exist it namespaces them as `/devin:sprang-*` and `/claude:sprang-*` — so installing two trees makes every skill appear twice.
+- **Devin's primary install path is the project-level `.devin/` layout, not the plugin.** Devin plugins are in closed beta and `devin plugins install` requires `devin auth login`, so `.devin-plugin/plugin.json` ships as a bonus. The Claude (`/plugin marketplace add FavioVazquez/sprang`) and Copilot (`copilot plugin install`) plugin installs work today.
+- **Dashboard Ask Agent bridge priority is now `devin` → `claude` → `copilot` → `relay`.** The `devin` bridge spawns `devin -p` with `--continue` for conversation continuity and `--respect-workspace-trust false` (print mode cannot answer a trust prompt and hard-fails without it); it requires the standalone Devin CLI *and* `devin auth login`. The `devin` binary bundled inside Devin Desktop is not authenticated, so Desktop users fall through to relay.
+- **Each skill is now self-contained.** Previously the real procedure for every command lived only in `.windsurf/workflows/`, so Claude Code and Copilot users had never actually received it. The two long skills, `sprang-analyze` and `sprang-knowledge`, keep their full procedure in `skills/<name>/REFERENCE.md` alongside `SKILL.md`.
+- **`sprang merge` gained `--kind codebase|knowledge`.** It previously hardcoded `codebase`, which would have corrupted a knowledge-base graph assembled through it.
+- Documentation rewritten for the three-platform world: `README.md` (platform table, per-platform install, repo layout, bridges, CLI reference), `AGENTS.md` cut down to a short pointer-style rule (skills table, tool table, before-editing workflow), `CLAUDE.md` reduced to Claude-only details, and `.github/copilot-instructions.md` refreshed for Copilot CLI.
+
+### Removed
+
+- **The entire Windsurf/Cascade integration.** `.windsurf/` (skills, workflows, rules, hooks) is deleted, along with the `cascade-messaging` VS Code extension (`packages/cascade-messaging` and `cascade-messaging-0.1.0.vsix` — whose source had never been committed), the `windsurf` dashboard bridge, and the `.cascade-trigger-session` trigger file.
+- **The `cascade-messaging` rule**, replaced by `.devin/rules/sprang-dashboard.md`, which describes the MCP-based relay instead of the extension.
+- **`.devin/hooks.json`**, which registered the event `post_cascade_response_with_transcript` — an event no current runtime fires. Replaced by `.devin/hooks.v1.json` (`SessionStart`, `PostToolUse`).
+- **`.claude/commands/`.** Claude Code merged custom slash commands into skills; `.claude/skills/` is the supported location.
+- **`.copilot-plugin/plugin.json`.** Copilot CLI reads a **root** `plugin.json` (verified against a real installed Copilot plugin), so the nested manifest was dead config.
+
+### Added
+
+- **A single source of truth for agent assets.** `skills/` (11 skills), `.devin/rules/` and `.devin/hooks/` are canonical; `.devin/skills/`, `.claude/skills/`, `.claude/rules/` and `.claude/hooks/` are generated by `node scripts/sync-agent-assets.mjs` (`pnpm sync:agents`). CI runs `--check` and fails on drift. This was not cosmetic: the hand-maintained copies had already silently diverged and were giving agents materially different instructions for the same command. Copilot CLI needs no copy — its `plugin.json` points straight at `skills/`.
+- **`relay` bridge** — the no-CLI fallback that replaces the VS Code extension. The dashboard writes the question to `.sprang/agent-question.md` and shows it for copy/paste; the user's agent answers and calls the `sprang_respond` MCP tool, which writes `.sprang/cascade-response.json` — the same file every other bridge writes, so the dashboard's polling path is unchanged. There is no longer a "no bridge available" state.
+- **`sprang_respond` now appends each exchange to `.sprang/agent-conversation.md`**, so the transcript survives across bridges and sessions. This used to be the job of the dead Cascade hook.
+- **`GET /graph-status`** on the dashboard server — reports `GRAPH_OK` / `GRAPH_NOT_FOUND` / `GRAPH_INVALID` / `GRAPH_READ_ERROR` with the validation issues and a remedy.
+- **`.sprang/intermediate/node-warnings.json`** — the Phase 1 per-node structural and security findings, re-attached by both merge paths.
+
+### Notes
+
+- All four packages and the three plugin manifests (`plugin.json`, `.devin-plugin/plugin.json`, `.claude-plugin/plugin.json`) are at `0.3.0`; the MCP `serverInfo.version` continues to track `package.json` automatically.
+
+---
+
 ## [0.2.4] — 2026-06-18
 
 Patch release: fixes a high-impact bug in the flagship `/sprang-analyze` command found by running it end-to-end (uncapped) against a real external repo, plus documentation-accuracy corrections. The analyze fix lives entirely in `merge.py` (shared by every platform) so it applies equally to Claude Code, Devin Desktop / Windsurf, and GitHub Copilot.

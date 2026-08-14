@@ -1,4 +1,4 @@
-import type { GraphLoader } from '../graph-loader.js';
+import type { GraphLoader, GraphError } from '../graph-loader.js';
 import type { Domain } from '@sprang/core';
 
 export interface SprangDomainInput {
@@ -25,10 +25,10 @@ export interface SprangDomainDetailResult {
 export async function sprangDomain(
   loader: GraphLoader,
   input: SprangDomainInput
-): Promise<SprangDomainDetailResult | SprangDomainListResult | { error: string; code: string }> {
+): Promise<SprangDomainDetailResult | SprangDomainListResult | GraphError | { error: string; code: string }> {
   const graph = await loader.getGraph();
   if (!graph) {
-    return { error: 'Knowledge graph not found', code: 'GRAPH_NOT_FOUND' };
+    return loader.getError();
   }
 
   if (input.domain_name) {

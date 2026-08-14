@@ -102,6 +102,72 @@ describe('GraphLoader', () => {
     const loader = new GraphLoader(dir);
     await expect(loader.getGraph()).resolves.toBeNull();
   });
+
+  describe('getError', () => {
+    it('reports GRAPH_NOT_FOUND with a scan remedy when no file exists', async () => {
+      const dir = join(tmpdir(), `sprang-mcp-missing-${Date.now()}`);
+      await mkdir(dir, { recursive: true });
+      const loader = new GraphLoader(dir);
+      await loader.getGraph();
+      const err = loader.getError();
+      expect(err.code).toBe('GRAPH_NOT_FOUND');
+      expect(err.remedy).toMatch(/sprang scan/);
+    });
+
+    it('distinguishes an invalid graph from a missing one and surfaces the Zod issues', async () => {
+      // Before v0.3.0 every tool answered "not found — run sprang scan first",
+      // which cannot fix an enrichment bug and sent users down the wrong path.
+      const dir = join(tmpdir(), `sprang-mcp-invalid-err-${Date.now()}`);
+      const sprangDir = join(dir, '.sprang');
+      await mkdir(sprangDir, { recursive: true });
+      const invalid = {
+        version: '1.0.0', generated_at: new Date().toISOString(), project_root: dir,
+        project_name: 'bad', phase: 'complete', nodes: [], edges: [], layers: [],
+        tours: [], domains: [{ id: 'd', flows: [] }],
+        stats: { node_count: 0, edge_count: 0, risk_summary: { high: 0, medium: 0, low: 0 }, smell_summary: {}, generated_at: new Date().toISOString() },
+      };
+      const graphPath = join(sprangDir, 'knowledge-graph.json');
+      await writeFile(graphPath, JSON.stringify(invalid), 'utf-8');
+
+      const loader = new GraphLoader(dir);
+      await loader.getGraph();
+      const err = loader.getError();
+      expect(err.code).toBe('GRAPH_INVALID');
+      expect(err.graph_path).toBe(graphPath);
+      expect(err.validation_issues).toBeTruthy();
+      expect(err.validation_issues).toMatch(/domains/);
+      expect(err.remedy).toMatch(/sprang merge/);
+      expect(err.remedy).toMatch(/will NOT fix/);
+    });
+
+    it('reports GRAPH_READ_ERROR for malformed JSON', async () => {
+      const dir = join(tmpdir(), `sprang-mcp-badjson-${Date.now()}`);
+      await mkdir(join(dir, '.sprang'), { recursive: true });
+      await writeFile(join(dir, '.sprang', 'knowledge-graph.json'), '{not json', 'utf-8');
+      const loader = new GraphLoader(dir);
+      await expect(loader.getGraph()).resolves.toBeNull();
+      expect(loader.getError().code).toBe('GRAPH_READ_ERROR');
+    });
+
+    it('clears the error once a valid graph loads', async () => {
+      const dir = join(tmpdir(), `sprang-mcp-recover-${Date.now()}`);
+      await mkdir(join(dir, '.sprang'), { recursive: true });
+      const graphPath = join(dir, '.sprang', 'knowledge-graph.json');
+      await writeFile(graphPath, '{not json', 'utf-8');
+      const loader = new GraphLoader(dir);
+      await loader.getGraph();
+      expect(loader.getError().code).toBe('GRAPH_READ_ERROR');
+
+      await new Promise((r) => setTimeout(r, 10));
+      await writeFile(graphPath, JSON.stringify({
+        version: '1.0.0', generated_at: new Date().toISOString(), project_root: dir,
+        project_name: 'recovered', phase: 'skeleton',
+        nodes: [], edges: [], layers: [], tours: [], domains: [],
+        stats: { node_count: 0, edge_count: 0, risk_summary: { high: 0, medium: 0, low: 0 }, smell_summary: {}, generated_at: new Date().toISOString() },
+      }), 'utf-8');
+      expect((await loader.getGraph())?.project_name).toBe('recovered');
+    });
+  });
 });
 
 describe('summarizeZodIssues', () => {

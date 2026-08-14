@@ -1,0 +1,26 @@
+{
+  "SessionStart": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/session-start.sh",
+          "timeout": 10
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "matcher": "^exec$",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/post-tool-use.sh",
+          "timeout": 10
+        }
+      ]
+    }
+  ]
+}

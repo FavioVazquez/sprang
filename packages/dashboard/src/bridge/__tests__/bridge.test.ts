@@ -24,12 +24,12 @@ vi.mock('node:child_process', () => ({
 
 // Now import the modules under test (they will use the mocked child_process)
 import {
-  isWindsurfBridgeActive,
+  isDevinCLIAvailable,
   isClaudeCLIAvailable,
   isCopilotCLIAvailable,
   detectBridge,
 } from '../detect.js';
-import { writeWindsurfTrigger, getWindsurfTriggerPath } from '../windsurf.js';
+import { writeRelayQuestion, getRelayQuestionPath } from '../relay.js';
 import { askClaude, clearClaudeSession } from '../claude.js';
 import { askCopilot, clearCopilotSession } from '../copilot.js';
 import { askAgent, clearAgentSession } from '../index.js';
@@ -76,35 +76,32 @@ beforeEach(() => {
 
 // ─── detect.ts ───────────────────────────────────────────────────────────────
 
-describe('isWindsurfBridgeActive', () => {
-  let tmpDir: string;
-  const origEnv = process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
-  beforeEach(() => { tmpDir = makeTmp(); delete process.env['WINDSURF_CASCADE_TERMINAL_KIND']; });
-  afterEach(() => {
-    cleanTmp(tmpDir);
-    vi.restoreAllMocks();
-    if (origEnv !== undefined) process.env['WINDSURF_CASCADE_TERMINAL_KIND'] = origEnv;
-    else delete process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
+describe('isDevinCLIAvailable', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('returns false when the devin CLI is absent', () => {
+    stubExecFileSync(true);
+    expect(isDevinCLIAvailable()).toBe(false);
   });
 
-  it('returns true when WINDSURF_CASCADE_TERMINAL_KIND env var is set', () => {
-    process.env['WINDSURF_CASCADE_TERMINAL_KIND'] = 'inherit';
-    expect(isWindsurfBridgeActive(tmpDir)).toBe(true);
+  it('returns false when devin is installed but not logged in', () => {
+    // The devin binary bundled inside Devin Desktop is present but
+    // unauthenticated; driving it would fail with "Login canceled".
+    mockExecFileSync.mockImplementation((_bin: unknown, args: unknown) => {
+      const argv = args as string[];
+      if (argv[0] === '--version') return Buffer.from('devin 3000.4.25');
+      return Buffer.from('Not logged in.\n  Credentials path: /x/credentials.toml');
+    });
+    expect(isDevinCLIAvailable()).toBe(false);
   });
 
-  it('returns false when env var unset and trigger file does not exist', () => {
-    expect(isWindsurfBridgeActive(tmpDir)).toBe(false);
-  });
-
-  it('returns true when env var unset but trigger file exists (fallback)', () => {
-    fs.writeFileSync(path.join(tmpDir, '.cascade-trigger-session'), 'hello');
-    expect(isWindsurfBridgeActive(tmpDir)).toBe(true);
-  });
-
-  it('returns true when .sprang/.cascade-bridge-active marker exists', () => {
-    fs.mkdirSync(path.join(tmpDir, '.sprang'), { recursive: true });
-    fs.writeFileSync(path.join(tmpDir, '.sprang', '.cascade-bridge-active'), new Date().toISOString());
-    expect(isWindsurfBridgeActive(tmpDir)).toBe(true);
+  it('returns true when devin is installed and authenticated', () => {
+    mockExecFileSync.mockImplementation((_bin: unknown, args: unknown) => {
+      const argv = args as string[];
+      if (argv[0] === '--version') return Buffer.from('devin 3000.4.25');
+      return Buffer.from('Logged in as someone@example.com');
+    });
+    expect(isDevinCLIAvailable()).toBe(true);
   });
 });
 
@@ -138,70 +135,78 @@ describe('isCopilotCLIAvailable', () => {
 
 describe('detectBridge priority', () => {
   let tmpDir: string;
-  const origEnv = process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
-  beforeEach(() => { tmpDir = makeTmp(); delete process.env['WINDSURF_CASCADE_TERMINAL_KIND']; });
-  afterEach(() => {
-    cleanTmp(tmpDir); vi.restoreAllMocks();
-    if (origEnv !== undefined) process.env['WINDSURF_CASCADE_TERMINAL_KIND'] = origEnv;
-    else delete process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
+  beforeEach(() => { tmpDir = makeTmp(); });
+  afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
+
+  /** Drive the sequence of execFileSync probes detectBridge makes. */
+  function stubProbes(handler: (bin: string, argv: string[]) => Buffer) {
+    mockExecFileSync.mockImplementation((bin: unknown, args: unknown) =>
+      handler(bin as string, args as string[]));
+  }
+
+  it('prefers devin when an authenticated devin CLI is present', () => {
+    stubProbes((bin) => {
+      if (bin === 'devin') return Buffer.from('ok');
+      return Buffer.from('1.0.0');
+    });
+    expect(detectBridge(tmpDir).kind).toBe('devin');
   });
 
-  it('returns windsurf when trigger file is fresh (highest priority)', () => {
-    // Even with CLIs available, windsurf wins if trigger is fresh
-    stubExecFileSync(false);
-    fs.writeFileSync(path.join(tmpDir, '.cascade-trigger-session'), 'alive');
-    expect(detectBridge(tmpDir).kind).toBe('windsurf');
-  });
-
-  it('returns claude when no windsurf but claude available', () => {
-    let calls = 0;
-    mockExecFileSync.mockImplementation(() => {
-      calls++;
-      if (calls === 1) return Buffer.from('1.0.0');
+  it('falls through to claude when devin is unauthenticated', () => {
+    stubProbes((bin, argv) => {
+      if (bin === 'devin' && argv[0] === 'auth') return Buffer.from('Not logged in.');
+      if (bin === 'devin') return Buffer.from('devin 3000.4.25');
+      if (bin === 'claude') return Buffer.from('1.0.0');
       throw new Error('not found');
     });
     expect(detectBridge(tmpDir).kind).toBe('claude');
   });
 
-  it('returns copilot when only copilot CLI available', () => {
-    let calls = 0;
-    mockExecFileSync.mockImplementation(() => {
-      calls++;
-      if (calls === 1) throw new Error('claude not found');
-      return Buffer.from('1.0.0'); // copilot ok
+  it('returns copilot when only the copilot CLI is available', () => {
+    stubProbes((bin) => {
+      if (bin === 'copilot') return Buffer.from('1.0.0');
+      throw new Error('not found');
     });
     expect(detectBridge(tmpDir).kind).toBe('copilot');
   });
 
-  it('returns none when nothing available', () => {
+  it('falls back to relay when no CLI is available', () => {
+    // There is no "none" state any more: an IDE-hosted agent can still answer
+    // through the sprang_respond MCP tool.
     stubExecFileSync(true);
     const status = detectBridge(tmpDir);
-    expect(status.kind).toBe('none');
-    expect(status.detail).toContain('No agent bridge');
+    expect(status.kind).toBe('relay');
+    expect(status.detail).toContain('sprang_respond');
   });
 });
 
-// ─── windsurf.ts ─────────────────────────────────────────────────────────────
+// ─── relay.ts ─────────────────────────────────────────────────────────────
 
-describe('writeWindsurfTrigger', () => {
+describe('writeRelayQuestion', () => {
   let tmpDir: string;
   beforeEach(() => { tmpDir = makeTmp(); });
   afterEach(() => { cleanTmp(tmpDir); });
 
-  it('writes trigger file atomically with no .tmp leftover', () => {
-    writeWindsurfTrigger('hello world', tmpDir);
-    const p = getWindsurfTriggerPath(tmpDir);
+  it('writes the question file atomically with no .tmp leftover', () => {
+    writeRelayQuestion('hello world', tmpDir);
+    const p = getRelayQuestionPath(tmpDir);
     expect(fs.existsSync(p)).toBe(true);
     expect(fs.existsSync(p + '.tmp')).toBe(false);
     expect(fs.readFileSync(p, 'utf-8')).toContain('hello world');
   });
 
-  it('wraps message with [SPRANG DASHBOARD MESSAGE] and sprang_respond', () => {
-    writeWindsurfTrigger('what does auth.ts do?', tmpDir);
-    const content = fs.readFileSync(getWindsurfTriggerPath(tmpDir), 'utf-8');
-    expect(content).toContain('[SPRANG DASHBOARD MESSAGE');
+  it('wraps the message with [SPRANG DASHBOARD MESSAGE] and a sprang_respond call', () => {
+    const prompt = writeRelayQuestion('what does auth.ts do?', tmpDir);
+    const content = fs.readFileSync(getRelayQuestionPath(tmpDir), 'utf-8');
+    expect(content).toBe(prompt);
+    expect(content).toContain('[SPRANG DASHBOARD MESSAGE]');
     expect(content).toContain('sprang_respond');
     expect(content).toContain('what does auth.ts do?');
+  });
+
+  it('JSON-escapes the question so the suggested call stays valid', () => {
+    const prompt = writeRelayQuestion('what does "auth.ts" do?', tmpDir);
+    expect(prompt).toContain('\\"auth.ts\\"');
   });
 });
 
@@ -321,36 +326,35 @@ describe('askCopilot', () => {
 
 describe('askAgent', () => {
   let tmpDir: string;
-  const origEnv = process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
-  beforeEach(() => { tmpDir = makeTmp(); delete process.env['WINDSURF_CASCADE_TERMINAL_KIND']; });
-  afterEach(() => {
-    cleanTmp(tmpDir); vi.restoreAllMocks();
-    if (origEnv !== undefined) process.env['WINDSURF_CASCADE_TERMINAL_KIND'] = origEnv;
-    else delete process.env['WINDSURF_CASCADE_TERMINAL_KIND'];
-  });
+  beforeEach(() => { tmpDir = makeTmp(); });
+  afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
 
-  it('returns mode=async for windsurf bridge and writes trigger file', () => {
-    // Fresh trigger file → windsurf detected
-    fs.writeFileSync(path.join(tmpDir, '.cascade-trigger-session'), 'alive');
+  it('stages the question for manual relay when no CLI is available', () => {
+    stubExecFileSync(true);
     const result = askAgent('test question', tmpDir);
     expect(result.mode).toBe('async');
     expect(result.ok).toBe(true);
-    const content = fs.readFileSync(path.join(tmpDir, '.cascade-trigger-session'), 'utf-8');
-    expect(content).toContain('test question');
+    expect(result.bridge).toBe('relay');
+    expect(result.prompt).toContain('test question');
+    const staged = fs.readFileSync(path.join(tmpDir, '.sprang', 'agent-question.md'), 'utf-8');
+    expect(staged).toContain('test question');
   });
 
-  it('returns mode=sync+ok=false for none bridge', () => {
-    // No trigger file, CLIs unavailable
-    stubExecFileSync(true);
+  it('reports the failure when the selected CLI bridge errors', () => {
+    stubExecFileSync(false);            // a CLI is available…
+    stubSpawnSync({ status: 1, stderr: 'boom' }); // …but the call fails
     const result = askAgent('test', tmpDir);
     expect(result.mode).toBe('sync');
     expect(result.ok).toBe(false);
     expect(result.error).toBeDefined();
   });
 
-  it('writes cascade-response.json and returns mode=sync for claude bridge', () => {
-    // No trigger file (no windsurf), claude CLI available
-    stubExecFileSync(false); // execFileSync succeeds → claude available
+  it('writes cascade-response.json and returns mode=sync for the claude bridge', () => {
+    // devin probe fails, claude probe succeeds
+    mockExecFileSync.mockImplementation((bin: unknown) => {
+      if (bin === 'devin') throw new Error('not found');
+      return Buffer.from('1.0.0');
+    });
     const fakeOut = JSON.stringify({ type: 'result', result: 'the answer', session_id: 's1' });
     stubSpawnSync({ status: 0, stdout: fakeOut });
     const result = askAgent('what does auth do?', tmpDir);
@@ -364,7 +368,7 @@ describe('askAgent', () => {
   });
 
   it('clears previous response before sending', () => {
-    fs.writeFileSync(path.join(tmpDir, '.cascade-trigger-session'), 'alive');
+    stubExecFileSync(true); // relay bridge
     const oldResp = path.join(tmpDir, '.sprang', 'cascade-response.json');
     fs.writeFileSync(oldResp, '{"response":"stale"}');
     askAgent('new question', tmpDir);
@@ -375,12 +379,15 @@ describe('askAgent', () => {
     const respFile = path.join(tmpDir, '.sprang', 'cascade-response.json');
     const claudeSession = path.join(tmpDir, '.sprang', 'claude-session.json');
     const copilotSession = path.join(tmpDir, '.sprang', 'copilot-session.json');
+    const devinSession = path.join(tmpDir, '.sprang', 'devin-session.json');
     fs.writeFileSync(respFile, '{}');
     fs.writeFileSync(claudeSession, '{}');
     fs.writeFileSync(copilotSession, '{}');
+    fs.writeFileSync(devinSession, '{}');
     clearAgentSession(tmpDir);
     expect(fs.existsSync(respFile)).toBe(false);
     expect(fs.existsSync(claudeSession)).toBe(false);
     expect(fs.existsSync(copilotSession)).toBe(false);
+    expect(fs.existsSync(devinSession)).toBe(false);
   });
 });

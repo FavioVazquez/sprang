@@ -9,8 +9,8 @@ const GREEN = '\x1b[32m';
 const DIM   = '\x1b[2m';
 const RESET = '\x1b[0m';
 
-type Platform = 'claude' | 'copilot' | 'windsurf' | 'all';
-const PLATFORMS: Platform[] = ['claude', 'copilot', 'windsurf', 'all'];
+type Platform = 'devin' | 'claude' | 'copilot' | 'all';
+const PLATFORMS: Platform[] = ['devin', 'claude', 'copilot', 'all'];
 
 function findMcpServerPath(): string {
   const cliDist = dirname(fileURLToPath(import.meta.url));
@@ -41,11 +41,11 @@ function findMcpServerPath(): string {
 function findAssetsRoot(): string | null {
   const cliDist = dirname(fileURLToPath(import.meta.url));
   const bundled = join(cliDist, 'agent-assets');
-  if (existsSync(join(bundled, '.claude'))) return bundled;
+  if (existsSync(join(bundled, '.devin'))) return bundled;
 
   let dir = cliDist;
   for (let i = 0; i < 8; i++) {
-    if (existsSync(join(dir, '.claude', 'commands')) && existsSync(join(dir, 'AGENTS.md'))) return dir;
+    if (existsSync(join(dir, '.devin', 'skills')) && existsSync(join(dir, 'AGENTS.md'))) return dir;
     const parent = resolve(dir, '..');
     if (parent === dir) break;
     dir = parent;
@@ -54,18 +54,23 @@ function findAssetsRoot(): string | null {
 }
 
 // Top-level entries to scaffold per platform.
+// Each platform gets ONLY its own tree. Installing two would make the agent
+// see the same skill twice and disambiguate it as `/devin:sprang` / `/claude:sprang`
+// instead of a plain `/sprang`.
 const PLATFORM_FILES: Record<Exclude<Platform, 'all'>, string[]> = {
-  claude:   ['.claude', 'CLAUDE.md', 'AGENTS.md', 'skills'],
-  windsurf: ['.windsurf', '.devin', 'AGENTS.md', 'skills'],
-  copilot:  ['.github', 'AGENTS.md', 'skills'],
+  devin:   ['.devin', 'AGENTS.md'],
+  claude:  ['.claude', 'CLAUDE.md', 'AGENTS.md'],
+  // Name the instructions file precisely: copying `.github` wholesale also
+  // dropped Sprang's own ci.yml / publish.yml into the user's repository.
+  copilot: ['.github/copilot-instructions.md', 'AGENTS.md', 'skills'],
 };
 
 // Never copy dev-only artifacts even if present in a monorepo source tree.
-const COPY_EXCLUDE = new Set(['worktrees', 'node_modules', '.git', 'cache', 'dist']);
+const COPY_EXCLUDE = new Set(['worktrees', 'node_modules', '.git', 'cache', 'dist', 'workflows']);
 const copyFilter = (src: string) => !COPY_EXCLUDE.has(src.split(/[\\/]/).pop() ?? '');
 
 function expandPlatforms(p: Platform): Array<Exclude<Platform, 'all'>> {
-  return p === 'all' ? ['claude', 'windsurf', 'copilot'] : [p];
+  return p === 'all' ? ['devin', 'claude', 'copilot'] : [p];
 }
 
 /** Copy the agent files for the given platform(s); returns the copied entries. */
@@ -76,7 +81,9 @@ function scaffold(assetsRoot: string, projectRoot: string, platform: Platform): 
   for (const entry of entries) {
     const src = join(assetsRoot, entry);
     if (!existsSync(src)) continue;
-    cpSync(src, join(projectRoot, entry), { recursive: true, filter: copyFilter });
+    const dest = join(projectRoot, entry);
+    mkdirSync(dirname(dest), { recursive: true });
+    cpSync(src, dest, { recursive: true, filter: copyFilter });
     copied.push(entry);
   }
   return copied;
@@ -105,20 +112,26 @@ function atomicWrite(file: string, content: string): void {
 
 /** Write the MCP server config in the location each platform reads. */
 function writeMcpConfig(projectRoot: string, serverPath: string, platform: Exclude<Platform, 'all'>): string {
-  if (platform === 'windsurf') {
-    // Devin Desktop resolves ${workspaceFolder}; config lives in .devin/config.json.
+  if (platform === 'devin') {
+    // Devin reads a dedicated .devin/mcp_config.json (since v3000.3.22) and
+    // resolves ${workspaceFolder} inside it. The older config.json#mcpServers
+    // location is auto-migrated away, so writing there would be undone.
     const dir = join(projectRoot, '.devin');
     mkdirSync(dir, { recursive: true });
-    const file = join(dir, 'config.json');
+    const file = join(dir, 'mcp_config.json');
     atomicWrite(file, JSON.stringify(mergeMcp(readJsonOrEmpty(file), serverPath, '${workspaceFolder}'), null, 2) + '\n');
     return relative(projectRoot, file);
   }
   if (platform === 'copilot') {
-    const dir = join(projectRoot, '.vscode');
-    mkdirSync(dir, { recursive: true });
-    const file = join(dir, 'mcp.json');
-    atomicWrite(file, JSON.stringify(mergeMcp(readJsonOrEmpty(file), serverPath, projectRoot), null, 2) + '\n');
-    return relative(projectRoot, file);
+    // Copilot CLI reads a workspace .mcp.json; the VS Code extension reads
+    // .vscode/mcp.json. Write both so either surface works.
+    const vscodeDir = join(projectRoot, '.vscode');
+    mkdirSync(vscodeDir, { recursive: true });
+    const vscodeFile = join(vscodeDir, 'mcp.json');
+    atomicWrite(vscodeFile, JSON.stringify(mergeMcp(readJsonOrEmpty(vscodeFile), serverPath, projectRoot), null, 2) + '\n');
+    const cliFile = join(projectRoot, '.mcp.json');
+    atomicWrite(cliFile, JSON.stringify(mergeMcp(readJsonOrEmpty(cliFile), serverPath, '.'), null, 2) + '\n');
+    return `${relative(projectRoot, vscodeFile)}, ${relative(projectRoot, cliFile)}`;
   }
   // claude → project-root .mcp.json
   const file = join(projectRoot, '.mcp.json');
@@ -132,7 +145,7 @@ export function makeInitCommand(): Command {
     .description('Set up Sprang in a project: MCP config + (optionally) the slash commands/rules/skills for your agent')
     .argument('[path]', 'Target project root (defaults to current directory)')
     .option('-y, --yes', 'Skip interactive prompt')
-    .option('-p, --platform <platform>', 'Scaffold agent files for: claude | copilot | windsurf | all')
+    .option('-p, --platform <platform>', 'Scaffold agent files for: devin | claude | copilot | all')
     .action(async (pathArg: string | undefined, options: { yes?: boolean; platform?: string }) => {
       process.stdout.write(`\n${CYAN}Sprang${RESET} — Knowledge Graph Dashboard\n\n`);
 
@@ -160,8 +173,8 @@ export function makeInitCommand(): Command {
 
       const mcpServerPath = findMcpServerPath();
 
-      // Write MCP config(s). With no --platform, default to Claude Code's .mcp.json.
-      const configPlatforms: Array<Exclude<Platform, 'all'>> = options.platform ? expandPlatforms(platform) : ['claude'];
+      // Write MCP config(s). With no --platform, default to the Devin layout.
+      const configPlatforms: Array<Exclude<Platform, 'all'>> = options.platform ? expandPlatforms(platform) : ['devin'];
       for (const p of configPlatforms) {
         process.stdout.write(`  ${GREEN}✓${RESET} Wrote ${writeMcpConfig(projectRoot, mcpServerPath, p)}\n`);
       }
@@ -180,7 +193,7 @@ export function makeInitCommand(): Command {
       process.stdout.write(`\n  MCP server: ${DIM}${mcpServerPath}${RESET}\n`);
       const hint = options.platform
         ? ''
-        : `\n  ${DIM}Tip: also scaffold the slash commands & rules for your agent with${RESET}\n    ${CYAN}sprang init --platform claude${RESET}  ${DIM}(or copilot | windsurf | all)${RESET}\n`;
+        : `\n  ${DIM}Tip: also scaffold the slash commands & rules for your agent with${RESET}\n    ${CYAN}sprang init --platform devin${RESET}  ${DIM}(or claude | copilot | all)${RESET}\n`;
       process.stdout.write(`${hint}
   ${GREEN}Done!${RESET} Next steps:
 

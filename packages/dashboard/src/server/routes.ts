@@ -9,10 +9,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { knowledgeGraphSchema, summarizeZodIssues } from '@sprang/core';
 import { detectBridge, clearAgentSession } from '../bridge/index.js';
 import { askClaudeBackground } from '../bridge/claude.js';
 import { askCopilotBackground } from '../bridge/copilot.js';
-import { writeWindsurfTrigger, getWindsurfResponsePath } from '../bridge/windsurf.js';
+import { askDevinBackground } from '../bridge/devin.js';
+import { writeRelayQuestion, getResponsePath } from '../bridge/relay.js';
 
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024; // 1 MB cap
 
@@ -139,6 +141,54 @@ export function registerRoutes(
     }
   });
 
+  // GET /graph-status — why the graph isn't usable, if it isn't.
+  //
+  // Without this the UI cannot tell "no graph yet" (run a scan) apart from
+  // "graph exists but is schema-invalid" (a scan will NOT fix it) — the exact
+  // confusion that made an enrichment bug look like a missing graph.
+  register('/graph-status', (_req, res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Type', 'application/json');
+    const graphFile = resolveGraphFile('knowledge-graph.json', getRoot);
+    if (!graphFile) {
+      res.statusCode = 404;
+      res.end(JSON.stringify({
+        ok: false,
+        code: 'GRAPH_NOT_FOUND',
+        error: 'No knowledge graph found',
+        remedy: 'Run `sprang scan` (or /sprang) to build one.',
+      }));
+      return;
+    }
+    try {
+      const parsed: unknown = JSON.parse(fs.readFileSync(graphFile, 'utf-8'));
+      const result = knowledgeGraphSchema.safeParse(parsed);
+      if (result.success) {
+        res.statusCode = 200;
+        res.end(JSON.stringify({ ok: true, code: 'GRAPH_OK', graph_path: graphFile }));
+        return;
+      }
+      res.statusCode = 422;
+      res.end(JSON.stringify({
+        ok: false,
+        code: 'GRAPH_INVALID',
+        error: 'Knowledge graph exists but failed schema validation',
+        graph_path: graphFile,
+        validation_issues: summarizeZodIssues(result.error),
+        remedy: 'Re-run `sprang merge` to re-normalise the intermediate chunks, or re-run /sprang-analyze. `sprang scan` will not fix this.',
+      }));
+    } catch (err) {
+      res.statusCode = 422;
+      res.end(JSON.stringify({
+        ok: false,
+        code: 'GRAPH_READ_ERROR',
+        error: err instanceof Error ? err.message : String(err),
+        graph_path: graphFile,
+        remedy: 'The file is not valid JSON. Re-run `sprang merge` or `sprang scan`.',
+      }));
+    }
+  });
+
   // GET /diff-overlay.json
   register('/diff-overlay.json', (_req, res) => {
     const overlayFile = resolveGraphFile('diff-overlay.json', getRoot);
@@ -213,13 +263,15 @@ export function registerRoutes(
         const userMessage = message.trim().slice(0, 4096);
         const sprangRoot = getRoot();
         const bridge = detectBridge(sprangRoot);
-        if (bridge.kind === 'none') { res.statusCode = 503; res.end(JSON.stringify({ error: bridge.detail ?? 'No agent bridge available' })); return; }
-        const responsePath = getWindsurfResponsePath(sprangRoot);
+        const responsePath = getResponsePath(sprangRoot);
         if (fs.existsSync(responsePath)) { try { fs.unlinkSync(responsePath); } catch { /* ignore */ } }
+        // The relay bridge cannot answer on its own — return the prompt so the UI
+        // can offer it for copy/paste into an IDE-hosted agent.
+        const prompt = bridge.kind === 'relay' ? writeRelayQuestion(userMessage, sprangRoot) : undefined;
         res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, sent: userMessage, mode: 'async' }));
-        if (bridge.kind === 'windsurf') {
-          writeWindsurfTrigger(userMessage, sprangRoot);
+        res.end(JSON.stringify({ ok: true, sent: userMessage, mode: 'async', bridge: bridge.kind, prompt }));
+        if (bridge.kind === 'devin') {
+          askDevinBackground(userMessage, sprangRoot, responsePath);
         } else if (bridge.kind === 'claude') {
           askClaudeBackground(userMessage, sprangRoot, responsePath);
         } else if (bridge.kind === 'copilot') {
@@ -238,7 +290,7 @@ export function registerRoutes(
       clearAgentSession(getRoot());
       res.statusCode = 200; res.end(JSON.stringify({ ok: true })); return;
     }
-    const responsePath = getWindsurfResponsePath(getRoot());
+    const responsePath = getResponsePath(getRoot());
     if (fs.existsSync(responsePath)) {
       try { res.statusCode = 200; res.end(fs.readFileSync(responsePath, 'utf-8')); }
       catch { res.statusCode = 500; res.end(JSON.stringify({ error: 'Failed to read response' })); }

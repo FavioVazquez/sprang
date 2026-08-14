@@ -86,15 +86,13 @@ export const DEFAULT_EXCLUDES = [
   '**/*.min.js',
   '**/*.min.css',
   '**/*.map',
-  // Sprang installation artifacts — workflows, skills, and rules copied into
-  // the target project should not appear in the project's knowledge graph.
-  '**/.windsurf/workflows/**',
-  '**/.windsurf/skills/**',
-  '**/skills/sprang*/scripts/**',
+  // Sprang installation artifacts — skills, rules, and hooks copied into the
+  // target project should not appear in the project's knowledge graph.
+  '**/skills/sprang*/**',
   '**/.devin/rules/**',
-  '**/.devin/workflows/**',
   '**/.devin/skills/**',
-  '**/.claude/commands/**',
+  '**/.devin/hooks/**',
+  '**/.claude/skills/**',
   '**/.claude/hooks/**',
   '**/.claude/rules/**',
   // Claude Code worktree directories (created by parallel agent execution — not project code)
@@ -103,12 +101,12 @@ export const DEFAULT_EXCLUDES = [
   '**/test-results/**',
   '**/playwright-report/**',
   // Sprang bridge / runtime transient files
-  '**/.cascade-trigger-session',
-  '**/.cascade-bridge-active',
   '**/cascade-response.json',
+  '**/agent-question.md',
+  '**/agent-conversation.md',
+  '**/devin-session.json',
   '**/claude-session.json',
   '**/copilot-session.json',
-  '**/agent-conversation.md',
   '**/diff-overlay.json',
 ];
 

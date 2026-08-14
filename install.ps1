@@ -3,15 +3,29 @@
   Sprang installer for Windows (PowerShell).
 
 .DESCRIPTION
-  Clones the repo, builds it, and creates skill symlinks/junctions for the chosen platform.
+  Clones the repo, builds it, and links the canonical skills/ directory into the
+  chosen platform's global skills folder.
+
+  Supported platforms:
+    devin     Devin CLI / Devin Desktop
+    claude    Claude Code
+    copilot   GitHub Copilot CLI
+
+  Each platform has a native plugin path (preferred) and a project-local path
+  (always works). This script sets up the global skills link and prints the
+  plugin command, because plugin availability differs per platform:
+    - Claude  : `/plugin marketplace add` works today
+    - Copilot : `copilot plugin install` works today
+    - Devin   : plugins are in closed beta and require `devin auth login`,
+                so the project-local `.devin/` layout is the primary route.
 
 .EXAMPLE
-  .\install.ps1                        # prompt for platform
-  .\install.ps1 windsurf               # install for Devin Desktop / Windsurf
-  .\install.ps1 copilot                # install for GitHub Copilot (VS Code)
-  .\install.ps1 claude                 # Claude Code setup guide
-  .\install.ps1 -Update                # pull latest changes + rebuild
-  .\install.ps1 -Uninstall windsurf    # remove links for windsurf
+  .\install.ps1                     # prompt for platform
+  .\install.ps1 devin               # install for Devin CLI / Devin Desktop
+  .\install.ps1 claude              # install for Claude Code
+  .\install.ps1 copilot             # install for GitHub Copilot CLI
+  .\install.ps1 -Update             # pull latest changes + rebuild
+  .\install.ps1 -Uninstall devin    # remove global skill links for devin
   .\install.ps1 -Help
 #>
 
@@ -25,14 +39,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# WARNING: Setting SPRANG_REPO_URL redirects the clone to an arbitrary URL with
+# no integrity check. Only use this to point to a trusted fork.
 $RepoUrl = if ($env:SPRANG_REPO_URL) { $env:SPRANG_REPO_URL } else { 'https://github.com/faviovazquez/sprang.git' }
 $RepoDir = if ($env:SPRANG_DIR)      { $env:SPRANG_DIR }      else { Join-Path $HOME '.sprang\repo' }
 
-# Platform table: Target = skills directory; Style = "per-skill" | "folder" | "claude"
+# Global skill directories. Project-level assets are installed per project with
+# `sprang init --platform <p>`.
 $Platforms = [ordered]@{
-    windsurf = @{ Target = (Join-Path $HOME '.windsurf\skills'); Style = 'per-skill'; Desc = 'Devin Desktop / Windsurf' }
-    copilot  = @{ Target = (Join-Path $HOME '.copilot\skills');  Style = 'per-skill'; Desc = 'GitHub Copilot (VS Code)' }
-    claude   = @{ Target = $null;                                Style = 'claude';    Desc = 'Claude Code (project-local)' }
+    devin   = @{ Label = 'Devin CLI / Devin Desktop'; Target = (Join-Path $HOME 'AppData\Roaming\devin\skills') }
+    claude  = @{ Label = 'Claude Code';               Target = (Join-Path $HOME '.claude\skills') }
+    copilot = @{ Label = 'GitHub Copilot CLI';        Target = (Join-Path $HOME '.copilot\skills') }
 }
 
 function Show-Usage {
@@ -42,13 +59,13 @@ Sprang installer (Windows)
 Usage:
   install.ps1 [<platform>]               Install for <platform> (or prompt if omitted)
   install.ps1 -Update                    Pull latest changes + rebuild
-  install.ps1 -Uninstall <platform>      Remove links for <platform>
+  install.ps1 -Uninstall <platform>      Remove global skill links for <platform>
   install.ps1 -Help
 
 Supported platforms:
-  windsurf   Devin Desktop / Windsurf
-  copilot    GitHub Copilot (VS Code)
-  claude     Claude Code (project-local setup guide)
+  devin     Devin CLI / Devin Desktop
+  claude    Claude Code
+  copilot   GitHub Copilot CLI
 
 Environment:
   SPRANG_REPO_URL   Override clone URL
@@ -60,17 +77,22 @@ function Resolve-Platform([string]$Id) {
     if (-not $Platforms.Contains($Id)) {
         Write-Error "Unknown platform: $Id. Supported: $($Platforms.Keys -join ', ')"
     }
-    return $Platforms[$Id]
+    return $Id
 }
 
-function Prompt-Platform {
+function Get-PlatformChoice {
     $ids = @($Platforms.Keys)
     Write-Host 'Which platform are you installing for?'
     for ($i = 0; $i -lt $ids.Count; $i++) {
-        $desc = $Platforms[$ids[$i]].Desc
-        Write-Host ("  {0}) {1,-12} — {2}" -f ($i + 1), $ids[$i], $desc)
+        Write-Host ("  {0}) {1,-8} - {2}" -f ($i + 1), $ids[$i], $Platforms[$ids[$i]].Label)
     }
     $choice = Read-Host ("Choose [1-{0}]" -f $ids.Count)
+    if (-not $choice) {
+        Write-Host ''
+        Write-Host 'No input received. Pass the platform as an argument instead:'
+        Write-Host '  .\install.ps1 devin'
+        exit 1
+    }
     $n = 0
     if (-not [int]::TryParse($choice, [ref]$n) -or $n -lt 1 -or $n -gt $ids.Count) {
         Write-Error "Invalid choice: $choice"
@@ -79,18 +101,14 @@ function Prompt-Platform {
 }
 
 function Get-SkillsRoot {
-    # Skills live in .windsurf\skills\; fall back to .agents\skills\ if present
-    $windsurf = Join-Path $RepoDir '.windsurf\skills'
-    $agents   = Join-Path $RepoDir '.agents\skills'
-    if (Test-Path $windsurf) { return $windsurf }
-    if (Test-Path $agents)   { return $agents }
-    return $windsurf
+    # The canonical skills live in skills/ at the repo root.
+    return (Join-Path $RepoDir 'skills')
 }
 
 function Install-CliBin {
     $cliBin = Join-Path $RepoDir 'packages\cli\dist\index.js'
     if (-not (Test-Path $cliBin)) {
-        Write-Host "  ⚠ CLI binary not found at $cliBin — skipping PATH link"
+        Write-Host "  ! CLI binary not found at $cliBin - skipping PATH link"
         return
     }
     # Write a .cmd wrapper to %LOCALAPPDATA%\Microsoft\WindowsApps (on PATH by default on Windows 10+)
@@ -98,24 +116,24 @@ function Install-CliBin {
     if (-not (Test-Path $binDir)) {
         $binDir = Join-Path $env:USERPROFILE '.local\bin'
         if (-not (Test-Path $binDir)) { New-Item -ItemType Directory -Path $binDir | Out-Null }
-        Write-Host "  ℹ Add $binDir to your PATH if not already present"
+        Write-Host "  i Add $binDir to your PATH if not already present"
     }
     $wrapper = "@echo off`r`nnode `"$cliBin`" %*`r`n"
     [System.IO.File]::WriteAllText((Join-Path $binDir 'sprang.cmd'), $wrapper)
-    Write-Host "  ✓ sprang CLI linked → $binDir\sprang.cmd"
+    Write-Host "  + sprang CLI linked -> $binDir\sprang.cmd"
 }
 
-function Clone-Or-Update {
+function Update-Checkout {
     if (Test-Path (Join-Path $RepoDir '.git')) {
-        Write-Host "→ Updating existing checkout at $RepoDir"
+        Write-Host "-> Updating existing checkout at $RepoDir"
         git -C "$RepoDir" pull --ff-only
     } else {
-        Write-Host "→ Cloning $RepoUrl → $RepoDir"
+        Write-Host "-> Cloning $RepoUrl -> $RepoDir"
         $parent = Split-Path -Parent $RepoDir
         if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
         git clone "$RepoUrl" "$RepoDir"
     }
-    Write-Host '→ Installing dependencies and building...'
+    Write-Host '-> Installing dependencies and building...'
     Push-Location $RepoDir
     try {
         pnpm install --frozen-lockfile
@@ -129,90 +147,86 @@ function Clone-Or-Update {
 function Get-SkillNames {
     $root = Get-SkillsRoot
     if (-not (Test-Path $root)) { Write-Error "Skills directory not found: $root" }
-    Get-ChildItem -Path $root -Directory | Select-Object -ExpandProperty Name
+    return (Get-ChildItem -Path $root -Directory | Select-Object -ExpandProperty Name)
 }
 
-function Link-Skills([string]$Target, [string]$Style) {
+function Install-GlobalSkills([string]$Target) {
     $root = Get-SkillsRoot
-    if (-not (Test-Path $Target)) { New-Item -ItemType Directory -Path $Target | Out-Null }
-    switch ($Style) {
-        'per-skill' {
-            foreach ($skill in (Get-SkillNames)) {
-                $src  = Join-Path $root $skill
-                $dest = Join-Path $Target $skill
-                if (Test-Path $dest) { Remove-Item -Force -Recurse $dest }
-                # Junction works without admin; symlink needs elevated prompt or Developer Mode
-                try {
-                    New-Item -ItemType Junction -Path $dest -Target $src | Out-Null
-                    Write-Host "  ✓ linked $skill (junction)"
-                } catch {
-                    New-Item -ItemType SymbolicLink -Path "$dest" -Target "$src" | Out-Null
-                    Write-Host "  ✓ linked $skill (symlink)"
-                }
-            }
-        }
-        'folder' {
-            $dest = Join-Path $Target 'sprang'
-            if (Test-Path $dest) { Remove-Item -Force -Recurse $dest }
-            try {
-                New-Item -ItemType Junction -Path $dest -Target $root | Out-Null
-                Write-Host "  ✓ linked skills folder → $dest (junction)"
-            } catch {
-                New-Item -ItemType SymbolicLink -Path "$dest" -Target "$root" | Out-Null
-                Write-Host "  ✓ linked skills folder → $dest (symlink)"
-            }
+    if (-not (Test-Path $root)) { Write-Error "Skills directory not found: $root" }
+    if (-not (Test-Path $Target)) { New-Item -ItemType Directory -Path $Target -Force | Out-Null }
+    foreach ($skill in (Get-SkillNames)) {
+        $src  = Join-Path $root $skill
+        $dest = Join-Path $Target $skill
+        if (Test-Path $dest) { Remove-Item -Force -Recurse $dest }
+        # Junction works without admin; symlink needs elevation or Developer Mode
+        try {
+            New-Item -ItemType Junction -Path $dest -Target $src | Out-Null
+            Write-Host "  + linked $skill (junction)"
+        } catch {
+            New-Item -ItemType SymbolicLink -Path "$dest" -Target "$src" | Out-Null
+            Write-Host "  + linked $skill (symlink)"
         }
     }
 }
 
-function Unlink-Skills([string]$Target, [string]$Style) {
+function Uninstall-GlobalSkills([string]$Target) {
     if (-not (Test-Path $Target)) { return }
-    switch ($Style) {
-        'per-skill' {
-            foreach ($skill in (Get-SkillNames)) {
-                $dest = Join-Path $Target $skill
-                if (Test-Path $dest) {
-                    Remove-Item -Force -Recurse $dest
-                    Write-Host "  ✗ removed $skill"
-                }
-            }
-        }
-        'folder' {
-            $dest = Join-Path $Target 'sprang'
-            if (Test-Path $dest) {
-                Remove-Item -Force -Recurse $dest
-                Write-Host "  ✗ removed $dest"
-            }
+    foreach ($skill in (Get-SkillNames)) {
+        $dest = Join-Path $Target $skill
+        if (Test-Path $dest) {
+            Remove-Item -Force -Recurse $dest
+            Write-Host "  - removed $skill"
         }
     }
 }
 
-function Install-Claude {
+function Show-NextSteps([string]$Id) {
     Write-Host ''
-    Write-Host '→ Claude Code installation'
-    Write-Host '  Claude Code uses project-local config files.'
-    Write-Host '  No global install is needed — all config ships with Sprang.'
+    Write-Host 'Project setup - run this inside each project you want indexed:'
     Write-Host ''
-    Write-Host '  Option A — Plugin marketplace (recommended, gives namespaced commands /sprang:sprang-*):'
-    Write-Host '    Inside a Claude Code session run:'
-    Write-Host '      /plugin marketplace add FavioVazquez/sprang'
-    Write-Host '      /plugin install sprang'
-    Write-Host '    Then build the MCP server binary (find the versioned cache folder):'
-    Write-Host '      cd "$env:USERPROFILE\.claude\plugins\cache\sprang\sprang\<version>"'
-    Write-Host '      pnpm install; pnpm build'
-    Write-Host '    Then run /reload-plugins inside Claude Code.'
+    Write-Host "  sprang init --platform $Id"
+    Write-Host '  sprang scan .'
     Write-Host ''
-    Write-Host '  Option B — Manual copy (gives unnamespaced /sprang, /sprang-onboard, etc.):'
-    Write-Host '    Copy these into your project root:'
-    Write-Host "      Copy-Item '$RepoDir\.mcp.json'  <your-project>\"
-    Write-Host "      Copy-Item '$RepoDir\CLAUDE.md'  <your-project>\"
-    Write-Host "      Copy-Item '$RepoDir\AGENTS.md'  <your-project>\"
-    Write-Host "      Copy-Item -Recurse '$RepoDir\.claude'  <your-project>\.claude"
-    Write-Host "    Then in <your-project>\.mcp.json update args to the absolute server path:"
-    Write-Host "      `"args`": [`"$RepoDir\packages\mcp\dist\server.js`"]"
-    Write-Host '    Open the project in Claude Code and run /sprang.'
+
+    switch ($Id) {
+        'devin' {
+            Write-Host 'What `sprang init --platform devin` writes:'
+            Write-Host '  .devin\skills\      11 skills (/sprang, /sprang-analyze, ...)'
+            Write-Host '  .devin\rules\       glob-triggered graph-context rules'
+            Write-Host '  .devin\hooks.v1.json + .devin\hooks\  stale-graph warning, post-commit refresh'
+            Write-Host '  .devin\mcp_config.json                MCP server (${workspaceFolder})'
+            Write-Host ''
+            Write-Host 'Plugin install (closed beta - needs `devin auth login`):'
+            Write-Host '  devin plugins install faviovazquez/sprang'
+        }
+        'claude' {
+            Write-Host 'What `sprang init --platform claude` writes:'
+            Write-Host '  .claude\skills\     11 skills (slash commands are skills now)'
+            Write-Host '  .claude\rules\      graph-context rules'
+            Write-Host '  .claude\settings.json  hooks + pre-approved permissions'
+            Write-Host '  .mcp.json           MCP server'
+            Write-Host ''
+            Write-Host 'Plugin install (works today), inside a Claude Code session:'
+            Write-Host '  /plugin marketplace add FavioVazquez/sprang'
+            Write-Host '  /plugin install sprang'
+        }
+        'copilot' {
+            Write-Host 'What `sprang init --platform copilot` writes:'
+            Write-Host '  skills\             11 skills'
+            Write-Host '  .github\copilot-instructions.md'
+            Write-Host '  .mcp.json           MCP server (Copilot CLI)'
+            Write-Host '  .vscode\mcp.json    MCP server (VS Code extension)'
+            Write-Host ''
+            Write-Host 'Plugin install (works today):'
+            Write-Host '  copilot plugin install faviovazquez/sprang'
+        }
+    }
+
     Write-Host ''
-    Write-Host "  For full details: $RepoDir\CLAUDE.md"
+    Write-Host 'Dashboard:'
+    Write-Host '  sprang open .'
+    Write-Host ''
+    Write-Host "Full docs: $RepoDir\README.md"
 }
 
 # --- Main ---
@@ -220,76 +234,34 @@ function Install-Claude {
 if ($Help) { Show-Usage; exit 0 }
 
 if ($Update) {
-    Clone-Or-Update
-    Write-Host "`n✓ Sprang updated."
+    Update-Checkout
+    Write-Host ''
+    Write-Host 'Sprang updated.'
     exit 0
 }
 
 if ($Uninstall) {
-    $plat = Resolve-Platform $Uninstall
-    Write-Host "`n→ Uninstalling Sprang for $Uninstall..."
-    if ($plat.Style -eq 'claude') {
-        Write-Host '  Claude Code is project-local — nothing to unlink globally.'
-    } else {
-        Unlink-Skills $plat.Target $plat.Style
-    }
-    Write-Host "`n✓ Uninstalled."
+    $id = Resolve-Platform $Uninstall
+    $target = $Platforms[$id].Target
+    Write-Host ''
+    Write-Host "-> Uninstalling Sprang for $id..."
+    Uninstall-GlobalSkills $target
+    Write-Host ''
+    Write-Host 'Uninstalled. Project-level files (.devin\, .claude\, .github\) are left in place.'
     exit 0
 }
 
-if (-not $Platform) { $Platform = Prompt-Platform }
-$plat = Resolve-Platform $Platform
+if (-not $Platform) { $Platform = Get-PlatformChoice }
+$Platform = Resolve-Platform $Platform
+$Target = $Platforms[$Platform].Target
 
-Write-Host "`n→ Installing Sprang for $Platform..."
-Clone-Or-Update
+Write-Host ''
+Write-Host "-> Installing Sprang for $($Platforms[$Platform].Label)..."
+Update-Checkout
 
-if ($plat.Style -eq 'claude') {
-    Install-Claude
-} else {
-    Write-Host "→ Linking skills into $($plat.Target)"
-    Link-Skills $plat.Target $plat.Style
-    Write-Host "`n✓ Skills linked for $Platform.`n"
-    switch ($Platform) {
-        'windsurf' {
-            Write-Host 'Next steps to complete the Windsurf / Devin Desktop setup:'
-            Write-Host ''
-            Write-Host '  1. Add the MCP server to %USERPROFILE%\.codeium\windsurf\mcp_config.json:'
-            Write-Host '     {'
-            Write-Host '       "mcpServers": { "sprang": {'
-            Write-Host "         `"command`": `"node`","
-            Write-Host "         `"args`": [`"$RepoDir\packages\mcp\dist\server.js`"],"
-            Write-Host '         "env": { "SPRANG_ROOT": "C:\path\to\your\project" }'
-            Write-Host '       }}'
-            Write-Host '     }'
-            Write-Host ''
-            Write-Host '  2. Copy rules + hooks into your project root:'
-            Write-Host "     Copy-Item -Recurse '$RepoDir\.windsurf\rules\*' .windsurf\rules\"
-            Write-Host "     Copy-Item -Recurse '$RepoDir\.devin\rules\*' .devin\rules\"
-            Write-Host "     Copy-Item '$RepoDir\.windsurf\hooks.json' .windsurf\"
-            Write-Host "     Copy-Item '$RepoDir\.windsurf\hooks\save-conversation.py' .windsurf\hooks\"
-            Write-Host "     Copy-Item -Recurse '$RepoDir\.windsurf\workflows\*' .windsurf\workflows\"
-            Write-Host "     Copy-Item -Recurse '$RepoDir\.windsurf\skills\sprang*' .windsurf\skills\"
-            Write-Host ''
-            Write-Host '  3. Reload the Windsurf window (Ctrl+Shift+P → Reload Window)'
-            Write-Host '  4. Run: sprang scan C:\path\to\your\project --phase1-only'
-            Write-Host ''
-            Write-Host '  Full docs: https://github.com/faviovazquez/sprang#windsurf--devin-desktop--agentic-install'
-        }
-        'copilot' {
-            Write-Host 'Next steps to complete the GitHub Copilot setup:'
-            Write-Host ''
-            Write-Host '  1. Copy .vscode\mcp.json into your project root:'
-            Write-Host "     Copy-Item '$RepoDir\.vscode\mcp.json' .vscode\mcp.json"
-            Write-Host "     Then edit .vscode\mcp.json → update args to: [`"$RepoDir\packages\mcp\dist\server.js`"]"
-            Write-Host ''
-            Write-Host '  2. Copy copilot-instructions.md into your project:'
-            Write-Host "     Copy-Item '$RepoDir\.github\copilot-instructions.md' .github\"
-            Write-Host ''
-            Write-Host '  3. Open VS Code, switch Copilot to Agent mode (model selector in chat panel)'
-            Write-Host '  4. Run: sprang scan C:\path\to\your\project --phase1-only'
-            Write-Host ''
-            Write-Host '  Note: MCP tools only work in Copilot Agent mode (not default ask/edit modes).'
-            Write-Host '  Full docs: https://github.com/faviovazquez/sprang#github-copilot'
-        }
-    }
-}
+Write-Host "-> Linking skills into $Target"
+Install-GlobalSkills $Target
+Write-Host ''
+Write-Host "Skills linked globally for $Platform."
+
+Show-NextSteps $Platform

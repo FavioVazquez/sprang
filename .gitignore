@@ -46,8 +46,10 @@ test-results/
 playwright-report/
 packages/dashboard/test-results/
 packages/dashboard/playwright-report/
+packages/dashboard/e2e/.bridge-root-devin/
 packages/dashboard/e2e/.bridge-root-claude/
 packages/dashboard/e2e/.bridge-root-copilot/
+packages/dashboard/e2e/.bridge-root-relay/
 
 # Development tool artifacts (never commit)
 .claude/worktrees/
@@ -58,18 +60,13 @@ packages/dashboard/e2e/.bridge-root-copilot/
 # Brand image generation script (local dev tool — uses .env API key)
 generate_images.py
 
-# cascade-messaging VS Code extension — source not shipped, only the .vsix
-packages/cascade-messaging/
-
 # Agent bridge runtime files (generated, never committed)
-.cascade-trigger-session
-.cascade-trigger
-.cascade-session
 .sprang/agent-conversation.md
+.sprang/agent-question.md
 .sprang/cascade-response.json
+.sprang/devin-session.json
 .sprang/claude-session.json
 .sprang/copilot-session.json
-.sprang/.cascade-bridge-active
 .sprang/diff-overlay.json
 
 # Nested .sprang dirs from e2e test fixtures (vite server CWD artifacts)
