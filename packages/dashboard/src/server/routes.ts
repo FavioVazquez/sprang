@@ -200,6 +200,26 @@ export function registerRoutes(
     }
   });
 
+  // POST /agent-heartbeat — "someone is sitting in the Ask Agent panel".
+  //
+  // The Stop hook uses this to decide whether to hold a finished turn open for
+  // a few seconds listening for a question. Without the signal it returns
+  // instantly, so ordinary work is untouched; with it, a question asked from
+  // the dashboard is picked up with no keystroke at all.
+  register('/agent-heartbeat', (_req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    try {
+      const dir = path.join(getRoot(), '.sprang');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, '.dashboard-listening'), new Date().toISOString());
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true }));
+    } catch {
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: false }));
+    }
+  });
+
   // GET /diff-overlay.json
   register('/diff-overlay.json', (_req, res) => {
     const overlayFile = resolveGraphFile('diff-overlay.json', getRoot);

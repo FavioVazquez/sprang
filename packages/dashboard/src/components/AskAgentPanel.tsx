@@ -43,6 +43,10 @@ interface ChatMessage {
 
 const POLL_INTERVAL_MS = 1500;
 
+/** Must stay well under the hook's freshness window so the signal never lapses
+ *  while the panel is genuinely open. */
+const HEARTBEAT_INTERVAL_MS = 8000;
+
 /** A spawned CLI answers in one shot, so a short ceiling is right. */
 const POLL_TIMEOUT_CLI_MS = 120_000;
 
@@ -160,6 +164,17 @@ export function AskAgentPanel() {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  // Tell the editor-side hook that someone is waiting here, so it holds a
+  // finished turn open briefly and picks up the next question with no typing.
+  // Only while the panel is open — otherwise normal work is never delayed.
+  useEffect(() => {
+    if (!open) return;
+    const ping = () => { void fetch('/agent-heartbeat', { method: 'POST' }).catch(() => null); };
+    ping();
+    const id = setInterval(ping, HEARTBEAT_INTERVAL_MS);
+    return () => clearInterval(id);
   }, [open]);
 
   const startPolling = useCallback((sentQuestion: string, bridge?: BridgeKind) => {
