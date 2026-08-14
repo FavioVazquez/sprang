@@ -167,16 +167,19 @@ describe('manifests', () => {
     // context — and, being instant, it beat the hook every time when both were
     // installed, so questions were silently answered by the wrong agent.
     const cfg = readJson('.devin/hooks.v1.json');
-    const wired = ['Stop', 'UserPromptSubmit'].filter((event) =>
+    const wired = ['Stop', 'UserPromptSubmit', 'PostToolUse'].filter((event) =>
       (cfg[event] ?? []).some((entry: any) =>
         (entry.hooks ?? []).some((h: any) => String(h.command).includes('dashboard-question')),
       ),
     );
-    expect(wired, 'both Stop and UserPromptSubmit should deliver questions').toEqual([
+    // Three hooks, three coverage windows: mid-turn (PostToolUse), just after a
+    // turn (Stop), and whenever you next type (UserPromptSubmit).
+    expect(wired, 'all three events should be able to deliver a question').toEqual([
       'Stop',
       'UserPromptSubmit',
+      'PostToolUse',
     ]);
-    for (const script of ['stop-dashboard-question.sh', 'user-prompt-dashboard-question.sh']) {
+    for (const script of ['stop-dashboard-question.sh', 'user-prompt-dashboard-question.sh', 'post-tool-dashboard-question.sh']) {
       const path = join(REPO_ROOT, '.devin/hooks', script);
       expect(existsSync(path), `${script} should exist`).toBe(true);
       expect(statSync(path).mode & 0o111, `${script} should be executable`).not.toBe(0);
@@ -301,7 +304,19 @@ describe('rules', () => {
 });
 
 describe('hooks wiring', () => {
-  const HOOK_SCRIPTS = ['session-start.sh', 'post-tool-use.sh', 'stop-dashboard-question.sh', 'user-prompt-dashboard-question.sh'];
+  const HOOK_SCRIPTS = ['session-start.sh', 'post-tool-use.sh', 'stop-dashboard-question.sh', 'user-prompt-dashboard-question.sh', 'post-tool-dashboard-question.sh'];
+
+  it('keeps the Stop hook under the ~2 min ceiling Devin enforces on hooks', () => {
+    // Measured: a Stop hook with timeout=630 was killed at 116s ("exited
+    // (code=1) after 116s"). Configure under the real ceiling so the hook ends
+    // on its own terms rather than being terminated mid-wait.
+    const cfg = readJson('.devin/hooks.v1.json');
+    for (const entry of cfg.Stop) {
+      for (const h of entry.hooks) {
+        expect(h.timeout, 'Stop hook timeout').toBeLessThanOrEqual(120);
+      }
+    }
+  });
 
   it('.devin/hooks.v1.json registers SessionStart and PostToolUse', () => {
     // The pre-0.3 file used `post_cascade_response_with_transcript`, an event no

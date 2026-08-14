@@ -21,6 +21,16 @@
           "timeout": 10
         }
       ]
+    },
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/post-tool-dashboard-question.sh",
+          "timeout": 10
+        }
+      ]
     }
   ],
   "Stop": [
@@ -30,7 +40,7 @@
         {
           "type": "command",
           "command": "bash .devin/hooks/stop-dashboard-question.sh",
-          "timeout": 630
+          "timeout": 115
         }
       ]
     }

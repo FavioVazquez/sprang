@@ -62,7 +62,10 @@ fi
 #   refreshed for as long as the heartbeat stays fresh. Ends the moment the
 #   panel closes.
 GRACE_SECONDS="${SPRANG_GRACE_SECONDS:-20}"
-LISTEN_SECONDS="${SPRANG_LISTEN_SECONDS:-600}"
+# Measured: Devin terminates a hook at roughly 120s no matter what timeout the
+# config asks for (observed "exited (code=1) after 116s" with timeout=630). Stay
+# under that so the hook ends on its own terms instead of being killed.
+LISTEN_SECONDS="${SPRANG_LISTEN_SECONDS:-100}"
 # Generous on purpose. The panel retracts this file explicitly when it closes,
 # so the age check is only a safety net for a browser that died without
 # cleaning up. A tight window fails constantly instead: browsers throttle timers
