@@ -44,9 +44,16 @@ if printf '%s' "$PAYLOAD" | grep -q '"stop_hook_active"[[:space:]]*:[[:space:]]*
   exit 0
 fi
 
-# How long to hold the turn open while the dashboard is in use, and how fresh
-# the heartbeat must be to count as "in use". Both overridable for testing.
-LISTEN_SECONDS="${SPRANG_LISTEN_SECONDS:-45}"
+# Two windows, because the panel is often opened *after* the agent goes quiet.
+#
+# GRACE_SECONDS: always wait this long, even with no heartbeat, so "stop talking
+#   to Devin, switch to the dashboard, ask something" is covered. Kept short —
+#   this is the only cost paid during ordinary work.
+# LISTEN_SECONDS: once the panel is confirmed open, keep listening this long,
+#   refreshed for as long as the heartbeat stays fresh. Ends the moment the
+#   panel closes.
+GRACE_SECONDS="${SPRANG_GRACE_SECONDS:-20}"
+LISTEN_SECONDS="${SPRANG_LISTEN_SECONDS:-600}"
 HEARTBEAT_MAX_AGE="${SPRANG_HEARTBEAT_MAX_AGE:-20}"
 
 heartbeat_is_fresh() {
@@ -78,19 +85,24 @@ if [ -f "$QUESTION_FILE" ]; then
   exit 0
 fi
 
-# Nothing pending and nobody watching → get out of the way immediately.
-heartbeat_is_fresh || exit 0
+# Listen. The deadline starts as a short grace period and is extended for as
+# long as the dashboard keeps reporting that someone is waiting, so the window
+# tracks actual use instead of a fixed guess.
+now=$(date +%s)
+deadline=$(( now + GRACE_SECONDS ))
+hard_stop=$(( now + LISTEN_SECONDS ))
 
-# Someone is sitting in the dashboard: stay listening briefly so their next
-# question is answered without them having to come back here and type.
-deadline=$(( $(date +%s) + LISTEN_SECONDS ))
 while [ "$(date +%s)" -lt "$deadline" ]; do
   if [ -f "$QUESTION_FILE" ]; then
-    deliver && exit 0
+    deliver
     exit 0
   fi
-  # Stop early if the dashboard is closed mid-wait.
-  heartbeat_is_fresh || exit 0
+  if heartbeat_is_fresh; then
+    # Panel is open: keep the window rolling, up to the hard stop.
+    extended=$(( $(date +%s) + HEARTBEAT_MAX_AGE ))
+    [ "$extended" -gt "$hard_stop" ] && extended=$hard_stop
+    [ "$extended" -gt "$deadline" ] && deadline=$extended
+  fi
   sleep 1
 done
 

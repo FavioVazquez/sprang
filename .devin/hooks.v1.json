@@ -30,7 +30,7 @@
         {
           "type": "command",
           "command": "bash .devin/hooks/stop-dashboard-question.sh",
-          "timeout": 60
+          "timeout": 630
         }
       ]
     }
