@@ -25,17 +25,36 @@ export function getRelayQuestionPath(sprangRoot: string): string {
   return path.join(sprangRoot, '.sprang', 'agent-question.md');
 }
 
-/** Build the prompt the user relays to their agent. */
+/**
+ * Build the prompt handed to the agent.
+ *
+ * The reply instruction has a shell fallback on purpose. The agent that picks
+ * this up is not always the one the dashboard can see: Devin opens a relayed
+ * question in a *new* conversation, and if the Sprang MCP server fails to start
+ * there the agent has no `sprang_respond` tool and simply answers into the void,
+ * leaving the dashboard polling forever. Writing the file directly needs nothing
+ * but a shell, so the answer always finds its way back.
+ */
 export function buildRelayPrompt(question: string): string {
+  const jsonQuestion = JSON.stringify(question);
   return `[SPRANG DASHBOARD MESSAGE]
 
 ${question}
 
 ---
-Answer using the Sprang MCP tools (sprang_query, sprang_node, sprang_health, sprang_why),
-then call sprang_respond so the answer appears in the dashboard:
+Ground your answer in the knowledge graph using the Sprang MCP tools
+(sprang_query, sprang_node, sprang_health, sprang_why) if they are available.
 
-sprang_respond({ response: "<your answer>", question: ${JSON.stringify(question)} })
+Then return the answer to the dashboard. Preferred:
+
+sprang_respond({ response: "<your answer>", question: ${jsonQuestion} })
+
+If the sprang_respond tool is NOT available in this session, write the file
+yourself instead — the dashboard polls it either way:
+
+  mkdir -p .sprang && cat > .sprang/cascade-response.json <<'SPRANG_EOF'
+  {"response": "<your answer>", "question": ${jsonQuestion}, "written_at": "<ISO-8601 timestamp>"}
+  SPRANG_EOF
 `;
 }
 

@@ -2,7 +2,9 @@
   "servers": {
     "sprang": {
       "command": "node",
-      "args": ["packages/mcp/dist/server.js"],
+      "args": [
+        "packages/mcp/dist/server.js"
+      ],
       "env": {
         "SPRANG_ROOT": "${workspaceFolder}"
       }

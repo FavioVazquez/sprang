@@ -123,8 +123,25 @@ describe('manifests', () => {
       // .vscode/mcp.json uses VS Code's "servers" key; the others use "mcpServers"
       const server = (manifest.mcpServers ?? manifest.servers)?.sprang;
       expect(server, `${relPath} should define a sprang server`).toBeTruthy();
-      expect(server.args, `${relPath} args`).toContain('packages/mcp/dist/server.js');
+      expect(server.args?.[0], `${relPath} args`).toContain('packages/mcp/dist/server.js');
       expect(server.env?.SPRANG_ROOT, `${relPath} env.SPRANG_ROOT`).toBeTruthy();
+    }
+  });
+
+  it('does not use ${workspaceFolder} in MCP args — it is only expanded in env', () => {
+    // Tempting, because `env.SPRANG_ROOT` uses it and works. It is not expanded
+    // in `args`: Devin's MCP config documents only ${env:VAR} and ${file:/path}.
+    // Putting it in args makes node try to open a literal "${workspaceFolder}/..."
+    // path, the server never starts, and every Sprang tool silently disappears
+    // from the session. Verified the hard way.
+    for (const relPath of ['.devin/mcp_config.json', '.vscode/mcp.json', '.mcp.json']) {
+      const manifest = readJson(relPath);
+      const args = ((manifest.mcpServers ?? manifest.servers).sprang.args as string[]);
+      for (const arg of args) {
+        expect(arg, `${relPath} args must not interpolate workspaceFolder`).not.toContain(
+          'workspaceFolder',
+        );
+      }
     }
   });
 

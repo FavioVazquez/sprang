@@ -31,7 +31,36 @@ interface ChatMessage {
 }
 
 const POLL_INTERVAL_MS = 1500;
-const POLL_TIMEOUT_MS = 120_000;
+
+/** A spawned CLI answers in one shot, so a short ceiling is right. */
+const POLL_TIMEOUT_CLI_MS = 120_000;
+
+/** devin-local and relay wait on a whole agent turn — sometimes a human one —
+ *  so two minutes is far too aggressive and produced a false "no response". */
+const POLL_TIMEOUT_ASYNC_MS = 600_000;
+
+/** Bridges where the answer comes back out-of-band via sprang_respond. */
+const ASYNC_BRIDGES = new Set<BridgeKind>(['devin-local', 'relay']);
+
+/** Actionable guidance when nothing came back — "no response" alone is useless. */
+function timeoutHelp(bridge: BridgeKind | undefined): string {
+  if (bridge === 'devin-local') {
+    return (
+      'Devin did not answer. The question was pushed into your Devin chat — check whether it ' +
+      'arrived (a relayed question opens in a new conversation). If Devin replied but nothing ' +
+      'appeared here, it is missing the sprang_respond MCP tool: check the sprang server is ' +
+      'running in that conversation, or have Devin write .sprang/cascade-response.json directly ' +
+      '(the staged prompt in .sprang/agent-question.md explains how).'
+    );
+  }
+  if (bridge === 'relay') {
+    return (
+      'Nothing came back yet. Paste the prompt from .sprang/agent-question.md into your agent ' +
+      'and make sure it finishes by calling sprang_respond.'
+    );
+  }
+  return 'The agent CLI did not answer in time. Check that it is authenticated and try again.';
+}
 
 async function fetchBridgeStatus(): Promise<BridgeStatus> {
   try {
@@ -43,7 +72,7 @@ async function fetchBridgeStatus(): Promise<BridgeStatus> {
   }
 }
 
-async function postAsk(message: string): Promise<{ ok: boolean; error?: string; prompt?: string }> {
+async function postAsk(message: string): Promise<{ ok: boolean; error?: string; prompt?: string; bridge?: BridgeKind }> {
   try {
     const res = await fetch('/agent-ask', {
       method: 'POST',
@@ -55,7 +84,11 @@ async function postAsk(message: string): Promise<{ ok: boolean; error?: string; 
       return { ok: false, error: typeof body['error'] === 'string' ? body['error'] : `HTTP ${res.status}` };
     }
     const body = await res.json().catch(() => ({} as Record<string, unknown>)) as Record<string, unknown>;
-    return { ok: true, prompt: typeof body['prompt'] === 'string' ? body['prompt'] : undefined };
+    return {
+      ok: true,
+      prompt: typeof body['prompt'] === 'string' ? body['prompt'] : undefined,
+      bridge: body['bridge'] as BridgeKind | undefined,
+    };
   } catch {
     return { ok: false, error: 'Network error' };
   }
@@ -115,7 +148,7 @@ export function AskAgentPanel() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  const startPolling = useCallback((sentQuestion: string) => {
+  const startPolling = useCallback((sentQuestion: string, bridge?: BridgeKind) => {
     stopPolling();
     setWaiting(true);
 
@@ -147,16 +180,17 @@ export function AskAgentPanel() {
       }
     }, POLL_INTERVAL_MS);
 
+    const limitMs = bridge && ASYNC_BRIDGES.has(bridge) ? POLL_TIMEOUT_ASYNC_MS : POLL_TIMEOUT_CLI_MS;
     timeoutTimerRef.current = setTimeout(() => {
       stopPolling();
       setWaiting(false);
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
         role: 'error',
-        text: `No response received within 2 minutes for: "${sentQuestion}"`,
+        text: `No response after ${Math.round(limitMs / 60_000)} min for: "${sentQuestion}"\n\n${timeoutHelp(bridge)}`,
         ts: new Date().toISOString(),
       }]);
-    }, POLL_TIMEOUT_MS);
+    }, limitMs);
   }, [stopPolling]);
 
   const handleSubmit = useCallback(async () => {
@@ -186,7 +220,7 @@ export function AskAgentPanel() {
       }]);
       return;
     }
-    startPolling(msg);
+    startPolling(msg, askResult.bridge);
   }, [input, waiting, startPolling]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
