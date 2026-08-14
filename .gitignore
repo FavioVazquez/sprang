@@ -65,6 +65,8 @@ generate_images.py
 .sprang/agent-conversation.md
 .sprang/agent-question.md
 .sprang/.devin-bridge-active
+.sprang/.cascade-bridge-active
+.sprang/agent-question.delivered.md
 .sprang/cascade-response.json
 .sprang/devin-session.json
 .sprang/claude-session.json
