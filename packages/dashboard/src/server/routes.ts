@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { knowledgeGraphSchema, summarizeZodIssues } from '@sprang/core';
-import { detectBridge, clearAgentSession } from '../bridge/index.js';
+import { detectBridge, listBridges, clearAgentSession } from '../bridge/index.js';
 import { askClaudeBackground } from '../bridge/claude.js';
 import { askCopilotBackground } from '../bridge/copilot.js';
 import { askDevinBackground } from '../bridge/devin.js';
@@ -241,7 +241,10 @@ export function registerRoutes(
   register('/bridge-status', (_req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.statusCode = 200;
-    res.end(JSON.stringify(detectBridge(getRoot())));
+    // `kind` is the auto-selected default; `options` lets the UI offer a choice
+    // and explain why an agent is unavailable instead of silently skipping it.
+    const root = getRoot();
+    res.end(JSON.stringify({ ...detectBridge(root), options: listBridges(root) }));
   });
 
   // POST /agent-ask
@@ -267,13 +270,18 @@ export function registerRoutes(
     req.on('end', () => {
       if (aborted) return;
       try {
-        const { message } = JSON.parse(body) as { message?: string };
+        const { message, bridge: requested } = JSON.parse(body) as { message?: string; bridge?: string };
         if (!message || typeof message !== 'string' || message.trim() === '') {
           res.statusCode = 400; res.end(JSON.stringify({ error: 'message field required' })); return;
         }
         const userMessage = message.trim().slice(0, 4096);
         const sprangRoot = getRoot();
-        const bridge = detectBridge(sprangRoot);
+        // An explicit pick from the dashboard wins, but only if that bridge can
+        // actually answer; otherwise fall back to auto-detection.
+        const chosen = requested
+          ? listBridges(sprangRoot).find((b) => b.kind === requested && b.available)
+          : undefined;
+        const bridge = chosen ? { kind: chosen.kind, detail: chosen.detail } : detectBridge(sprangRoot);
         const responsePath = getResponsePath(sprangRoot);
         if (fs.existsSync(responsePath)) { try { fs.unlinkSync(responsePath); } catch { /* ignore */ } }
         // devin-local and relay both work by staging the question file. With the

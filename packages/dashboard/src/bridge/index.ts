@@ -12,14 +12,14 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { detectBridge, type BridgeStatus, type BridgeKind } from './detect.js';
+import { detectBridge, listBridges, type BridgeStatus, type BridgeKind, type BridgeOption } from './detect.js';
 import { askClaude, clearClaudeSession } from './claude.js';
 import { askCopilot, clearCopilotSession } from './copilot.js';
 import { askDevin, clearDevinSession } from './devin.js';
 import { writeRelayQuestion, getResponsePath, getRelayQuestionPath } from './relay.js';
 
-export { detectBridge, clearClaudeSession, clearCopilotSession, clearDevinSession, getResponsePath };
-export type { BridgeStatus, BridgeKind };
+export { detectBridge, listBridges, clearClaudeSession, clearCopilotSession, clearDevinSession, getResponsePath };
+export type { BridgeStatus, BridgeKind, BridgeOption };
 
 export type AskAgentMode = 'async' | 'sync';
 
@@ -44,9 +44,20 @@ function writeResponse(
   fs.renameSync(tmp, responsePath);
 }
 
-/** Send a question to whichever agent bridge is available. */
-export function askAgent(question: string, sprangRoot: string): AskAgentResult {
-  const bridge = detectBridge(sprangRoot);
+/**
+ * Send a question to an agent bridge.
+ *
+ * `preferred` comes from the dashboard's picker. It is honoured only if that
+ * bridge is actually available — an explicit choice should not silently send a
+ * question into a void when the CLI behind it is missing or logged out.
+ */
+export function askAgent(question: string, sprangRoot: string, preferred?: BridgeKind): AskAgentResult {
+  const chosen = preferred
+    ? listBridges(sprangRoot).find((b) => b.kind === preferred && b.available)
+    : undefined;
+  const bridge: BridgeStatus = chosen
+    ? { kind: chosen.kind, detail: chosen.detail }
+    : detectBridge(sprangRoot);
   const responsePath = getResponsePath(sprangRoot);
 
   // Drop any previous answer so polling can't return a stale one.

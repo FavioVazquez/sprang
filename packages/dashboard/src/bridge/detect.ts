@@ -27,6 +27,23 @@ export interface BridgeStatus {
   detail: string;
 }
 
+export interface BridgeOption {
+  kind: BridgeKind;
+  /** Whether this bridge can actually answer right now. */
+  available: boolean;
+  detail: string;
+  /** Human label for the picker. */
+  label: string;
+}
+
+const LABELS: Record<BridgeKind, string> = {
+  'devin-local': 'Devin (this editor session)',
+  devin: 'Devin CLI',
+  claude: 'Claude Code',
+  copilot: 'Copilot CLI',
+  relay: 'Copy / paste',
+};
+
 /** Returns true if the `claude` CLI is available on PATH and responds. */
 export function isClaudeCLIAvailable(): boolean {
   try {
@@ -48,6 +65,59 @@ export function isCopilotCLIAvailable(): boolean {
 }
 
 export { isDevinCLIAvailable, isDevinLocalAvailable };
+
+/**
+ * Every bridge and whether it can answer right now.
+ *
+ * Auto-selection alone is not enough: a machine can easily have Devin, Claude
+ * and Copilot installed at once, and picking by fixed priority silently routes
+ * a question to an agent the user did not intend — or, worse, to one whose
+ * credentials have quietly expired. The dashboard shows this list so the choice
+ * is explicit and the reason a bridge is unavailable is visible.
+ */
+export function listBridges(sprangRoot: string): BridgeOption[] {
+  const devinLocal = isDevinLocalAvailable(sprangRoot);
+  const devinCli = isDevinCLIAvailable();
+  const claude = isClaudeCLIAvailable();
+  const copilot = isCopilotCLIAvailable();
+
+  return [
+    {
+      kind: 'devin-local',
+      available: devinLocal,
+      label: LABELS['devin-local'],
+      detail: devinLocal
+        ? 'Answered in your editor session, with its full context'
+        : 'No dashboard-question hook configured — run `sprang init --platform devin`',
+    },
+    {
+      kind: 'devin',
+      available: devinCli,
+      label: LABELS.devin,
+      detail: devinCli
+        ? (process.env['WINDSURF_API_KEY'] ? 'Authenticated via WINDSURF_API_KEY' : 'Authenticated CLI on PATH')
+        : 'Not installed, or not logged in (`devin auth login`, or export WINDSURF_API_KEY)',
+    },
+    {
+      kind: 'claude',
+      available: claude,
+      label: LABELS.claude,
+      detail: claude ? 'claude CLI on PATH' : 'claude CLI not found',
+    },
+    {
+      kind: 'copilot',
+      available: copilot,
+      label: LABELS.copilot,
+      detail: copilot ? 'copilot CLI on PATH' : 'copilot CLI not found',
+    },
+    {
+      kind: 'relay',
+      available: true,
+      label: LABELS.relay,
+      detail: 'Always available — you paste the question into any agent',
+    },
+  ];
+}
 
 /** Detect the best available bridge. */
 export function detectBridge(sprangRoot: string): BridgeStatus {

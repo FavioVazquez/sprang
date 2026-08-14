@@ -4,10 +4,21 @@ import { Sparkles, Send, Loader2, X, AlertCircle, MessageSquare, Trash2 } from '
 
 type BridgeKind = 'devin-local' | 'devin' | 'claude' | 'copilot' | 'relay';
 
+interface BridgeOption {
+  kind: BridgeKind;
+  available: boolean;
+  detail: string;
+  label: string;
+}
+
 interface BridgeStatus {
   kind: BridgeKind;
   detail: string;
+  options?: BridgeOption[];
 }
+
+/** Remembered across reloads so a deliberate choice is not silently undone. */
+const BRIDGE_PREF_KEY = 'sprang:bridge';
 
 const BRIDGE_LABELS: Record<BridgeKind, string> = {
   'devin-local': 'Devin',
@@ -72,12 +83,12 @@ async function fetchBridgeStatus(): Promise<BridgeStatus> {
   }
 }
 
-async function postAsk(message: string): Promise<{ ok: boolean; error?: string; prompt?: string; bridge?: BridgeKind }> {
+async function postAsk(message: string, bridge?: BridgeKind): Promise<{ ok: boolean; error?: string; prompt?: string; bridge?: BridgeKind }> {
   try {
     const res = await fetch('/agent-ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, bridge }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({} as Record<string, unknown>)) as Record<string, unknown>;
@@ -117,6 +128,9 @@ export function AskAgentPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [bridgeOk, setBridgeOk] = useState(true);
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus | null>(null);
+  const [chosenBridge, setChosenBridge] = useState<BridgeKind | ''>(
+    () => (localStorage.getItem(BRIDGE_PREF_KEY) as BridgeKind | null) ?? '',
+  );
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -209,7 +223,7 @@ export function AskAgentPanel() {
       ts: new Date().toISOString(),
     }]);
 
-    const askResult = await postAsk(msg);
+    const askResult = await postAsk(msg, chosenBridge || undefined);
     if (!askResult.ok) {
       fetchBridgeStatus().then(setBridgeStatus).catch(() => null);
       setMessages((prev) => [...prev, {
@@ -221,7 +235,7 @@ export function AskAgentPanel() {
       return;
     }
     startPolling(msg, askResult.bridge);
-  }, [input, waiting, startPolling]);
+  }, [input, waiting, startPolling, chosenBridge]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -288,12 +302,32 @@ export function AskAgentPanel() {
                   <div className="w-5 h-5 rounded bg-sprang-500/20 flex items-center justify-center">
                     <Sparkles className="w-3 h-3 text-sprang-400" />
                   </div>
-                  <div>
+                  <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-surface-200">Ask Agent</span>
-                    {bridgeStatus && bridgeStatus.kind !== 'relay' && (
-                      <span className="ml-1.5 text-[9px] text-surface-500 font-normal">
-                        via {BRIDGE_LABELS[bridgeStatus.kind]}
-                      </span>
+                    {/* Explicit agent choice. A fixed priority order silently
+                        routes questions to whichever agent happens to rank
+                        highest — including one whose credentials have expired. */}
+                    {bridgeStatus?.options && (
+                      <select
+                        value={chosenBridge}
+                        onChange={(e) => {
+                          const v = e.target.value as BridgeKind | '';
+                          setChosenBridge(v);
+                          if (v) localStorage.setItem(BRIDGE_PREF_KEY, v);
+                          else localStorage.removeItem(BRIDGE_PREF_KEY);
+                        }}
+                        title="Which agent answers dashboard questions"
+                        className="text-[10px] bg-surface-900 border border-surface-700 rounded px-1.5 py-0.5 text-surface-300 outline-none focus:border-sprang-500/60"
+                      >
+                        <option value="">
+                          Auto ({BRIDGE_LABELS[bridgeStatus.kind]})
+                        </option>
+                        {bridgeStatus.options.map((o) => (
+                          <option key={o.kind} value={o.kind} disabled={!o.available}>
+                            {o.label}{o.available ? '' : ' — unavailable'}
+                          </option>
+                        ))}
+                      </select>
                     )}
                   </div>
                 </div>
