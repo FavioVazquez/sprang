@@ -14,6 +14,87 @@
  * and `packages/core/tests/graph/normalize-assembled.test.ts` guard both).
  */
 
+import { EDGE_TYPES } from '../schema/types.js';
+
+const EDGE_TYPE_SET: ReadonlySet<string> = new Set(EDGE_TYPES);
+
+/**
+ * Agent-drift edge types → canonical `EDGE_TYPES`.
+ *
+ * `swap: true` means the alias is written in the opposite direction from the
+ * canonical edge, so source/target must be exchanged. The classic case is
+ * `tests` (test-file → source-file), whose canonical form is `tested_by`
+ * (source-file → test-file).
+ */
+const EDGE_TYPE_ALIASES: Readonly<Record<string, { type: string; swap?: boolean }>> = {
+  // dependencies
+  tests: { type: 'tested_by', swap: true },
+  tested: { type: 'tested_by', swap: true },
+  test: { type: 'tested_by', swap: true },
+  testedby: { type: 'tested_by' },
+  dependson: { type: 'depends_on' },
+  depends: { type: 'depends_on' },
+  requires: { type: 'depends_on' },
+  uses: { type: 'depends_on' },
+  configuredby: { type: 'configures', swap: true },
+  // structural
+  extends: { type: 'inherits' },
+  subclassof: { type: 'inherits' },
+  inheritsfrom: { type: 'inherits' },
+  importedby: { type: 'imports', swap: true },
+  imported: { type: 'imports', swap: true },
+  includes: { type: 'contains' },
+  containedby: { type: 'contains', swap: true },
+  partof: { type: 'contains', swap: true },
+  belongsto: { type: 'contains', swap: true },
+  parentof: { type: 'contains' },
+  childof: { type: 'contains', swap: true },
+  implementsinterface: { type: 'implements' },
+  // behavioral
+  invokes: { type: 'calls' },
+  callsfunction: { type: 'calls' },
+  calledby: { type: 'calls', swap: true },
+  subscribesto: { type: 'subscribes' },
+  listensto: { type: 'subscribes' },
+  publishesto: { type: 'publishes' },
+  emits: { type: 'publishes' },
+  // data flow
+  reads: { type: 'reads_from' },
+  readsfrom: { type: 'reads_from' },
+  queries: { type: 'reads_from' },
+  writes: { type: 'writes_to' },
+  writesto: { type: 'writes_to' },
+  persists: { type: 'writes_to' },
+  // semantic
+  references: { type: 'related' },
+  refersto: { type: 'related' },
+  relatedto: { type: 'related' },
+  relatesto: { type: 'related' },
+  seealso: { type: 'related' },
+  similarto: { type: 'similar_to' },
+  // knowledge
+  builds: { type: 'builds_on' },
+  buildson: { type: 'builds_on' },
+  derivedfrom: { type: 'builds_on' },
+  documentedby: { type: 'documents', swap: true },
+  describes: { type: 'documents' },
+  categorizedunder: { type: 'categorized_under' },
+  authoredby: { type: 'authored_by' },
+  // infrastructure
+  deployedby: { type: 'deploys', swap: true },
+  servedby: { type: 'serves', swap: true },
+  triggeredby: { type: 'triggers', swap: true },
+  definesschema: { type: 'defines_schema' },
+  crossdomain: { type: 'cross_domain' },
+  containsflow: { type: 'contains_flow' },
+  flowstep: { type: 'flow_step' },
+};
+
+/** Collapse `dependsOn`, `depends-on`, `Depends On` … to a single lookup key. */
+function edgeKey(raw: string): string {
+  return raw.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 const SMELL_CATEGORIES = new Set([
   'duplicate_logic', 'unclear_coupling', 'low_cohesion', 'god_node',
   'unstable_interface', 'orphan_node', 'circular_dependency', 'over_connected',
@@ -99,9 +180,77 @@ function normalizeSecurityWarning(w: unknown): Dict | null {
   return out;
 }
 
+/**
+ * Coerce one agent-written edge to the canonical schema, or return null to drop it.
+ *
+ * `knowledgeGraphSchema` has no nullable fields, so an unmappable `type` makes the
+ * whole graph unloadable — dropping one edge is strictly better than losing the graph.
+ */
+export function normalizeEdge(e: unknown): Dict | null {
+  if (!isObj(e)) return null;
+  let source = str(e['source'] ?? e['from']);
+  let target = str(e['target'] ?? e['to']);
+  if (!source || !target) return null;
+
+  const rawType = str(e['type'] ?? e['label'] ?? e['kind']);
+  const key = edgeKey(rawType);
+  let type: string | null = null;
+
+  if (EDGE_TYPE_SET.has(rawType)) {
+    type = rawType;
+  } else {
+    const alias = EDGE_TYPE_ALIASES[key];
+    if (alias) {
+      type = alias.type;
+      if (alias.swap) [source, target] = [target, source];
+    } else {
+      // Last resort: the canonical name with separators stripped (`depends_on` ≡ `dependson`).
+      const direct = EDGE_TYPES.find((t) => edgeKey(t) === key);
+      if (direct) type = direct;
+    }
+  }
+  if (!type) return null;
+
+  const out: Dict = { source, target, type };
+  if (e['direction'] === 'forward' || e['direction'] === 'backward' || e['direction'] === 'bidirectional') {
+    out['direction'] = e['direction'];
+  }
+  if (e['description'] != null) out['description'] = str(e['description']);
+  if (typeof e['weight'] === 'number') out['weight'] = e['weight'];
+  if (isObj(e['metadata'])) out['metadata'] = e['metadata'];
+  return out;
+}
+
+export interface NormalizedEdges {
+  edges: Dict[];
+  /** Unmappable edge types and how many edges each one cost, for a merge-time warning. */
+  dropped: Record<string, number>;
+}
+
+/** Normalise + dedupe an agent-written edge array. */
+export function normalizeEdges(rawEdges: unknown[]): NormalizedEdges {
+  const dropped: Record<string, number> = {};
+  const bySignature = new Map<string, Dict>();
+  for (const raw of rawEdges) {
+    const edge = normalizeEdge(raw);
+    if (!edge) {
+      const label = isObj(raw) ? str(raw['type'] ?? raw['label'] ?? raw['kind']) || '(missing type)' : '(malformed)';
+      dropped[label] = (dropped[label] ?? 0) + 1;
+      continue;
+    }
+    bySignature.set(`${edge['source']}::${edge['target']}::${edge['type']}`, edge);
+  }
+  return { edges: Array.from(bySignature.values()), dropped };
+}
+
 function normalizeNode(n: unknown): Dict | null {
   if (!isObj(n) || !n['id']) return null;
   const node: Dict = { ...n };
+  // No field in knowledgeGraphSchema is nullable, so an explicit null (the
+  // `"layer": null` the analyze template used to emit) always fails validation.
+  for (const [k, v] of Object.entries(node)) {
+    if (v === null) delete node[k];
+  }
   if (!node['label']) node['label'] = node['name'] ?? str(node['id']).split(':').pop() ?? str(node['id']);
   if (!COMPLEXITY.has(str(node['complexity']))) delete node['complexity'];
 
@@ -198,6 +347,9 @@ function normalizeDomain(d: unknown, idx: number): Dict | null {
 
 export interface NormalizedAssembly {
   nodes: Dict[];
+  edges: Dict[];
+  /** Edge types that could not be mapped to `EDGE_TYPES`, with drop counts. */
+  dropped_edge_types: Record<string, number>;
   layers: Dict[];
   tours: Dict[];
   domains: Dict[];
@@ -213,12 +365,14 @@ export interface NormalizedAssembly {
  */
 export function normalizeAssembledGraph(input: {
   nodes: unknown[];
+  edges?: unknown[];
   layers: unknown[];
   tours: unknown[];
   domains: unknown[];
   metaSmellSummary?: unknown;
 }): NormalizedAssembly {
   const nodes = input.nodes.map(normalizeNode).filter(Boolean) as Dict[];
+  const { edges, dropped: dropped_edge_types } = normalizeEdges(input.edges ?? []);
   const layers = input.layers.map((l, i) => normalizeLayer(l, i)).filter(Boolean) as Dict[];
 
   // Wrap a flat step array into a single Tour object before normalising.
@@ -263,5 +417,5 @@ export function normalizeAssembledGraph(input: {
   }
   const security_summary = secTotal ? { total: secTotal, by_severity: secBySev, by_category: secByCat } : undefined;
 
-  return { nodes, layers, tours, domains, smell_summary, security_summary, risk_summary };
+  return { nodes, edges, dropped_edge_types, layers, tours, domains, smell_summary, security_summary, risk_summary };
 }

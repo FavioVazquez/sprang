@@ -8,7 +8,7 @@ import { join } from 'node:path';
 test.afterAll(async () => {
   const cwd = process.cwd(); // playwright runs from packages/dashboard/
   const artifacts = [
-    join(cwd, '.cascade-trigger-session'),
+    join(cwd, '.sprang', 'agent-question.md'),
     join(cwd, '.sprang', 'cascade-response.json'),
     join(cwd, '.sprang', 'claude-session.json'),
     join(cwd, '.sprang', 'copilot-session.json'),
@@ -851,7 +851,7 @@ test('bridge status API – /bridge-status returns valid BridgeStatus JSON', asy
   expect(resp.status()).toBe(200);
   const body = await resp.json() as { kind: string; detail: string };
   // kind must be one of the four valid values
-  expect(['windsurf', 'claude', 'copilot', 'none']).toContain(body.kind);
+  expect(['devin', 'claude', 'copilot', 'relay']).toContain(body.kind);
   expect(typeof body.detail).toBe('string');
 });
 
@@ -868,7 +868,7 @@ test('Ask Agent panel – opens and displays bridge info', async ({ page }) => {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ kind: 'none', detail: 'No agent bridge found.' }),
+      body: JSON.stringify({ kind: 'relay', detail: 'No agent CLI detected. Copy the question into your agent — it answers via sprang_respond.' }),
     }),
   );
   await page.goto('/');
@@ -883,7 +883,7 @@ test('Ask Agent panel – opens and displays bridge info', async ({ page }) => {
   await expect(page.getByText('Ask Agent').first()).toBeVisible({ timeout: 3000 });
 
   // Empty state shows bridge detection message
-  await expect(page.getByText(/no bridge detected|detecting agent bridge/i)).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText(/manual relay|detecting agent bridge/i)).toBeVisible({ timeout: 3000 });
 
   // Close by pressing Escape — the slide-in panel should disappear
   await page.keyboard.press('Escape');
@@ -892,9 +892,9 @@ test('Ask Agent panel – opens and displays bridge info', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 35: Ask Agent panel – /agent-ask returns 503 when no bridge
+// Test 35: Ask Agent panel – /agent-ask always resolves to some bridge
 // ---------------------------------------------------------------------------
-test('Ask Agent panel – /agent-ask 503 when no agent bridge available', async ({ page }) => {
+test('Ask Agent panel – /agent-ask always resolves to a bridge', async ({ page }) => {
   await page.addInitScript(() => { localStorage.setItem('sprang:onboarded', 'true'); });
   await page.route('**/knowledge-graph.json', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockGraph) }),
@@ -902,15 +902,18 @@ test('Ask Agent panel – /agent-ask 503 when no agent bridge available', async 
   await page.goto('/');
   await expect(page.getByText('sprang').first()).toBeVisible({ timeout: 15000 });
 
-  // All bridges now non-blocking — response is always fast (200 = bridge found, 503 = none).
+  // Since v0.3.0 there is no "no bridge" state: when no agent CLI is drivable
+  // the request falls back to `relay`, so /agent-ask must always succeed.
   const resp = await page.request.post('/agent-ask', {
     data: { message: 'what does auth.ts do?' },
   });
-  expect([200, 503]).toContain(resp.status());
-  if (resp.status() === 503) {
-    const body = await resp.json() as { error: string };
-    expect(typeof body.error).toBe('string');
-  }
+  expect(resp.status()).toBe(200);
+  const body = await resp.json() as { ok: boolean; bridge: string; prompt?: string };
+  expect(body.ok).toBe(true);
+  expect(['devin', 'claude', 'copilot', 'relay']).toContain(body.bridge);
+  // The relay bridge cannot answer by itself, so it must hand back a prompt
+  // the user can paste into their own agent.
+  if (body.bridge === 'relay') expect(body.prompt).toBeTruthy();
 });
 
 // ---------------------------------------------------------------------------
@@ -1055,7 +1058,7 @@ test('bridge status – response has expected shape', async ({ page }) => {
   const resp = await page.request.get('/bridge-status');
   expect(resp.status()).toBe(200);
   const body = await resp.json() as { kind: string; detail?: string };
-  expect(['windsurf', 'claude', 'copilot', 'none']).toContain(body.kind);
+  expect(['devin', 'claude', 'copilot', 'relay']).toContain(body.kind);
   // detail is always present (may be empty string for active bridges)
   expect(typeof body.detail).toBe('string');
 });

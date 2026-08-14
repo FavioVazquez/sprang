@@ -35,6 +35,34 @@ export async function loadGraph(_graphPath?: string): Promise<KnowledgeGraph | n
   return null;
 }
 
+export interface GraphStatus {
+  ok: boolean;
+  code: 'GRAPH_OK' | 'GRAPH_NOT_FOUND' | 'GRAPH_INVALID' | 'GRAPH_READ_ERROR';
+  error?: string;
+  graph_path?: string;
+  /** Condensed Zod issues — only present for GRAPH_INVALID. */
+  validation_issues?: string;
+  remedy?: string;
+}
+
+/**
+ * Ask the server *why* the graph is unusable.
+ *
+ * `loadGraph()` returning null is ambiguous — no graph yet vs. a graph that
+ * exists but fails schema validation. Only the latter means a re-scan is the
+ * wrong remedy, so the UI needs to tell them apart.
+ */
+export async function loadGraphStatus(): Promise<GraphStatus | null> {
+  try {
+    const res = await fetch('/graph-status');
+    const data: unknown = await res.json();
+    if (data && typeof data === 'object' && 'code' in data) return data as GraphStatus;
+  } catch {
+    // Endpoint unavailable (e.g. static hosting) — caller falls back to generic messaging.
+  }
+  return null;
+}
+
 export function getRiskColor(score: number): string {
   if (score >= 0.7) return '#ef4444'; // risk.high
   if (score >= 0.4) return '#f59e0b'; // risk.medium

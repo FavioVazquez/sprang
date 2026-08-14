@@ -105,7 +105,7 @@ export default tseslint.config(
 
   // ── CLI bin + scripts (CJS/ESM, Node globals) ────────────────────────────────
   {
-    files: ['packages/cli/bin/**/*.js', 'packages/cli/scripts/**/*.mjs'],
+    files: ['packages/cli/bin/**/*.js', 'packages/cli/scripts/**/*.mjs', 'scripts/**/*.mjs'],
     languageOptions: {
       sourceType: 'module',
       globals: { ...globals.node },

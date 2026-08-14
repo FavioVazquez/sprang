@@ -2,34 +2,37 @@
   "permissions": {
     "allow": [
       "Bash(npx @faviovazquez/sprang*)",
+      "Bash(sprang *)",
       "Bash(node packages/mcp/dist/server.js*)",
-      "Bash(pnpm --filter @sprang/dashboard dev*)",
+      "Bash(node packages/cli/dist/index.js*)",
+      "Bash(pnpm --filter @sprang/dashboard *)",
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(git rev-parse*)",
-      "Bash(cat .sprang/agent-conversation.md*)"
+      "Bash(cat .sprang/agent-conversation.md*)",
+      "mcp__sprang__*"
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": [".claude/hooks/post-tool-use.sh"]
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash",
-            "args": [".claude/hooks/session-start.sh"]
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-tool-use.sh\"",
+            "timeout": 10
           }
         ]
       }

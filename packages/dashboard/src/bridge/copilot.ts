@@ -78,6 +78,8 @@ Question: ${question}`;
     result = spawnSync('copilot', args, {
       cwd: sprangRoot,
       timeout: COPILOT_TIMEOUT_MS,
+      // See STDIN note in askCopilotBackground.
+      stdio: ['ignore', 'pipe', 'pipe'],
       maxBuffer: 10 * 1024 * 1024,
       encoding: 'utf-8',
     });
@@ -137,6 +139,7 @@ export function askCopilotBackground(
   question: string,
   sprangRoot: string,
   responsePath: string,
+  onFailure?: (error: string) => void,
 ): void {
   const sessionId = loadSessionId(sprangRoot);
 
@@ -149,13 +152,26 @@ Question: ${question}`;
   const args = ['--prompt', prompt, '--output-format', 'json'];
   if (sessionId) args.push(`--resume=${sessionId}`);
 
-  const child = spawn('copilot', args, { cwd: sprangRoot, timeout: COPILOT_TIMEOUT_MS });
+  // Close stdin: these CLIs block waiting for piped input when stdin is
+  // inherited from a server process, then exit non-zero. The prompt is passed
+  // as an argument, not on stdin.
+  const child = spawn('copilot', args, {
+    cwd: sprangRoot,
+    timeout: COPILOT_TIMEOUT_MS,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   let stdout = '';
+  let stderr = '';
   child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf-8'); });
+  child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf-8'); });
+  child.on('error', (err) => onFailure?.(`copilot could not be started: ${err.message}`));
 
   child.on('close', (code) => {
-    if (code !== 0 || !stdout.trim()) return;
+    if (code !== 0 || !stdout.trim()) {
+      onFailure?.(`copilot exited with code ${code}: ${(stderr || stdout).trim().slice(0, 300)}`);
+      return;
+    }
     let responseText = stdout.trim();
     let parsedSessionId: string | undefined;
     const textParts: string[] = [];

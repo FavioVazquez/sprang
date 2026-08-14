@@ -12,7 +12,7 @@ export interface LLMOptions {
 /**
  * LLMClient is a simple interface for optional LLM enrichment.
  *
- * In production, your AI agent (Claude Code, Windsurf, Copilot) IS the LLM — it reads
+ * In production, your AI agent (Devin, Claude Code, Copilot) IS the LLM — it reads
  * the knowledge graph via MCP tools and applies its own intelligence. This client is only
  * used when an
  * explicit enrichment pass is requested with a custom implementation.

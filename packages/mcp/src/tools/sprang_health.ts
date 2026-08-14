@@ -1,4 +1,4 @@
-import type { GraphLoader } from '../graph-loader.js';
+import type { GraphLoader, GraphError } from '../graph-loader.js';
 import type { RiskFactor, SmellCategory } from '@sprang/core';
 import { calcHealthGrade, gradeColor, loadHistory } from '@sprang/core';
 
@@ -55,10 +55,10 @@ export interface SprangHealthResult {
 export async function sprangHealth(
   loader: GraphLoader,
   _input: SprangHealthInput
-): Promise<SprangHealthResult | { error: string; code: string }> {
+): Promise<SprangHealthResult | GraphError | { error: string; code: string }> {
   const graph = await loader.getGraph();
   if (!graph) {
-    return { error: 'Knowledge graph not found — run sprang scan first', code: 'GRAPH_NOT_FOUND' };
+    return loader.getError();
   }
 
   // Build edge lookup for orphan detection

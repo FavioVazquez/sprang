@@ -36,6 +36,25 @@ export function makeScanCommand(): Command {
           process.stdout.write(`[sprang] Graph is current (commit: ${shortSha}). Skipping scan.\n`);
           return;
         }
+
+        // Refuse to trade an enriched graph for a skeleton one.
+        //
+        // --if-stale exists for the post-commit hook, which runs --phase1-only.
+        // Left unguarded that silently replaces a `complete` graph — semantic
+        // summaries, layers, tours, domains, risk scores — with a bare skeleton,
+        // just because HEAD moved. Observed in practice: 980 nodes/`complete`
+        // became 270 nodes/`skeleton` after one commit, with no warning.
+        //
+        // A slightly stale enriched graph beats a fresh empty one, so keep it and
+        // tell the user how to refresh properly.
+        if (options.phase1Only && graph?.phase === 'complete') {
+          process.stdout.write(
+            '[sprang] Graph is stale but enriched (phase: complete). Refusing to overwrite it ' +
+            'with a Phase 1 skeleton.\n' +
+            '[sprang] Run `sprang scan` for a full refresh, or /sprang-analyze to re-enrich.\n',
+          );
+          return;
+        }
       }
 
       const spinner = ora('Phase 1: Scanning files...').start();

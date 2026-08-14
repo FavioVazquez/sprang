@@ -1,0 +1,60 @@
+{
+  "SessionStart": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/session-start.sh",
+          "timeout": 10
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "matcher": "^exec$",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/post-tool-use.sh",
+          "timeout": 10
+        }
+      ]
+    },
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/post-tool-dashboard-question.sh",
+          "timeout": 10
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/stop-dashboard-question.sh",
+          "timeout": 115
+        }
+      ]
+    }
+  ],
+  "UserPromptSubmit": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/user-prompt-dashboard-question.sh",
+          "timeout": 10
+        }
+      ]
+    }
+  ]
+}

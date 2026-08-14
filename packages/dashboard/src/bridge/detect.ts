@@ -1,38 +1,48 @@
 /**
- * Bridge detection — determines which agent bridge is available at runtime.
+ * Bridge detection — determines how the dashboard can reach an AI agent.
  *
  * Priority order:
- *  1. windsurf  — cascade-messaging extension watching .cascade-trigger-session
- *  2. claude    — `claude` CLI available (Claude Code)
- *  3. copilot   — `copilot` CLI available (GitHub Copilot CLI)
- *  4. none      — no bridge; user must ask their agent directly
+ *  1. devin-local — the Devin session already running in your editor, reached
+ *                   through the Stop / UserPromptSubmit hooks. First because it
+ *                   is already authenticated and already has your context: no
+ *                   second login, no extension, no new conversation.
+ *  2. devin       — `devin` CLI on PATH and authenticated
+ *  3. claude      — `claude` CLI available (Claude Code)
+ *  4. copilot     — `copilot` CLI available (GitHub Copilot CLI)
+ *  5. relay       — nothing drivable; the user pastes the question themselves
+ *
+ * Every option below the first converges on the same response file, so the
+ * dashboard's polling path never changes. `relay` is always reachable, so
+ * there is no "no bridge" state.
  */
 
 import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
+import { isDevinCLIAvailable } from './devin.js';
+import { isDevinLocalAvailable, isInsideDevinDesktop } from './devin-local.js';
 
-export type BridgeKind = 'windsurf' | 'claude' | 'copilot' | 'none';
+export type BridgeKind = 'devin-local' | 'devin' | 'claude' | 'copilot' | 'relay';
 
 export interface BridgeStatus {
   kind: BridgeKind;
   detail: string;
 }
 
-/** Returns true if running inside Windsurf / Devin Desktop.
- *
- *  Detection signals (any one is sufficient):
- *  1. WINDSURF_CASCADE_TERMINAL_KIND env var — present when Vite is launched from a
- *     Windsurf/Devin Desktop terminal (the most reliable signal when available).
- *  2. .sprang/.cascade-bridge-active marker — written by the cascade-messaging extension
- *     on activation, deleted on deactivation. Works even when the server was started
- *     outside the IDE terminal (e.g. via a script or system service).
- *  3. .cascade-trigger-session exists — legacy fallback (extension wrote it previously). */
-export function isWindsurfBridgeActive(sprangRoot: string): boolean {
-  if (process.env['WINDSURF_CASCADE_TERMINAL_KIND'] !== undefined) return true;
-  if (fs.existsSync(path.join(sprangRoot, '.sprang', '.cascade-bridge-active'))) return true;
-  return fs.existsSync(path.join(sprangRoot, '.cascade-trigger-session'));
+export interface BridgeOption {
+  kind: BridgeKind;
+  /** Whether this bridge can actually answer right now. */
+  available: boolean;
+  detail: string;
+  /** Human label for the picker. */
+  label: string;
 }
+
+const LABELS: Record<BridgeKind, string> = {
+  'devin-local': 'Devin (this editor session)',
+  devin: 'Devin CLI',
+  claude: 'Claude Code',
+  copilot: 'Copilot CLI',
+  relay: 'Copy / paste',
+};
 
 /** Returns true if the `claude` CLI is available on PATH and responds. */
 export function isClaudeCLIAvailable(): boolean {
@@ -54,24 +64,94 @@ export function isCopilotCLIAvailable(): boolean {
   }
 }
 
+export { isDevinCLIAvailable, isDevinLocalAvailable };
+
+/**
+ * Every bridge and whether it can answer right now.
+ *
+ * Auto-selection alone is not enough: a machine can easily have Devin, Claude
+ * and Copilot installed at once, and picking by fixed priority silently routes
+ * a question to an agent the user did not intend — or, worse, to one whose
+ * credentials have quietly expired. The dashboard shows this list so the choice
+ * is explicit and the reason a bridge is unavailable is visible.
+ */
+export function listBridges(sprangRoot: string): BridgeOption[] {
+  const devinLocal = isDevinLocalAvailable(sprangRoot);
+  const devinCli = isDevinCLIAvailable();
+  const claude = isClaudeCLIAvailable();
+  const copilot = isCopilotCLIAvailable();
+
+  return [
+    {
+      kind: 'devin-local',
+      available: devinLocal,
+      label: LABELS['devin-local'],
+      detail: devinLocal
+        ? 'Answered in your editor session, with its full context'
+        : 'No dashboard-question hook configured — run `sprang init --platform devin`',
+    },
+    {
+      kind: 'devin',
+      available: devinCli,
+      label: LABELS.devin,
+      detail: devinCli
+        ? (process.env['WINDSURF_API_KEY'] ? 'Authenticated via WINDSURF_API_KEY' : 'Authenticated CLI on PATH')
+        : 'Not installed, or not logged in (`devin auth login`, or export WINDSURF_API_KEY)',
+    },
+    {
+      kind: 'claude',
+      available: claude,
+      label: LABELS.claude,
+      detail: claude ? 'claude CLI on PATH' : 'claude CLI not found',
+    },
+    {
+      kind: 'copilot',
+      available: copilot,
+      label: LABELS.copilot,
+      detail: copilot ? 'copilot CLI on PATH' : 'copilot CLI not found',
+    },
+    {
+      kind: 'relay',
+      available: true,
+      label: LABELS.relay,
+      detail: 'Always available — you paste the question into any agent',
+    },
+  ];
+}
+
 /** Detect the best available bridge. */
 export function detectBridge(sprangRoot: string): BridgeStatus {
-  // 1. Windsurf extension (real-time, no CLI needed)
-  if (isWindsurfBridgeActive(sprangRoot)) {
-    return { kind: 'windsurf', detail: 'cascade-messaging extension active' };
+  // An authenticated CLI outranks the in-editor hooks on purpose: hooks can only
+  // deliver when something happens in the session, so a question asked while the
+  // editor is idle waits until you come back. The CLI always answers. Users who
+  // prefer in-context replies can pick devin-local in the dashboard.
+  if (isDevinCLIAvailable()) {
+    return {
+      kind: 'devin',
+      detail: process.env['WINDSURF_API_KEY']
+        ? 'devin CLI authenticated via WINDSURF_API_KEY (same account as the IDE)'
+        : 'devin CLI, authenticated — answers even while the editor session is idle',
+    };
   }
-  // 2. Claude Code CLI
+  if (isDevinLocalAvailable(sprangRoot)) {
+    return {
+      kind: 'devin-local',
+      detail: 'Devin session in your editor — delivered by the Sprang lifecycle hooks',
+    };
+  }
   if (isClaudeCLIAvailable()) {
     return { kind: 'claude', detail: 'claude CLI available' };
   }
-  // 3. GitHub Copilot CLI
   if (isCopilotCLIAvailable()) {
     return { kind: 'copilot', detail: 'copilot CLI available' };
   }
-  // 4. No bridge
   return {
-    kind: 'none',
-    detail:
-      'No agent bridge found. Windsurf: install cascade-messaging extension. Claude Code: install claude CLI. Copilot: install GitHub Copilot CLI.',
+    kind: 'relay',
+    detail: isInsideDevinDesktop()
+      ? 'Running inside Devin Desktop, but no dashboard-question hook is configured — ' +
+        'run `sprang init --platform devin` to install it, or copy the question across ' +
+        'manually. Either way Devin answers via the sprang_respond MCP tool.'
+      : 'No agent CLI detected. Copy the question into your agent (Devin Desktop, Cursor, …) — ' +
+        'it will answer via the sprang_respond MCP tool and the reply appears here.',
   };
 }

@@ -9,12 +9,26 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { detectBridge, clearAgentSession } from '../bridge/index.js';
+import { knowledgeGraphSchema, summarizeZodIssues } from '@sprang/core';
+import { bridgeLog } from '../bridge/log.js';
+import { detectBridge, listBridges, clearAgentSession } from '../bridge/index.js';
 import { askClaudeBackground } from '../bridge/claude.js';
 import { askCopilotBackground } from '../bridge/copilot.js';
-import { writeWindsurfTrigger, getWindsurfResponsePath } from '../bridge/windsurf.js';
+import { askDevinBackground } from '../bridge/devin.js';
+import { writeRelayQuestion, getResponsePath } from '../bridge/relay.js';
 
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024; // 1 MB cap
+
+/** Write the agent response file atomically, in the shape every bridge uses. */
+function writeAgentResponse(responsePath: string, payload: Record<string, unknown>): void {
+  const dir = path.dirname(responsePath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = responsePath + '.tmp';
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf-8');
+    fs.renameSync(tmp, responsePath);
+  } catch { /* the dashboard will keep polling; nothing better to do here */ }
+}
 
 const EXT_TO_LANG: Record<string, string> = {
   ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx',
@@ -139,6 +153,85 @@ export function registerRoutes(
     }
   });
 
+  // GET /graph-status — why the graph isn't usable, if it isn't.
+  //
+  // Without this the UI cannot tell "no graph yet" (run a scan) apart from
+  // "graph exists but is schema-invalid" (a scan will NOT fix it) — the exact
+  // confusion that made an enrichment bug look like a missing graph.
+  register('/graph-status', (_req, res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Type', 'application/json');
+    const graphFile = resolveGraphFile('knowledge-graph.json', getRoot);
+    if (!graphFile) {
+      res.statusCode = 404;
+      res.end(JSON.stringify({
+        ok: false,
+        code: 'GRAPH_NOT_FOUND',
+        error: 'No knowledge graph found',
+        remedy: 'Run `sprang scan` (or /sprang) to build one.',
+      }));
+      return;
+    }
+    try {
+      const parsed: unknown = JSON.parse(fs.readFileSync(graphFile, 'utf-8'));
+      const result = knowledgeGraphSchema.safeParse(parsed);
+      if (result.success) {
+        res.statusCode = 200;
+        res.end(JSON.stringify({ ok: true, code: 'GRAPH_OK', graph_path: graphFile }));
+        return;
+      }
+      res.statusCode = 422;
+      res.end(JSON.stringify({
+        ok: false,
+        code: 'GRAPH_INVALID',
+        error: 'Knowledge graph exists but failed schema validation',
+        graph_path: graphFile,
+        validation_issues: summarizeZodIssues(result.error),
+        remedy: 'Re-run `sprang merge` to re-normalise the intermediate chunks, or re-run /sprang-analyze. `sprang scan` will not fix this.',
+      }));
+    } catch (err) {
+      res.statusCode = 422;
+      res.end(JSON.stringify({
+        ok: false,
+        code: 'GRAPH_READ_ERROR',
+        error: err instanceof Error ? err.message : String(err),
+        graph_path: graphFile,
+        remedy: 'The file is not valid JSON. Re-run `sprang merge` or `sprang scan`.',
+      }));
+    }
+  });
+
+  // POST /agent-heartbeat — "someone is sitting in the Ask Agent panel".
+  //
+  // The Stop hook uses this to decide whether to hold a finished turn open for
+  // a few seconds listening for a question. Without the signal it returns
+  // instantly, so ordinary work is untouched; with it, a question asked from
+  // the dashboard is picked up with no keystroke at all.
+  register('/agent-heartbeat', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    const marker = path.join(getRoot(), '.sprang', '.dashboard-listening');
+    try {
+      // sendBeacon can only POST, so it signals closure with ?close=1.
+      const closing = req.method === 'DELETE' || (req.url ?? '').includes('close=1');
+      if (closing) {
+        // Explicit close beats any timeout: browsers throttle timers in hidden
+        // tabs, so "recently pinged" is not a reliable proxy for "panel open" —
+        // and the tab is *always* hidden at the moment this matters, because the
+        // user has switched to the editor.
+        if (fs.existsSync(marker)) fs.unlinkSync(marker);
+      } else {
+        const dir = path.dirname(marker);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(marker, new Date().toISOString());
+      }
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true }));
+    } catch {
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: false }));
+    }
+  });
+
   // GET /diff-overlay.json
   register('/diff-overlay.json', (_req, res) => {
     const overlayFile = resolveGraphFile('diff-overlay.json', getRoot);
@@ -180,7 +273,10 @@ export function registerRoutes(
   register('/bridge-status', (_req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.statusCode = 200;
-    res.end(JSON.stringify(detectBridge(getRoot())));
+    // `kind` is the auto-selected default; `options` lets the UI offer a choice
+    // and explain why an agent is unavailable instead of silently skipping it.
+    const root = getRoot();
+    res.end(JSON.stringify({ ...detectBridge(root), options: listBridges(root) }));
   });
 
   // POST /agent-ask
@@ -206,24 +302,60 @@ export function registerRoutes(
     req.on('end', () => {
       if (aborted) return;
       try {
-        const { message } = JSON.parse(body) as { message?: string };
+        const { message, bridge: requested } = JSON.parse(body) as { message?: string; bridge?: string };
         if (!message || typeof message !== 'string' || message.trim() === '') {
           res.statusCode = 400; res.end(JSON.stringify({ error: 'message field required' })); return;
         }
         const userMessage = message.trim().slice(0, 4096);
         const sprangRoot = getRoot();
-        const bridge = detectBridge(sprangRoot);
-        if (bridge.kind === 'none') { res.statusCode = 503; res.end(JSON.stringify({ error: bridge.detail ?? 'No agent bridge available' })); return; }
-        const responsePath = getWindsurfResponsePath(sprangRoot);
+        // An explicit pick from the dashboard wins, but only if that bridge can
+        // actually answer; otherwise fall back to auto-detection.
+        const chosen = requested
+          ? listBridges(sprangRoot).find((b) => b.kind === requested && b.available)
+          : undefined;
+        const bridge = chosen ? { kind: chosen.kind, detail: chosen.detail } : detectBridge(sprangRoot);
+        const responsePath = getResponsePath(sprangRoot);
         if (fs.existsSync(responsePath)) { try { fs.unlinkSync(responsePath); } catch { /* ignore */ } }
+        // devin-local and relay both work by staging the question file. With the
+        // Sprang Devin Bridge extension installed it is picked up automatically
+        // and pushed into the Devin chat; without it the user pastes the prompt.
+        bridgeLog(sprangRoot, 'ask', {
+          bridge: bridge.kind,
+          requested: requested ?? '(auto)',
+          question: userMessage,
+        });
+        const staged = bridge.kind === 'devin-local' || bridge.kind === 'relay';
+        const prompt = staged ? writeRelayQuestion(userMessage, sprangRoot) : undefined;
         res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, sent: userMessage, mode: 'async' }));
-        if (bridge.kind === 'windsurf') {
-          writeWindsurfTrigger(userMessage, sprangRoot);
+        res.end(JSON.stringify({ ok: true, sent: userMessage, mode: 'async', bridge: bridge.kind, prompt }));
+        // A CLI can be installed and still be unable to answer — a revoked
+        // OAuth token, an unsupported model, a rate limit. Detection cannot see
+        // any of that (`claude auth status` reports loggedIn:true for a revoked
+        // token), so the only reliable signal is the call itself failing. When
+        // it does, degrade to the relay rather than leaving the panel spinning.
+        const degradeToRelay = (kind: string) => (error: string) => {
+          bridgeLog(sprangRoot, 'degrade', { from: kind, error });
+          const relayPrompt = writeRelayQuestion(userMessage, sprangRoot);
+          writeAgentResponse(responsePath, {
+            response:
+              `The ${kind} CLI is installed but could not answer:\n\n${error}\n\n` +
+              'Falling back to manual relay — paste the prompt below into your agent ' +
+              'and it will reply here via the sprang_respond MCP tool.\n\n' +
+              '```\n' + relayPrompt + '```',
+            question: userMessage,
+            written_at: new Date().toISOString(),
+            bridge: 'relay',
+            degraded_from: kind,
+            error,
+          });
+        };
+
+        if (bridge.kind === 'devin') {
+          askDevinBackground(userMessage, sprangRoot, responsePath, degradeToRelay('devin'));
         } else if (bridge.kind === 'claude') {
-          askClaudeBackground(userMessage, sprangRoot, responsePath);
+          askClaudeBackground(userMessage, sprangRoot, responsePath, degradeToRelay('claude'));
         } else if (bridge.kind === 'copilot') {
-          askCopilotBackground(userMessage, sprangRoot, responsePath);
+          askCopilotBackground(userMessage, sprangRoot, responsePath, degradeToRelay('copilot'));
         }
       } catch {
         res.statusCode = 400; res.end(JSON.stringify({ error: 'Invalid JSON body' }));
@@ -238,7 +370,7 @@ export function registerRoutes(
       clearAgentSession(getRoot());
       res.statusCode = 200; res.end(JSON.stringify({ ok: true })); return;
     }
-    const responsePath = getWindsurfResponsePath(getRoot());
+    const responsePath = getResponsePath(getRoot());
     if (fs.existsSync(responsePath)) {
       try { res.statusCode = 200; res.end(fs.readFileSync(responsePath, 'utf-8')); }
       catch { res.statusCode = 500; res.end(JSON.stringify({ error: 'Failed to read response' })); }

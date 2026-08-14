@@ -69,7 +69,7 @@ jobs:
         run: pnpm build
 
       - name: Build dashboard static files
-        run: pnpm --filter @sprang/dashboard build
+        run: pnpm --filter '@sprang/dashboard...' build
 
       - name: Resolve & verify version
         id: ver
@@ -103,9 +103,12 @@ jobs:
         run: |
           PKG_VERSION="${{ steps.ver.outputs.version }}"
           # Only the versioned plugin manifests are checked here. marketplace.json
-          # (a Claude marketplace listing) and .devin/config.json (an mcpServers
+          # (a Claude marketplace listing) and .devin/mcp_config.json (an mcpServers
           # block) intentionally carry no version field, so they are excluded.
-          for f in .claude-plugin/plugin.json .copilot-plugin/plugin.json; do
+          # The list must track the manifests that actually exist: 0.3.0 added
+          # .devin-plugin/ and moved the Copilot manifest to the repo root, so the
+          # old .copilot-plugin/ entry was silently skipping every check.
+          for f in .claude-plugin/plugin.json .devin-plugin/plugin.json plugin.json; do
             if [ -f "$f" ]; then
               V=$(node -e "console.log(require('./$f').version || '?')")
               echo "$f: $V"

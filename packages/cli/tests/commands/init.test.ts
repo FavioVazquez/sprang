@@ -22,41 +22,56 @@ afterEach(() => {
 });
 
 describe('sprang init', () => {
-  it('writes .mcp.json with an absolute server path and no scaffold by default', () => {
+  it('defaults to the Devin layout and scaffolds nothing without --platform', () => {
     const root = project();
     expect(init(root).status).toBe(0);
-    expect(existsSync(join(root, '.mcp.json'))).toBe(true);
-    const cfg = JSON.parse(readFileSync(join(root, '.mcp.json'), 'utf-8'));
+    const cfg = JSON.parse(readFileSync(join(root, '.devin', 'mcp_config.json'), 'utf-8'));
     expect(cfg.mcpServers.sprang.args[0]).toMatch(/^\/.+(mcp-server\.cjs|server\.cjs)$/);
-    expect(cfg.mcpServers.sprang.env.SPRANG_ROOT).toBe('.');
+    expect(cfg.mcpServers.sprang.env.SPRANG_ROOT).toBe('${workspaceFolder}');
     // No agent files scaffolded without --platform
+    expect(existsSync(join(root, '.devin', 'skills'))).toBe(false);
     expect(existsSync(join(root, '.claude'))).toBe(false);
   });
 
-  it('--platform claude scaffolds commands, rules, skills (with merge.py) and CLAUDE.md', () => {
+  it('--platform devin scaffolds skills, rules and hooks into .devin/', () => {
+    const root = project();
+    expect(init(root, ['--platform', 'devin']).status).toBe(0);
+    expect(readdirSync(join(root, '.devin', 'skills')).length).toBe(11);
+    expect(readdirSync(join(root, '.devin', 'rules')).length).toBe(3);
+    expect(existsSync(join(root, '.devin', 'hooks.v1.json'))).toBe(true);
+    expect(existsSync(join(root, '.devin', 'hooks', 'session-start.sh'))).toBe(true);
+    expect(existsSync(join(root, 'AGENTS.md'))).toBe(true);
+    expect(existsSync(join(root, '.devin', 'skills', 'sprang-analyze', 'scripts', 'merge.py'))).toBe(true);
+    // Installing only one tree keeps the slash command as plain `/sprang`
+    // instead of the disambiguated `/devin:sprang` / `/claude:sprang`.
+    expect(existsSync(join(root, '.claude'))).toBe(false);
+  });
+
+  it('--platform claude scaffolds skills, rules, settings and CLAUDE.md', () => {
     const root = project();
     expect(init(root, ['--platform', 'claude']).status).toBe(0);
-    expect(readdirSync(join(root, '.claude', 'commands')).length).toBe(11);
-    expect(readdirSync(join(root, '.claude', 'rules')).length).toBeGreaterThanOrEqual(3);
+    expect(readdirSync(join(root, '.claude', 'skills')).length).toBe(11);
+    expect(readdirSync(join(root, '.claude', 'rules')).length).toBe(3);
+    expect(existsSync(join(root, '.claude', 'settings.json'))).toBe(true);
     expect(existsSync(join(root, 'CLAUDE.md'))).toBe(true);
-    expect(existsSync(join(root, 'skills', 'sprang-analyze', 'scripts', 'merge.py'))).toBe(true);
+    expect(existsSync(join(root, '.claude', 'skills', 'sprang-analyze', 'scripts', 'merge.py'))).toBe(true);
+    // Claude merged slash commands into skills; .claude/commands must not return
+    expect(existsSync(join(root, '.claude', 'commands'))).toBe(false);
     // dev-only worktrees must never be copied
     expect(existsSync(join(root, '.claude', 'worktrees'))).toBe(false);
   });
 
-  it('--platform windsurf writes .devin/config.json with ${workspaceFolder} and copies workflows', () => {
-    const root = project();
-    expect(init(root, ['--platform', 'windsurf']).status).toBe(0);
-    const cfg = JSON.parse(readFileSync(join(root, '.devin', 'config.json'), 'utf-8'));
-    expect(cfg.mcpServers.sprang.env.SPRANG_ROOT).toBe('${workspaceFolder}');
-    expect(readdirSync(join(root, '.windsurf', 'workflows')).length).toBe(11);
-  });
-
-  it('--platform copilot writes .vscode/mcp.json and copies copilot-instructions.md', () => {
+  it('--platform copilot writes both MCP locations and copies the instructions', () => {
     const root = project();
     expect(init(root, ['--platform', 'copilot']).status).toBe(0);
+    // .vscode/mcp.json for the VS Code extension, .mcp.json for the CLI
     expect(existsSync(join(root, '.vscode', 'mcp.json'))).toBe(true);
+    expect(existsSync(join(root, '.mcp.json'))).toBe(true);
     expect(existsSync(join(root, '.github', 'copilot-instructions.md'))).toBe(true);
+    expect(readdirSync(join(root, 'skills')).length).toBe(11);
+    // Copying `.github` wholesale used to drop Sprang's own ci.yml/publish.yml
+    // into the user's repository.
+    expect(existsSync(join(root, '.github', 'workflows'))).toBe(false);
   });
 
   it('rejects an unknown platform', () => {

@@ -3,7 +3,37 @@ import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 
 import { execSync } from 'node:child_process';
 import { Command } from 'commander';
 import ora from 'ora';
-import { normalizeAssembledGraph, knowledgeGraphSchema, summarizeZodIssues } from '@sprang/core';
+import {
+  normalizeAssembledGraph,
+  knowledgeGraphSchema,
+  summarizeZodIssues,
+  applyNodeWarnings,
+  NODE_WARNINGS_FILE,
+  type NodeWarningsIndex,
+} from '@sprang/core';
+
+/**
+ * `risk-scores.json` exists in two shapes: the `{ "<node-id>": {...} }` map the
+ * analyze skill tells agents to write, and the `{ nodes: [{ nodeId, ... }] }`
+ * record the Phase 1 risk-scorer emits. Reading only the first silently discarded
+ * all Phase 1 risk data, so accept both.
+ */
+function riskEntries(raw: unknown): Array<[string, Record<string, unknown>]> {
+  if (typeof raw !== 'object' || raw === null) return [];
+  const obj = raw as Record<string, unknown>;
+  if (Array.isArray(obj['nodes'])) {
+    return (obj['nodes'] as unknown[])
+      .filter((n): n is Record<string, unknown> => typeof n === 'object' && n !== null)
+      .map((n) => [String(n['nodeId'] ?? n['id'] ?? ''), n] as [string, Record<string, unknown>])
+      .filter(([id]) => id !== '');
+  }
+  return Object.entries(obj).filter(
+    (e): e is [string, Record<string, unknown>] => typeof e[1] === 'object' && e[1] !== null && !Array.isArray(e[1]),
+  );
+}
+
+/** Where every skill writes its chunk files. */
+const DEFAULT_INTERMEDIATE = '.sprang/intermediate';
 
 /**
  * Normalize a value that should be an array but agents sometimes write as a dict.
@@ -29,10 +59,15 @@ export function makeMergeCommand(): Command {
   cmd
     .description('Assemble intermediate chunk files into .sprang/knowledge-graph.json')
     .argument('[path]', 'Path to the project root', undefined)
-    .option('--intermediate <dir>', 'Directory containing chunk files', 'intermediate')
-    .action(async (pathArg: string | undefined, options: { intermediate: string }) => {
+    .option('--intermediate <dir>', 'Directory containing chunk files', DEFAULT_INTERMEDIATE)
+    .option('--kind <kind>', 'Graph kind: codebase or knowledge', 'codebase')
+    .action(async (pathArg: string | undefined, options: { intermediate: string; kind: string }) => {
+      if (options.kind !== 'codebase' && options.kind !== 'knowledge') {
+        console.error(`--kind must be "codebase" or "knowledge", got: ${options.kind}`);
+        process.exit(1);
+      }
       const projectRoot = resolve(pathArg ?? process.cwd());
-      const inter = resolve(projectRoot, options.intermediate);
+      let inter = resolve(projectRoot, options.intermediate);
       const outDir = join(projectRoot, '.sprang');
       const outPath = join(outDir, 'knowledge-graph.json');
 
@@ -42,6 +77,15 @@ export function makeMergeCommand(): Command {
       if (!inter.startsWith(projectRoot + '/') && inter !== projectRoot) {
         spinner.fail(`--intermediate must be a path within the project root, got: ${options.intermediate}`);
         process.exit(1);
+      }
+
+      // Tolerate the pre-0.3 default (`<root>/intermediate`), which no skill ever wrote to.
+      if (!existsSync(inter) && options.intermediate !== DEFAULT_INTERMEDIATE) {
+        const fallback = resolve(projectRoot, DEFAULT_INTERMEDIATE);
+        if (existsSync(fallback)) {
+          spinner.info(`No chunks at ${inter} — falling back to ${DEFAULT_INTERMEDIATE}`);
+          inter = fallback;
+        }
       }
 
       try {
@@ -105,14 +149,7 @@ export function makeMergeCommand(): Command {
             }
           } catch { /* skip */ }
         }
-        // Deduplicate edges by source+target+type
-        const edgeSet = new Map<string, unknown>();
-        for (const e of edges) {
-          const edge = e as Record<string, unknown>;
-          const key = `${edge['source']}::${edge['target']}::${edge['type']}`;
-          edgeSet.set(key, e);
-        }
-        edges = Array.from(edgeSet.values());
+        // Edge-type normalisation + dedupe happens in normalizeAssembledGraph below.
 
         // --- Load layers ---
         const layersPath = join(inter, 'final-layers.json');
@@ -160,19 +197,31 @@ export function makeMergeCommand(): Command {
           process.exit(1);
         }
 
+        // --- Restore Phase 1 per-node warnings (baseline; agent values win) ---
+        // Without this, enrichment silently drops every smell/security finding and
+        // the health grade improves for code that did not change.
+        const warningsPath = join(inter, NODE_WARNINGS_FILE);
+        if (existsSync(warningsPath)) {
+          try {
+            const index = JSON.parse(readFileSync(warningsPath, 'utf-8')) as NodeWarningsIndex;
+            const applied = applyNodeWarnings(nodes as Array<Record<string, unknown>>, index);
+            if (applied > 0) spinner.info(`Restored Phase 1 warnings on ${applied} nodes`);
+          } catch { spinner.warn(`Could not read ${NODE_WARNINGS_FILE}; skipping warning restore`); }
+        }
+
         // --- Apply risk-scores.json (risk_score, risk_factors, decision_context, warnings) ---
         const riskPath = join(inter, 'risk-scores.json');
         if (existsSync(riskPath)) {
           try {
-            const riskData = JSON.parse(readFileSync(riskPath, 'utf-8')) as Record<string, Record<string, unknown>>;
+            const raw = JSON.parse(readFileSync(riskPath, 'utf-8')) as unknown;
             const byId = new Map<string, Record<string, unknown>>();
             for (const n of nodes) {
               const node = n as Record<string, unknown>;
               if (typeof node['id'] === 'string') byId.set(node['id'], node);
             }
-            for (const [id, info] of Object.entries(riskData)) {
+            for (const [id, info] of riskEntries(raw)) {
               const node = byId.get(id);
-              if (!node || typeof info !== 'object' || info === null) continue;
+              if (!node) continue;
               for (const key of ['risk_score', 'risk_factors', 'decision_context', 'structural_warnings', 'security_warnings'] as const) {
                 if (info[key] != null) node[key] = info[key];
               }
@@ -203,18 +252,25 @@ export function makeMergeCommand(): Command {
         // --- Normalise agent-assembled pieces to the canonical schema (shared with merge.py) ---
         const norm = normalizeAssembledGraph({
           nodes,
+          edges,
           layers,
           tours,
           domains,
           metaSmellSummary: assembled['smell_summary'],
         });
 
+        const droppedTypes = Object.entries(norm.dropped_edge_types);
+        if (droppedTypes.length > 0) {
+          const detail = droppedTypes.map(([t, n]) => `${t} (${n})`).join(', ');
+          spinner.warn(`Dropped edges with unmappable types: ${detail}`);
+        }
+
         const now = new Date().toISOString();
 
         // --- Assemble complete valid graph ---
         const stats: Record<string, unknown> = {
           node_count: norm.nodes.length,
-          edge_count: edges.length,
+          edge_count: norm.edges.length,
           risk_summary: norm.risk_summary,
           smell_summary: norm.smell_summary,
           generated_at: now,
@@ -224,7 +280,7 @@ export function makeMergeCommand(): Command {
 
         const graph = {
           version: '0.2.0',
-          kind: 'codebase',
+          kind: (assembled['kind'] as string | undefined) ?? options.kind,
           generated_at: now,
           project_root: projectRoot,
           project_name: (assembled['project_name'] as string | undefined) ?? basename(projectRoot),
@@ -234,7 +290,7 @@ export function makeMergeCommand(): Command {
           phase: 'complete',
           stats,
           nodes: norm.nodes,
-          edges,
+          edges: norm.edges,
           layers: norm.layers,
           tours: norm.tours,
           domains: norm.domains,
@@ -254,7 +310,7 @@ export function makeMergeCommand(): Command {
         writeFileSync(outPath, JSON.stringify(graph, null, 2), 'utf-8');
 
         spinner.succeed(
-          `Graph written: ${norm.nodes.length} nodes, ${edges.length} edges, ${norm.layers.length} layers, ${norm.tours.length} tours, ${norm.domains.length} domains → ${outPath}`
+          `Graph written: ${norm.nodes.length} nodes, ${norm.edges.length} edges, ${norm.layers.length} layers, ${norm.tours.length} tours, ${norm.domains.length} domains → ${outPath}`
         );
       } catch (err) {
         spinner.fail(`merge failed: ${String(err)}`);

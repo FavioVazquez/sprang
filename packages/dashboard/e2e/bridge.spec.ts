@@ -1,39 +1,58 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 /**
- * Platform bridge e2e — exercises the REAL pipeline for all three agent
- * bridges through the dashboard HTTP endpoints, with mock platform CLIs on
- * PATH (see playwright.bridge.config.ts):
+ * Platform bridge e2e — exercises the REAL pipeline for every agent bridge
+ * through the dashboard HTTP endpoints, with mock platform CLIs on PATH
+ * (see playwright.bridge.config.ts):
  *
- *   POST /agent-ask → detectBridge → spawn CLI / write trigger file
- *   → background parse → .sprang/cascade-response.json → GET /agent-response
+ *   POST /agent-ask → detectBridge → spawn CLI (devin/claude/copilot) or stage
+ *   the relay question → background parse → .sprang/cascade-response.json
+ *   → GET /agent-response
  *
  * Unlike the vitest bridge unit tests (which stub spawnSync), nothing here is
  * stubbed: the preview server really spawns the mock executables, really
  * parses their stdout, really persists session files, and really writes the
  * response file the dashboard polls.
+ *
+ * Detection priority is devin → claude → copilot → relay, so each environment
+ * shadows the higher-priority CLIs it must not select.
  */
 
 const CLAUDE_URL = 'http://localhost:4174';
 const COPILOT_URL = 'http://localhost:4175';
+const DEVIN_URL = 'http://localhost:4176';
+const RELAY_URL = 'http://localhost:4177';
+const DEGRADED_URL = 'http://localhost:4178';
 
 // Playwright runs from packages/dashboard — these match SPRANG_ROOT of each server
 const claudeRoot = join(process.cwd(), 'e2e', '.bridge-root-claude');
 const copilotRoot = join(process.cwd(), 'e2e', '.bridge-root-copilot');
+const devinRoot = join(process.cwd(), 'e2e', '.bridge-root-devin');
+const relayRoot = join(process.cwd(), 'e2e', '.bridge-root-relay');
 const claudeLog = join(claudeRoot, 'mock-claude-args.log');
 const copilotLog = join(copilotRoot, 'mock-copilot-args.log');
+const devinLog = join(devinRoot, 'mock-devin-args.log');
 
 test.describe.configure({ mode: 'serial' });
 
-async function ask(request: APIRequestContext, baseURL: string, message: string) {
+interface AskBody {
+  ok: boolean;
+  sent: string;
+  mode: string;
+  bridge: string;
+  prompt?: string;
+}
+
+async function ask(request: APIRequestContext, baseURL: string, message: string): Promise<AskBody> {
   const res = await request.post(`${baseURL}/agent-ask`, {
     data: { message },
     headers: { 'Content-Type': 'application/json' },
   });
   expect(res.status()).toBe(200);
-  const body = (await res.json()) as { ok: boolean; sent: string; mode: string };
+  const body = (await res.json()) as AskBody;
   expect(body.ok).toBe(true);
   return body;
 }
@@ -136,44 +155,113 @@ test('claude bridge – second ask resumes the persisted session', async ({ requ
 });
 
 // ---------------------------------------------------------------------------
-// Windsurf / Devin Desktop bridge (marker file, highest detection priority)
+// Devin CLI bridge, unauthenticated (port 4174 — the claude environment also
+// carries a mock `devin` that reports "Not logged in")
 // ---------------------------------------------------------------------------
 
-test('windsurf bridge – marker file wins over claude CLI; trigger file written with protocol prefix', async ({
+test('devin bridge – an installed but unauthenticated devin is skipped in favour of claude', async ({
   request,
 }) => {
-  const marker = join(claudeRoot, '.sprang', '.cascade-bridge-active');
-  const trigger = join(claudeRoot, '.cascade-trigger-session');
-  fs.writeFileSync(marker, '');
+  // Precondition: a `devin` binary really is on that server's PATH…
+  const mockDevin = join(claudeRoot, 'bin', 'devin');
+  expect(fs.existsSync(mockDevin)).toBe(true);
+  // …it answers --version…
+  expect(execFileSync(mockDevin, ['--version'], { encoding: 'utf-8' })).toContain('devin');
+  // …but it is not logged in, exactly like the copy bundled with Devin Desktop.
+  expect(execFileSync(mockDevin, ['auth', 'status'], { encoding: 'utf-8' })).toMatch(/not logged in/i);
 
-  try {
-    // Detection now prefers windsurf even though the (mock) claude CLI exists
-    const status = (await (await request.get(`${CLAUDE_URL}/bridge-status`)).json()) as {
-      kind: string;
-    };
-    expect(status.kind).toBe('windsurf');
-
-    const body = await ask(request, CLAUDE_URL, 'Hello from the dashboard e2e test');
-    expect(body.mode).toBe('async');
-
-    // The Cascade trigger file is the Windsurf protocol surface
-    await waitForFile(trigger);
-    const content = fs.readFileSync(trigger, 'utf-8');
-    expect(content).toContain('[SPRANG DASHBOARD MESSAGE');
-    expect(content).toContain('Hello from the dashboard e2e test');
-    expect(content).toContain('sprang_respond');
-    // Atomic write left no temp file behind
-    expect(fs.existsSync(trigger + '.tmp')).toBe(false);
-  } finally {
-    fs.rmSync(marker, { force: true });
-    fs.rmSync(trigger, { force: true });
-  }
-
-  // With marker and trigger gone, detection falls back to claude
-  const after = (await (await request.get(`${CLAUDE_URL}/bridge-status`)).json()) as {
+  // Detection must therefore fall through devin → claude.
+  const status = (await (await request.get(`${CLAUDE_URL}/bridge-status`)).json()) as {
     kind: string;
   };
-  expect(after.kind).toBe('claude');
+  expect(status.kind).toBe('claude');
+});
+
+// ---------------------------------------------------------------------------
+// Devin CLI bridge (mock authenticated `devin` on PATH, port 4176)
+// ---------------------------------------------------------------------------
+
+test('devin bridge – /bridge-status detects an authenticated devin CLI', async ({ request }) => {
+  const res = await request.get(`${DEVIN_URL}/bridge-status`);
+  expect(res.status()).toBe(200);
+  const status = (await res.json()) as { kind: string; detail: string };
+  expect(status.kind).toBe('devin');
+});
+
+test('devin bridge – full ask pipeline: spawn, parse, response file', async ({ request }) => {
+  const body = await ask(request, DEVIN_URL, 'What is the health of this codebase?');
+  expect(body.bridge).toBe('devin');
+
+  const payload = await waitForAgentResponse(request, DEVIN_URL);
+  expect(payload.response).toContain('Mock Devin answer');
+  expect(payload.bridge).toBe('devin');
+  expect(payload.question).toBe('What is the health of this codebase?');
+
+  // The answer really landed in the one response file every bridge writes
+  const responseFile = join(devinRoot, '.sprang', 'cascade-response.json');
+  await waitForFile(responseFile);
+  const onDisk = JSON.parse(fs.readFileSync(responseFile, 'utf-8')) as { bridge: string };
+  expect(onDisk.bridge).toBe('devin');
+
+  // Print mode was invoked with the documented contract
+  const calls = readCalls(devinLog);
+  expect(calls.length).toBe(1);
+  const argv = calls[0]!;
+  expect(argv).toContain('-p');
+  expect(argv).toContain('--permission-mode');
+  expect(argv).toContain('--respect-workspace-trust');
+  expect(argv.join(' ')).toContain('What is the health of this codebase?');
+  // First call must NOT continue a previous conversation
+  expect(argv).not.toContain('--continue');
+});
+
+test('devin bridge – second ask continues the recorded conversation', async ({ request }) => {
+  // A turn was recorded by the previous test, so `-c` should now be passed.
+  expect(fs.existsSync(join(devinRoot, '.sprang', 'devin-session.json'))).toBe(true);
+
+  await ask(request, DEVIN_URL, 'And what about circular dependencies?');
+  await waitForAgentResponse(request, DEVIN_URL);
+
+  const calls = readCalls(devinLog);
+  expect(calls.length).toBe(2);
+  expect(calls[1]!).toContain('--continue');
+});
+
+// ---------------------------------------------------------------------------
+// Relay bridge (no drivable agent CLI on PATH, port 4177)
+// ---------------------------------------------------------------------------
+
+test('relay bridge – /bridge-status falls back to relay when no CLI is drivable', async ({
+  request,
+}) => {
+  const res = await request.get(`${RELAY_URL}/bridge-status`);
+  expect(res.status()).toBe(200);
+  const status = (await res.json()) as { kind: string; detail: string };
+  expect(status.kind).toBe('relay');
+  // There is no "no bridge" state — the detail explains the MCP return path.
+  expect(status.detail).toContain('sprang_respond');
+});
+
+test('relay bridge – /agent-ask stages the question for the user’s own agent', async ({
+  request,
+}) => {
+  const question = 'Hello from the dashboard e2e test';
+  const body = await ask(request, RELAY_URL, question);
+  expect(body.mode).toBe('async');
+  expect(body.bridge).toBe('relay');
+  expect(body.prompt).toBeTruthy();
+  expect(body.prompt).toContain(question);
+
+  const questionFile = join(relayRoot, '.sprang', 'agent-question.md');
+  await waitForFile(questionFile);
+  const content = fs.readFileSync(questionFile, 'utf-8');
+  expect(content).toBe(body.prompt);
+  expect(content).toContain('[SPRANG DASHBOARD MESSAGE');
+  expect(content).toContain(question);
+  // The agent answers by calling the MCP tool, which writes cascade-response.json
+  expect(content).toContain('sprang_respond');
+  // Atomic write left no temp file behind
+  expect(fs.existsSync(questionFile + '.tmp')).toBe(false);
 });
 
 // ---------------------------------------------------------------------------
@@ -235,4 +323,44 @@ test('copilot bridge – DELETE /agent-response clears the session; next ask sta
   const calls = readCalls(copilotLog);
   expect(calls.length).toBe(3);
   expect(calls[2]!.some((a) => a.startsWith('--resume='))).toBe(false);
+});
+
+
+// ---------------------------------------------------------------------------
+// Degradation: a CLI that passes detection but cannot actually answer
+// ---------------------------------------------------------------------------
+// Detection can only see whether a binary responds to `--version`. It cannot see
+// a revoked OAuth token, an unsupported model, or a rate limit — Claude's own
+// `auth status` even reports loggedIn:true for a revoked token. So the ask must
+// survive a CLI that looks fine and then fails, instead of leaving the panel
+// polling forever.
+
+test('degraded bridge – detection still selects the installed claude CLI', async ({ request }) => {
+  const res = await request.get(`${DEGRADED_URL}/bridge-status`);
+  expect(res.ok()).toBeTruthy();
+  expect((await res.json()).kind).toBe('claude');
+});
+
+test('degraded bridge – a failing CLI falls back to relay with the error and a paste-able prompt', async ({ request }) => {
+  const ask = await request.post(`${DEGRADED_URL}/agent-ask`, {
+    data: { message: 'what does the graph loader do?' },
+  });
+  expect(ask.ok()).toBeTruthy();
+  expect((await ask.json()).bridge).toBe('claude');
+
+  // Poll until the background spawn has failed and written the fallback.
+  let body: Record<string, unknown> | null = null;
+  for (let i = 0; i < 40; i++) {
+    const res = await request.get(`${DEGRADED_URL}/agent-response`);
+    if (res.status() === 200) { body = await res.json(); break; }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  expect(body, 'the panel must receive something rather than polling forever').not.toBeNull();
+  expect(body!['bridge']).toBe('relay');
+  expect(body!['degraded_from']).toBe('claude');
+  expect(String(body!['error'])).toContain('401');
+  // The user needs the real reason and a way to still get an answer.
+  expect(String(body!['response'])).toContain('revoked');
+  expect(String(body!['response'])).toContain('sprang_respond');
+  expect(String(body!['response'])).toContain('what does the graph loader do?');
 });

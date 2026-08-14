@@ -1,0 +1,20 @@
+{
+  "name": "sprang",
+  "version": "0.3.0",
+  "description": "Knowledge graph platform for instant codebase comprehension — git history, structural health, risk scoring, and architectural tours for any project",
+  "author": { "name": "FavioVazquez" },
+  "homepage": "https://github.com/faviovazquez/sprang",
+  "repository": "https://github.com/faviovazquez/sprang.git",
+  "license": "MIT",
+  "keywords": [
+    "knowledge-graph",
+    "codebase-analysis",
+    "architecture",
+    "git-history",
+    "risk-scoring",
+    "onboarding",
+    "dashboard"
+  ],
+  "skills": "./skills/",
+  "source": "."
+}

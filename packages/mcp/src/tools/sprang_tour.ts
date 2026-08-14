@@ -1,4 +1,4 @@
-import type { GraphLoader } from '../graph-loader.js';
+import type { GraphLoader, GraphError } from '../graph-loader.js';
 import type { Tour, TourStep, SprangNode, LanguageLesson } from '@sprang/core';
 
 export interface SprangTourInput {
@@ -85,10 +85,10 @@ function filterStepsForPersona(
 export async function sprangTour(
   loader: GraphLoader,
   input: SprangTourInput
-): Promise<SprangTourResult | SprangTourListResult | { error: string; code: string }> {
+): Promise<SprangTourResult | SprangTourListResult | GraphError | { error: string; code: string }> {
   const graph = await loader.getGraph();
   if (!graph) {
-    return { error: 'Knowledge graph not found', code: 'GRAPH_NOT_FOUND' };
+    return loader.getError();
   }
 
   if (graph.tours.length === 0) {

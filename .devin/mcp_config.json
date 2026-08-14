@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "sprang": {
+      "command": "node",
+      "args": [
+        "packages/mcp/dist/server.js"
+      ],
+      "env": {
+        "SPRANG_ROOT": "."
+      }
+    }
+  }
+}

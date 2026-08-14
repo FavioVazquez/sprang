@@ -9,13 +9,21 @@
 #   ./install.sh --help
 #
 # Supported platforms:
-#   windsurf   Devin Desktop / Windsurf (skills in ~/.windsurf/skills/)
-#   copilot    GitHub Copilot VS Code extension (skills in ~/.copilot/skills/)
-#   claude     Claude Code (project-local via .mcp.json — no global install needed)
+#   devin     Devin CLI / Devin Desktop
+#   claude    Claude Code
+#   copilot   GitHub Copilot CLI
+#
+# Each platform has a native plugin path (preferred) and a project-local path
+# (always works). This script sets up the project-local path and prints the
+# plugin command, because plugin availability differs per platform:
+#   - Claude  : `/plugin marketplace add` works today
+#   - Copilot : `copilot plugin install` works today
+#   - Devin   : plugins are in closed beta and require `devin auth login`,
+#               so the project-local `.devin/` layout is the primary route.
 #
 # Curl-pipe usage:
 #   curl -fsSL https://raw.githubusercontent.com/faviovazquez/sprang/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/faviovazquez/sprang/main/install.sh | bash -s windsurf
+#   curl -fsSL https://raw.githubusercontent.com/faviovazquez/sprang/main/install.sh | bash -s devin
 #
 # Environment:
 #   SPRANG_REPO_URL  Override clone URL (default: official GitHub repo)
@@ -28,46 +36,34 @@ set -euo pipefail
 REPO_URL="${SPRANG_REPO_URL:-https://github.com/faviovazquez/sprang.git}"
 REPO_DIR="${SPRANG_DIR:-$HOME/.sprang/repo}"
 
-# Platform table — id|skills-target-dir|style
-# style "per-skill": one symlink per skill dir into the target
-# style "folder":    one symlink for the whole skills/ dir named "sprang"
-platforms_table() {
-  cat <<EOF
-windsurf|$HOME/.windsurf/skills|per-skill
-copilot|$HOME/.copilot/skills|per-skill
-claude|__claude__|claude
-EOF
+PLATFORM_IDS=(devin claude copilot)
+
+platform_label() {
+  case "$1" in
+    devin)   printf 'Devin CLI / Devin Desktop' ;;
+    claude)  printf 'Claude Code' ;;
+    copilot) printf 'GitHub Copilot CLI' ;;
+  esac
 }
 
-platform_ids() { platforms_table | cut -d'|' -f1; }
-
 resolve_platform() {
-  local id="$1"
-  local row
-  row="$(platforms_table | awk -F'|' -v id="$id" '$1==id {print; exit}')"
-  if [[ -z "$row" ]]; then
-    printf 'Unknown platform: %s\n' "$id" >&2
-    printf 'Supported: %s\n' "$(platform_ids | tr '\n' ' ')" >&2
-    exit 1
-  fi
-  printf '%s\n' "$row"
+  local id="$1" p
+  for p in "${PLATFORM_IDS[@]}"; do
+    [[ "$p" == "$id" ]] && { printf '%s\n' "$id"; return; }
+  done
+  printf 'Unknown platform: %s\n' "$id" >&2
+  printf 'Supported: %s\n' "${PLATFORM_IDS[*]}" >&2
+  exit 1
 }
 
 prompt_platform() {
-  local ids=()
-  while IFS= read -r id; do ids+=("$id"); done < <(platform_ids)
-
   printf 'Which platform are you installing for?\n' >&2
-  local i=1
-  for id in "${ids[@]}"; do
-    case "$id" in
-      windsurf) printf '  %d) %s   — Devin Desktop / Windsurf\n' "$i" "$id" >&2 ;;
-      copilot)  printf '  %d) %s     — GitHub Copilot (VS Code)\n' "$i" "$id" >&2 ;;
-      claude)   printf '  %d) %s      — Claude Code (project-local)\n' "$i" "$id" >&2 ;;
-    esac
-    i=$((i+1))
+  local i=1 id
+  for id in "${PLATFORM_IDS[@]}"; do
+    printf '  %d) %-8s — %s\n' "$i" "$id" "$(platform_label "$id")" >&2
+    i=$((i + 1))
   done
-  printf 'Choose [1-%d]: ' "${#ids[@]}" >&2
+  printf 'Choose [1-%d]: ' "${#PLATFORM_IDS[@]}" >&2
 
   local choice=""
   if { exec 3</dev/tty; } 2>/dev/null; then
@@ -78,14 +74,14 @@ prompt_platform() {
   fi
   if [[ -z "$choice" ]]; then
     printf '\nNo input received. Pass the platform as an argument instead:\n' >&2
-    printf '  install.sh windsurf\n' >&2
+    printf '  install.sh devin\n' >&2
     exit 1
   fi
-  if ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#ids[@]} )); then
+  if ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#PLATFORM_IDS[@]} )); then
     printf 'Invalid choice: %s\n' "$choice" >&2
     exit 1
   fi
-  printf '%s\n' "${ids[$((choice-1))]}"
+  printf '%s\n' "${PLATFORM_IDS[$((choice - 1))]}"
 }
 
 install_cli_bin() {
@@ -94,14 +90,11 @@ install_cli_bin() {
     printf '  ⚠ CLI binary not found at %s — skipping PATH link\n' "$cli_bin"
     return
   fi
-  # Try ~/.local/bin first (XDG standard, no sudo needed)
   local bin_dir="${HOME}/.local/bin"
   mkdir -p "$bin_dir"
-  # Write a wrapper script so it works without 'node' prefix
   printf '#!/usr/bin/env sh\nexec node "%s" "$@"\n' "$cli_bin" > "$bin_dir/sprang"
   chmod +x "$bin_dir/sprang"
   printf '  ✓ sprang CLI linked → %s/sprang\n' "$bin_dir"
-  # Remind user to add ~/.local/bin to PATH if not already there
   if ! echo "$PATH" | grep -qF "$bin_dir"; then
     printf '  ℹ Add %s to your PATH if not already present:\n' "$bin_dir"
     printf '      echo '\''export PATH="$HOME/.local/bin:$PATH"'\'' >> ~/.zshrc  # or ~/.bashrc\n'
@@ -122,104 +115,83 @@ clone_or_update() {
   install_cli_bin
 }
 
-skills_root() {
-  # Skills live in .windsurf/skills/ (Windsurf/Devin format); also check .agents/skills/ fallback
-  if [[ -d "$REPO_DIR/.windsurf/skills" ]]; then
-    printf '%s\n' "$REPO_DIR/.windsurf/skills"
-  elif [[ -d "$REPO_DIR/.agents/skills" ]]; then
-    printf '%s\n' "$REPO_DIR/.agents/skills"
-  else
-    printf '%s\n' "$REPO_DIR/.windsurf/skills"
-  fi
+# Global skill directories. Project-level assets are installed per project with
+# `sprang init --platform <p>`; only Copilot reads a global skills dir today.
+global_skills_dir() {
+  case "$1" in
+    devin)   printf '%s/.config/devin/skills' "$HOME" ;;
+    copilot) printf '%s/.copilot/skills' "$HOME" ;;
+    claude)  printf '%s/.claude/skills' "$HOME" ;;
+  esac
 }
 
-list_skills() {
-  local root
-  root="$(skills_root)"
-  if [[ ! -d "$root" ]]; then
-    printf 'Skills directory not found: %s\n' "$root" >&2
-    exit 1
-  fi
+link_global_skills() {
+  local target="$1"
+  local root="$REPO_DIR/skills"
+  [[ -d "$root" ]] || { printf 'Skills directory not found: %s\n' "$root" >&2; exit 1; }
+  mkdir -p "$target"
   local d
   for d in "$root"/*/; do
     [[ -d "$d" ]] || continue
-    basename "$d"
+    local name; name="$(basename "$d")"
+    ln -sfn "$root/$name" "$target/$name"
+    printf '  ✓ linked %s\n' "$name"
   done
 }
 
-link_skills() {
-  local target="$1" style="$2"
-  local root
-  root="$(skills_root)"
-  mkdir -p "$target"
-  case "$style" in
-    per-skill)
-      local skill
-      while IFS= read -r skill; do
-        ln -sfn "$root/$skill" "$target/$skill"
-        printf '  ✓ linked %s\n' "$skill"
-      done < <(list_skills)
-      ;;
-    folder)
-      ln -sfn "$root" "$target/sprang"
-      printf '  ✓ linked skills folder → %s/sprang\n' "$target"
-      ;;
-    *)
-      printf 'Unknown style: %s\n' "$style" >&2
-      exit 1
-      ;;
-  esac
-}
-
-unlink_skills() {
-  local target="$1" style="$2"
+unlink_global_skills() {
+  local target="$1"
   [[ -d "$target" ]] || return 0
-  case "$style" in
-    per-skill)
-      if [[ -d "$(skills_root)" ]]; then
-        local skill
-        while IFS= read -r skill; do
-          if [[ -L "$target/$skill" ]]; then
-            rm -f "$target/$skill"
-            printf '  ✗ removed %s\n' "$skill"
-          fi
-        done < <(list_skills)
-      fi
-      ;;
-    folder)
-      if [[ -L "$target/sprang" ]]; then
-        rm -f "$target/sprang"
-        printf '  ✗ removed %s/sprang\n' "$target"
-      fi
-      ;;
-  esac
+  local d
+  for d in "$REPO_DIR"/skills/*/; do
+    [[ -d "$d" ]] || continue
+    local name; name="$(basename "$d")"
+    if [[ -L "$target/$name" ]]; then
+      rm -f "$target/$name"
+      printf '  ✗ removed %s\n' "$name"
+    fi
+  done
 }
 
-install_claude() {
-  printf '\n→ Claude Code installation\n'
-  printf '  Claude Code uses project-local config files.\n'
-  printf '  No global install is needed — all config ships with Sprang.\n\n'
+print_next_steps() {
+  local platform="$1"
+  printf '\nProject setup — run this inside each project you want indexed:\n\n'
+  printf '  sprang init --platform %s\n' "$platform"
+  printf '  sprang scan .\n\n'
 
-  printf '  Option A — Plugin marketplace (recommended, gives namespaced commands /sprang:sprang-*):\n'
-  printf '    Inside a Claude Code session run:\n'
-  printf '      /plugin marketplace add FavioVazquez/sprang\n'
-  printf '      /plugin install sprang\n'
-  printf '    Then build the MCP server binary:\n'
-  printf '      cd "$(ls -d ~/.claude/plugins/cache/sprang/sprang/*/ | tail -1)"\n'
-  printf '      pnpm install && pnpm build\n'
-  printf '    Then run /reload-plugins inside Claude Code.\n\n'
-
-  printf '  Option B — Manual copy (gives unnamespaced /sprang, /sprang-onboard, etc.):\n'
-  printf '    Copy these into your project root:\n'
-  printf '      cp %s/.mcp.json          <your-project>/\n' "$REPO_DIR"
-  printf '      cp %s/CLAUDE.md          <your-project>/\n' "$REPO_DIR"
-  printf '      cp %s/AGENTS.md          <your-project>/\n' "$REPO_DIR"
-  printf '      cp -r %s/.claude/        <your-project>/.claude/\n' "$REPO_DIR"
-  printf '    Then in <your-project>/.mcp.json update args to the absolute server path:\n'
-  printf '      "args": ["%s/packages/mcp/dist/server.js"]\n' "$REPO_DIR"
-  printf '    Finally, open the project in Claude Code and run /sprang.\n\n'
-
-  printf '  For full details: %s/CLAUDE.md\n' "$REPO_DIR"
+  case "$platform" in
+    devin)
+      printf 'What `sprang init --platform devin` writes:\n'
+      printf '  .devin/skills/      11 skills (/sprang, /sprang-analyze, …)\n'
+      printf '  .devin/rules/       glob-triggered graph-context rules\n'
+      printf '  .devin/hooks.v1.json + .devin/hooks/  stale-graph warning, post-commit refresh\n'
+      printf '  .devin/mcp_config.json                MCP server (${workspaceFolder})\n\n'
+      printf 'Plugin install (closed beta — needs `devin auth login`):\n'
+      printf '  devin plugins install faviovazquez/sprang\n'
+      ;;
+    claude)
+      printf 'What `sprang init --platform claude` writes:\n'
+      printf '  .claude/skills/     11 skills (slash commands are skills now)\n'
+      printf '  .claude/rules/      graph-context rules\n'
+      printf '  .claude/settings.json  hooks + pre-approved permissions\n'
+      printf '  .mcp.json           MCP server\n\n'
+      printf 'Plugin install (works today), inside a Claude Code session:\n'
+      printf '  /plugin marketplace add FavioVazquez/sprang\n'
+      printf '  /plugin install sprang\n'
+      ;;
+    copilot)
+      printf 'What `sprang init --platform copilot` writes:\n'
+      printf '  skills/             11 skills\n'
+      printf '  .github/copilot-instructions.md\n'
+      printf '  .mcp.json           MCP server (Copilot CLI)\n'
+      printf '  .vscode/mcp.json    MCP server (VS Code extension)\n\n'
+      printf 'Plugin install (works today):\n'
+      printf '  copilot plugin install faviovazquez/sprang\n'
+      ;;
+  esac
+  printf '\nDashboard:\n'
+  printf '  sprang open .\n\n'
+  printf 'Full docs: %s/README.md\n' "$REPO_DIR"
 }
 
 show_usage() {
@@ -229,13 +201,13 @@ Sprang installer (macOS / Linux)
 Usage:
   install.sh [<platform>]             Install for <platform> (or prompt if omitted)
   install.sh --update                 Pull latest changes + rebuild
-  install.sh --uninstall <platform>   Remove links for <platform>
+  install.sh --uninstall <platform>   Remove global skill links for <platform>
   install.sh --help
 
 Supported platforms:
-  windsurf   Devin Desktop / Windsurf
-  copilot    GitHub Copilot (VS Code)
-  claude     Claude Code (project-local setup guide)
+  devin     Devin CLI / Devin Desktop
+  claude    Claude Code
+  copilot   GitHub Copilot CLI
 
 Environment:
   SPRANG_REPO_URL  Override clone URL
@@ -250,11 +222,11 @@ PLATFORM=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --help|-h)        show_usage; exit 0 ;;
-    --update)         ACTION="update"; shift ;;
-    --uninstall)      ACTION="uninstall"; PLATFORM="${2:-}"; shift 2 ;;
-    --*)              printf 'Unknown flag: %s\n' "$1" >&2; exit 1 ;;
-    *)                PLATFORM="$1"; shift ;;
+    --help|-h)   show_usage; exit 0 ;;
+    --update)    ACTION="update"; shift ;;
+    --uninstall) ACTION="uninstall"; PLATFORM="${2:-}"; shift 2 ;;
+    --*)         printf 'Unknown flag: %s\n' "$1" >&2; exit 1 ;;
+    *)           PLATFORM="$1"; shift ;;
   esac
 done
 
@@ -264,73 +236,22 @@ if [[ "$ACTION" == "update" ]]; then
   exit 0
 fi
 
-if [[ -z "$PLATFORM" ]]; then
-  PLATFORM="$(prompt_platform)"
-fi
-
-row="$(resolve_platform "$PLATFORM")"
-target="$(echo "$row" | cut -d'|' -f2)"
-style="$(echo "$row" | cut -d'|' -f3)"
+[[ -n "$PLATFORM" ]] || PLATFORM="$(prompt_platform)"
+PLATFORM="$(resolve_platform "$PLATFORM")"
+TARGET="$(global_skills_dir "$PLATFORM")"
 
 if [[ "$ACTION" == "uninstall" ]]; then
   printf '\n→ Uninstalling Sprang for %s...\n' "$PLATFORM"
-  if [[ "$style" == "claude" ]]; then
-    printf '  Claude Code is project-local — nothing to unlink globally.\n'
-  else
-    unlink_skills "$target" "$style"
-  fi
-  printf '\n✓ Uninstalled.\n'
+  unlink_global_skills "$TARGET"
+  printf '\n✓ Uninstalled. Project-level files (.devin/, .claude/, .github/) are left in place.\n'
   exit 0
 fi
 
-# Install
-printf '\n→ Installing Sprang for %s...\n' "$PLATFORM"
+printf '\n→ Installing Sprang for %s...\n' "$(platform_label "$PLATFORM")"
 clone_or_update
 
-if [[ "$style" == "claude" ]]; then
-  install_claude
-else
-  printf '→ Linking skills into %s\n' "$target"
-  link_skills "$target" "$style"
-  printf '\n✓ Skills linked for %s.\n\n' "$PLATFORM"
-  case "$PLATFORM" in
-    windsurf)
-      printf 'Next steps to complete the Windsurf / Devin Desktop setup:\n\n'
-      printf '  1. Add the MCP server to ~/.codeium/windsurf/mcp_config.json:\n'
-      printf '     {\n'
-      printf '       "mcpServers": { "sprang": {\n'
-      printf '         "command": "node",\n'
-      printf '         "args": ["%s/packages/mcp/dist/server.js"],\n' "$REPO_DIR"
-      printf '         "env": { "SPRANG_ROOT": "/path/to/your/project" }\n'
-      printf '       }}\n'
-      printf '     }\n\n'
-      printf '  2. Copy rules + hooks into your project root:\n'
-      printf '     mkdir -p .windsurf/rules .devin/rules .windsurf/hooks .windsurf/workflows .windsurf/skills\n'
-      printf '     cp %s/.windsurf/rules/*.md .windsurf/rules/\n' "$REPO_DIR"
-      printf '     cp %s/.devin/rules/*.md .devin/rules/\n' "$REPO_DIR"
-      printf '     cp %s/.windsurf/hooks.json .windsurf/hooks.json\n' "$REPO_DIR"
-      printf '     cp %s/.windsurf/hooks/save-conversation.py .windsurf/hooks/save-conversation.py\n' "$REPO_DIR"
-      printf '     cp %s/.windsurf/workflows/*.md .windsurf/workflows/\n' "$REPO_DIR"
-      printf '     cp -r %s/.windsurf/skills/sprang* .windsurf/skills/\n\n' "$REPO_DIR"
-      printf '  3. Reload the Windsurf window (Cmd/Ctrl+Shift+P → Reload Window)\n'
-      printf '  4. Run: sprang scan /path/to/your/project --phase1-only\n\n'
-      printf '  Tip: instead of steps 1-4, paste the agentic install prompt from the README\n'
-      printf '  into Cascade or Devin — it handles everything automatically.\n'
-      printf '  Full docs: https://github.com/faviovazquez/sprang#windsurf--devin-desktop--agentic-install\n'
-      ;;
-    copilot)
-      printf 'Next steps to complete the GitHub Copilot setup:\n\n'
-      printf '  1. Copy .vscode/mcp.json into your project root:\n'
-      printf '     mkdir -p .vscode\n'
-      printf '     cp %s/.vscode/mcp.json .vscode/mcp.json\n' "$REPO_DIR"
-      printf '     Then edit .vscode/mcp.json → update args to: ["%s/packages/mcp/dist/server.js"]\n\n' "$REPO_DIR"
-      printf '  2. Copy copilot-instructions.md into your project:\n'
-      printf '     mkdir -p .github\n'
-      printf '     cp %s/.github/copilot-instructions.md .github/copilot-instructions.md\n\n' "$REPO_DIR"
-      printf '  3. Open VS Code, switch Copilot to Agent mode (model selector in chat panel)\n'
-      printf '  4. Run: sprang scan /path/to/your/project --phase1-only\n\n'
-      printf '  Note: MCP tools only work in Copilot Agent mode (not default ask/edit modes).\n'
-      printf '  Full docs: https://github.com/faviovazquez/sprang#github-copilot\n'
-      ;;
-  esac
-fi
+printf '→ Linking skills into %s\n' "$TARGET"
+link_global_skills "$TARGET"
+printf '\n✓ Skills linked globally for %s.\n' "$PLATFORM"
+
+print_next_steps "$PLATFORM"

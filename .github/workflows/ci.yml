@@ -39,14 +39,24 @@ jobs:
       - name: Run unit tests
         run: pnpm test -- --coverage
 
+      - name: Check generated agent assets are in sync
+        # skills/, .devin/rules/ and .devin/hooks/ are canonical; the .devin/skills,
+        # .claude/skills, .claude/rules and .claude/hooks trees are generated. Before
+        # v0.3.0 these were hand-maintained and had silently diverged, shipping
+        # different instructions to different agents.
+        run: pnpm check:agents
+
       - name: Validate plugin manifests
         run: |
           node -e "
             const files = [
+              '.devin-plugin/plugin.json',
               '.claude-plugin/plugin.json',
               '.claude-plugin/marketplace.json',
-              '.copilot-plugin/plugin.json',
-              '.devin/config.json',
+              'plugin.json',
+              '.devin/mcp_config.json',
+              '.devin/hooks.v1.json',
+              '.claude/settings.json',
               '.mcp.json',
               '.vscode/mcp.json',
             ];
@@ -84,7 +94,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build dashboard
-        run: pnpm --filter @sprang/dashboard build
+        # The `...` suffix builds workspace dependencies first. The dashboard
+        # server imports @sprang/core (to validate graphs for /graph-status),
+        # so building the dashboard alone fails on a clean checkout where
+        # packages/core/dist does not exist yet.
+        run: pnpm --filter '@sprang/dashboard...' build
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4

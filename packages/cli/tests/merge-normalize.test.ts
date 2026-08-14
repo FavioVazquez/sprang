@@ -8,7 +8,6 @@ import { knowledgeGraphSchema } from '@sprang/core';
 // merge.py lives at the repo root (three levels up from packages/cli/tests).
 const REPO_ROOT = resolve(__dirname, '../../..');
 const MERGE_PY = join(REPO_ROOT, 'skills/sprang-analyze/scripts/merge.py');
-const MERGE_PY_WINDSURF = join(REPO_ROOT, '.windsurf/skills/sprang-analyze/scripts/merge.py');
 
 const pythonAvailable = spawnSync('python3', ['--version']).status === 0;
 
@@ -149,7 +148,93 @@ describe.skipIf(!pythonAvailable)('merge.py schema normalisation (v0.2.4)', () =
     expect(knowledgeGraphSchema.safeParse(graph).success).toBe(true);
   });
 
-  it('keeps the two distributed merge.py copies byte-identical', () => {
-    expect(readFileSync(MERGE_PY, 'utf-8')).toBe(readFileSync(MERGE_PY_WINDSURF, 'utf-8'));
+  it('maps drifted edge types and swaps `tests` into `tested_by`', () => {
+    // The TypeScript twin is covered in packages/core; this pins that merge.py
+    // produces byte-identical results, since the two must never diverge.
+    const graph = runMerge(tmpDir, {
+      'final-nodes-chunk-1.json': [
+        { id: 'file:src/a.ts', type: 'file', label: 'a.ts', layer: null },
+      ],
+      'final-edges.json': [
+        { source: 'file:t/a.test.ts', target: 'file:src/a.ts', type: 'tests' },
+        { source: 'file:src/a.ts', target: 'file:src/b.ts', type: 'dependsOn' },
+        { source: 'file:src/a.ts', target: 'file:src/c.ts', type: 'references' },
+        { source: 'file:src/a.ts', target: 'file:src/d.ts', type: 'vibes' },
+      ],
+    }) as { nodes: Array<Record<string, unknown>>; edges: Array<Record<string, string>> };
+
+    expect(knowledgeGraphSchema.safeParse(graph).success).toBe(true);
+    // `layer: null` is not `layer` absent — this exact template broke production.
+    expect('layer' in graph.nodes[0]!).toBe(false);
+    expect(graph.edges).toEqual([
+      { source: 'file:src/a.ts', target: 'file:t/a.test.ts', type: 'tested_by' },
+      { source: 'file:src/a.ts', target: 'file:src/b.ts', type: 'depends_on' },
+      { source: 'file:src/a.ts', target: 'file:src/c.ts', type: 'related' },
+    ]);
+  });
+
+  it('restores Phase 1 warnings from node-warnings.json without clobbering the agent', () => {
+    const secWarning = {
+      category: 'hardcoded_secret', severity: 'high',
+      description: 'Hardcoded API key', pattern: 'api_key',
+    };
+    const graph = runMerge(tmpDir, {
+      'final-nodes-chunk-1.json': [
+        { id: 'file:bad.js', type: 'file', label: 'bad.js', summary: 'Agent summary.' },
+        { id: 'file:ok.js', type: 'file', label: 'ok.js', risk_score: 0.1 },
+      ],
+      'node-warnings.json': {
+        'file:bad.js': { security_warnings: [secWarning], risk_score: 0.82 },
+        'file:ok.js': { risk_score: 0.99 },
+      },
+    }) as {
+      nodes: Array<Record<string, unknown>>;
+      stats: { security_summary?: { total: number } };
+    };
+
+    const bad = graph.nodes.find((n) => n['id'] === 'file:bad.js')!;
+    expect(bad['security_warnings']).toEqual([secWarning]);
+    expect(bad['risk_score']).toBe(0.82);
+    expect(bad['summary']).toBe('Agent summary.');   // enrichment preserved
+    // The agent already scored this node; the older static value must not win.
+    expect(graph.nodes.find((n) => n['id'] === 'file:ok.js')!['risk_score']).toBe(0.1);
+    // Findings feed the summary again, so the health grade stops inflating.
+    expect(graph.stats.security_summary?.total).toBe(1);
+  });
+
+  it('accepts both risk-scores.json shapes', () => {
+    // Phase 1 writes { nodes: [{ nodeId }] }; the analyze skill tells agents to
+    // write { "<node-id>": {...} }. Reading only the latter silently dropped all
+    // Phase 1 risk data.
+    const graph = runMerge(tmpDir, {
+      'final-nodes-chunk-1.json': [{ id: 'file:a.ts', type: 'file', label: 'a.ts' }],
+      'risk-scores.json': { nodes: [{ nodeId: 'file:a.ts', risk_score: 0.77 }] },
+    }) as { nodes: Array<Record<string, unknown>> };
+    expect(graph.nodes[0]!['risk_score']).toBe(0.77);
+  });
+
+  it('honours SPRANG_GRAPH_KIND for knowledge-base graphs', () => {
+    const inter = join(tmpDir, '.sprang', 'intermediate');
+    mkdirSync(inter, { recursive: true });
+    writeFileSync(join(inter, 'final-nodes-chunk-1.json'),
+      JSON.stringify([{ id: 'article:note.md', type: 'article', label: 'note' }]));
+    const res = spawnSync('python3', [MERGE_PY], {
+      env: { ...process.env, PROJECT_ROOT: tmpDir, SPRANG_GRAPH_KIND: 'knowledge' },
+      encoding: 'utf-8',
+    });
+    expect(res.status, res.stderr).toBe(0);
+    const graph = JSON.parse(readFileSync(join(tmpDir, '.sprang', 'knowledge-graph.json'), 'utf-8')) as { kind: string };
+    expect(graph.kind).toBe('knowledge');
+  });
+
+  it('ships merge.py to every platform from one canonical copy', () => {
+    // Pre-0.3 there were two hand-maintained copies. `skills/` is now canonical
+    // and scripts/sync-agent-assets.mjs generates the per-platform trees, so all
+    // copies must be byte-identical to it.
+    const canonical = readFileSync(MERGE_PY, 'utf-8');
+    for (const tree of ['.devin/skills', '.claude/skills']) {
+      const copy = join(REPO_ROOT, tree, 'sprang-analyze/scripts/merge.py');
+      expect(readFileSync(copy, 'utf-8'), `${tree} copy of merge.py`).toBe(canonical);
+    }
   });
 });

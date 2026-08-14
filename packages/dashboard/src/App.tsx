@@ -27,7 +27,7 @@ import { WarningBanner } from './components/WarningBanner';
 import { ThemePicker, useTheme } from './components/ThemePicker';
 import { OnboardingOverlay, useOnboarding } from './components/OnboardingOverlay';
 import { MobileBottomNav, type MobileView } from './components/MobileLayout';
-import { AskAgentPanel } from './components/AskCascadePanel';
+import { AskAgentPanel } from './components/AskAgentPanel';
 import { LandingScreen, type AnalyzeParams } from './components/LandingScreen';
 import { loadGraph } from './api/graphApi';
 import { useDashboardStore } from './store';

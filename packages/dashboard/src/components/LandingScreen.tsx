@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FolderOpen, Github, Sparkles, ArrowRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from './ui/Button';
+import { loadGraphStatus, type GraphStatus } from '../api/graphApi';
 
 export interface AnalyzeParams {
   path?: string;
@@ -56,6 +57,15 @@ export function LandingScreen({ onAnalyze, onRetry, autoScan = false, defaultPat
   const [msgIndex, setMsgIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoFiredRef = useRef(false);
+  const [graphStatus, setGraphStatus] = useState<GraphStatus | null>(null);
+
+  // A graph that exists but fails validation is NOT a missing graph — re-scanning
+  // won't help, and silently showing the "analyze a project" prompt hides a real bug.
+  useEffect(() => {
+    let cancelled = false;
+    void loadGraphStatus().then((s) => { if (!cancelled) setGraphStatus(s); });
+    return () => { cancelled = true; };
+  }, []);
 
   // Cycle progress messages during scan/clone
   useEffect(() => {
@@ -130,6 +140,31 @@ export function LandingScreen({ onAnalyze, onRetry, autoScan = false, defaultPat
           <p className="text-xs text-surface-500 mt-0.5">Knowledge graph for any codebase</p>
         </div>
       </motion.div>
+
+      {/* Invalid-graph banner — distinct from "no graph yet" */}
+      {graphStatus && !graphStatus.ok && graphStatus.code !== 'GRAPH_NOT_FOUND' && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="w-full max-w-lg mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3"
+        >
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-amber-200">{graphStatus.error}</p>
+              {graphStatus.validation_issues && (
+                <p className="mt-1 text-[11px] text-amber-300/80 font-mono break-words">
+                  {graphStatus.validation_issues}
+                </p>
+              )}
+              {graphStatus.remedy && (
+                <p className="mt-1.5 text-[11px] text-surface-400">{graphStatus.remedy}</p>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Input card */}
       <motion.div

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { GraphLoader } from '../graph-loader.js';
+import type { GraphLoader, GraphError } from '../graph-loader.js';
 import type { DecisionContext, SprangNode } from '@sprang/core';
 
 export interface SprangWhyInput {
@@ -47,10 +47,10 @@ export async function sprangWhy(
   loader: GraphLoader,
   input: SprangWhyInput,
   sprangRoot: string
-): Promise<SprangWhyResult | { error: string; code: string }> {
+): Promise<SprangWhyResult | GraphError | { error: string; code: string }> {
   const graph = await loader.getGraph();
   if (!graph) {
-    return { error: 'Knowledge graph not found', code: 'GRAPH_NOT_FOUND' };
+    return loader.getError();
   }
 
   const node = resolveNode(graph.nodes, input.node_id);

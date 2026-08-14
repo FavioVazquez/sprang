@@ -4,6 +4,7 @@ import type { KnowledgeGraph } from '../schema/types.js';
 import type { AgentContext, SprangOptions } from '../agents/base.js';
 import { NullLLMClient } from '../llm/client.js';
 import { loadGraph, saveGraph } from '../graph/store.js';
+import { buildNodeWarningsIndex, NODE_WARNINGS_FILE } from '../graph/node-warnings.js';
 import { ArchitectureAnalyzerAgent } from '../agents/architecture-analyzer.js';
 import { DomainAnalyzerAgent } from '../agents/domain-analyzer.js';
 import { TourBuilderAgent } from '../agents/tour-builder.js';
@@ -208,6 +209,16 @@ export async function runPhase2(
   };
 
   await saveGraph(sprangDir, graph);
+
+  // Persist per-node findings so a later agent-driven merge can restore them.
+  // Without this the enriched graph loses every warning and the health grade
+  // silently improves for unchanged code.
+  await writeFile(
+    path.join(intermediateDir, NODE_WARNINGS_FILE),
+    JSON.stringify(buildNodeWarningsIndex(graph), null, 2),
+    'utf-8',
+  );
+
   onProgress?.('Phase 2 complete');
 
   progress.completedAt = now;
