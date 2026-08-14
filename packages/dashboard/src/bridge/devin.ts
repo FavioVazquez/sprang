@@ -114,6 +114,8 @@ export function askDevin(question: string, sprangRoot: string): DevinAskResult {
       timeout: DEVIN_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024,
       encoding: 'utf-8',
+      // See STDIN note in askDevinBackground.
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {
     return { ok: false, error: `devin CLI error: ${err instanceof Error ? err.message : String(err)}` };
@@ -136,22 +138,40 @@ export function askDevin(question: string, sprangRoot: string): DevinAskResult {
  * Non-blocking variant — spawns `devin -p` in the background and writes the
  * response file when done, so the HTTP handler returns immediately.
  */
-export function askDevinBackground(question: string, sprangRoot: string, responsePath: string): void {
+export function askDevinBackground(
+  question: string,
+  sprangRoot: string,
+  responsePath: string,
+  onFailure?: (error: string) => void,
+): void {
   const bin = resolveDevinBinary();
-  if (!bin) return;
+  if (!bin) {
+    onFailure?.('devin CLI not found on PATH');
+    return;
+  }
 
   const previous = loadSession(sprangRoot);
+  // Close stdin: these CLIs block waiting for piped input when stdin is
+  // inherited from a server process, then exit non-zero ("no stdin data
+  // received in 3s"). The prompt is passed as an argument, not on stdin.
   const child = spawn(bin, buildArgs(question, previous !== null), {
     cwd: sprangRoot,
     timeout: DEVIN_TIMEOUT_MS,
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
 
   let stdout = '';
+  let stderr = '';
   child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf-8'); });
+  child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf-8'); });
+  child.on('error', (err) => onFailure?.(`devin could not be started: ${err.message}`));
 
   child.on('close', (code) => {
     const text = stdout.trim();
-    if (code !== 0 || !text) return;
+    if (code !== 0 || !text) {
+      onFailure?.(`devin exited with code ${code}: ${(stderr || text).trim().slice(0, 300)}`);
+      return;
+    }
     recordTurn(sprangRoot, previous);
     const payload = {
       response: text,

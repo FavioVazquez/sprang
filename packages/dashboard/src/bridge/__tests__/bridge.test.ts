@@ -324,6 +324,24 @@ describe('askCopilot', () => {
 
 // ─── index.ts ─────────────────────────────────────────────────────────────────
 
+describe('CLI spawn hygiene', () => {
+  let tmpDir: string;
+  beforeEach(() => { tmpDir = makeTmp(); });
+  afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
+
+  it('closes stdin when spawning a CLI', () => {
+    // Inheriting stdin from a long-lived server makes these CLIs block waiting
+    // for piped input and then exit non-zero ("no stdin data received in 3s"),
+    // which broke the bridge even with valid credentials. The prompt is passed
+    // as an argument, so stdin must be closed.
+    stubExecFileSync(false);
+    stubSpawnSync({ status: 0, stdout: JSON.stringify({ type: 'result', result: 'ok', session_id: 's' }) });
+    askClaude('question', tmpDir);
+    const opts = mockSpawnSync.mock.calls[0]![2] as { stdio?: unknown };
+    expect(opts.stdio).toEqual(['ignore', 'pipe', 'pipe']);
+  });
+});
+
 describe('askAgent', () => {
   let tmpDir: string;
   beforeEach(() => { tmpDir = makeTmp(); });

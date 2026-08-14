@@ -50,6 +50,7 @@ packages/dashboard/e2e/.bridge-root-devin/
 packages/dashboard/e2e/.bridge-root-claude/
 packages/dashboard/e2e/.bridge-root-copilot/
 packages/dashboard/e2e/.bridge-root-relay/
+packages/dashboard/e2e/.bridge-root-degraded/
 
 # Development tool artifacts (never commit)
 .claude/worktrees/

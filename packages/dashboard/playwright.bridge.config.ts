@@ -52,6 +52,18 @@ const DEVIN_AUTHED = [
   'echo "Mock Devin answer: the knowledge graph looks healthy"',
 ].join('\n');
 
+/** Present, reports itself healthy, but every actual answer fails — the shape of
+ *  a revoked OAuth token. Detection cannot see this (Claude's own `auth status`
+ *  reports loggedIn:true for a revoked token), so the ask must degrade to relay. */
+const CLAUDE_BROKEN_AUTH = [
+  '#!/usr/bin/env bash',
+  '# Mock Claude CLI that passes detection but 401s on every request.',
+  'if [ "$1" = "--version" ]; then echo "2.1.163 (Claude Code)"; exit 0; fi',
+  // Double quotes need no escaping: mockBin wraps the body in shell single quotes.
+  'echo {"type":"result","is_error":true,"api_error_status":401,"result":"Failed to authenticate. API Error: 401 OAuth access token has been revoked."}',
+  'exit 1',
+].join('\n');
+
 const DEVIN_UNAUTHED = [
   '#!/usr/bin/env bash',
   '# Mock Devin CLI as shipped inside Devin Desktop: present but NOT logged in.',
@@ -71,6 +83,7 @@ const FAILING_SHIM = [
 const CLAUDE_BIN = '"$PWD/e2e/.bridge-root-claude/bin"';
 const DEVIN_BIN = '"$PWD/e2e/.bridge-root-devin/bin"';
 const RELAY_BIN = '"$PWD/e2e/.bridge-root-relay/bin"';
+const DEGRADED_BIN = '"$PWD/e2e/.bridge-root-degraded/bin"';
 
 export default defineConfig({
   testDir: './e2e',
@@ -113,6 +126,19 @@ export default defineConfig({
         'PATH="$PWD/e2e/.bridge-root-devin/bin:$PATH" ' +
         'pnpm preview --port 4176 --host',
       port: 4176,
+      reuseExistingServer: false,
+      timeout: 60000,
+    },
+    {
+      command:
+        'rm -rf e2e/.bridge-root-degraded && mkdir -p e2e/.bridge-root-degraded/.sprang && ' +
+        mockBin(DEGRADED_BIN, 'devin', FAILING_SHIM) + ' && ' +
+        mockBin(DEGRADED_BIN, 'claude', CLAUDE_BROKEN_AUTH) + ' && ' +
+        mockBin(DEGRADED_BIN, 'copilot', FAILING_SHIM) + ' && ' +
+        'SPRANG_ROOT="$PWD/e2e/.bridge-root-degraded" ' +
+        'PATH="$PWD/e2e/.bridge-root-degraded/bin:$PATH" ' +
+        'pnpm preview --port 4178 --host',
+      port: 4178,
       reuseExistingServer: false,
       timeout: 60000,
     },

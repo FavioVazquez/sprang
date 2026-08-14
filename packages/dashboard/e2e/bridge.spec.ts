@@ -25,6 +25,7 @@ const CLAUDE_URL = 'http://localhost:4174';
 const COPILOT_URL = 'http://localhost:4175';
 const DEVIN_URL = 'http://localhost:4176';
 const RELAY_URL = 'http://localhost:4177';
+const DEGRADED_URL = 'http://localhost:4178';
 
 // Playwright runs from packages/dashboard — these match SPRANG_ROOT of each server
 const claudeRoot = join(process.cwd(), 'e2e', '.bridge-root-claude');
@@ -322,4 +323,44 @@ test('copilot bridge – DELETE /agent-response clears the session; next ask sta
   const calls = readCalls(copilotLog);
   expect(calls.length).toBe(3);
   expect(calls[2]!.some((a) => a.startsWith('--resume='))).toBe(false);
+});
+
+
+// ---------------------------------------------------------------------------
+// Degradation: a CLI that passes detection but cannot actually answer
+// ---------------------------------------------------------------------------
+// Detection can only see whether a binary responds to `--version`. It cannot see
+// a revoked OAuth token, an unsupported model, or a rate limit — Claude's own
+// `auth status` even reports loggedIn:true for a revoked token. So the ask must
+// survive a CLI that looks fine and then fails, instead of leaving the panel
+// polling forever.
+
+test('degraded bridge – detection still selects the installed claude CLI', async ({ request }) => {
+  const res = await request.get(`${DEGRADED_URL}/bridge-status`);
+  expect(res.ok()).toBeTruthy();
+  expect((await res.json()).kind).toBe('claude');
+});
+
+test('degraded bridge – a failing CLI falls back to relay with the error and a paste-able prompt', async ({ request }) => {
+  const ask = await request.post(`${DEGRADED_URL}/agent-ask`, {
+    data: { message: 'what does the graph loader do?' },
+  });
+  expect(ask.ok()).toBeTruthy();
+  expect((await ask.json()).bridge).toBe('claude');
+
+  // Poll until the background spawn has failed and written the fallback.
+  let body: Record<string, unknown> | null = null;
+  for (let i = 0; i < 40; i++) {
+    const res = await request.get(`${DEGRADED_URL}/agent-response`);
+    if (res.status() === 200) { body = await res.json(); break; }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  expect(body, 'the panel must receive something rather than polling forever').not.toBeNull();
+  expect(body!['bridge']).toBe('relay');
+  expect(body!['degraded_from']).toBe('claude');
+  expect(String(body!['error'])).toContain('401');
+  // The user needs the real reason and a way to still get an answer.
+  expect(String(body!['response'])).toContain('revoked');
+  expect(String(body!['response'])).toContain('sprang_respond');
+  expect(String(body!['response'])).toContain('what does the graph loader do?');
 });

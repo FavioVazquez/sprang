@@ -101,6 +101,8 @@ Question: ${question}`;
       timeout: CLAUDE_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024, // 10 MB
       encoding: 'utf-8',
+      // See STDIN note in askClaudeBackground.
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -168,6 +170,7 @@ export function askClaudeBackground(
   question: string,
   sprangRoot: string,
   responsePath: string,
+  onFailure?: (error: string) => void,
 ): void {
   const sessionId = loadSessionId(sprangRoot);
 
@@ -183,16 +186,26 @@ Question: ${question}`;
   if (fs.existsSync(mcpConfigPath)) args.push('--mcp-config', mcpConfigPath);
   if (sessionId) args.push('--resume', sessionId);
 
+  // Close stdin: claude blocks waiting for piped input when stdin is inherited
+  // from a server process and then exits 1 ("no stdin data received in 3s").
+  // The prompt is passed as an argument, not on stdin.
   const child = spawn('claude', args, {
     cwd: sprangRoot,
     timeout: CLAUDE_TIMEOUT_MS,
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
 
   let stdout = '';
+  let stderr = '';
   child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf-8'); });
+  child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf-8'); });
+  child.on('error', (err) => onFailure?.(`claude could not be started: ${err.message}`));
 
   child.on('close', (code) => {
-    if (code !== 0 || !stdout.trim()) return;
+    if (code !== 0 || !stdout.trim()) {
+      onFailure?.(`claude exited with code ${code}: ${(stderr || stdout).trim().slice(0, 300)}`);
+      return;
+    }
     let responseText = stdout.trim();
     let newSessionId: string | undefined;
     for (const line of stdout.split('\n').reverse()) {

@@ -18,6 +18,17 @@ import { writeRelayQuestion, getResponsePath } from '../bridge/relay.js';
 
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024; // 1 MB cap
 
+/** Write the agent response file atomically, in the shape every bridge uses. */
+function writeAgentResponse(responsePath: string, payload: Record<string, unknown>): void {
+  const dir = path.dirname(responsePath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = responsePath + '.tmp';
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf-8');
+    fs.renameSync(tmp, responsePath);
+  } catch { /* the dashboard will keep polling; nothing better to do here */ }
+}
+
 const EXT_TO_LANG: Record<string, string> = {
   ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx',
   py: 'python', go: 'go', rs: 'rust', java: 'java', kt: 'kotlin',
@@ -270,12 +281,33 @@ export function registerRoutes(
         const prompt = bridge.kind === 'relay' ? writeRelayQuestion(userMessage, sprangRoot) : undefined;
         res.statusCode = 200;
         res.end(JSON.stringify({ ok: true, sent: userMessage, mode: 'async', bridge: bridge.kind, prompt }));
+        // A CLI can be installed and still be unable to answer — a revoked
+        // OAuth token, an unsupported model, a rate limit. Detection cannot see
+        // any of that (`claude auth status` reports loggedIn:true for a revoked
+        // token), so the only reliable signal is the call itself failing. When
+        // it does, degrade to the relay rather than leaving the panel spinning.
+        const degradeToRelay = (kind: string) => (error: string) => {
+          const relayPrompt = writeRelayQuestion(userMessage, sprangRoot);
+          writeAgentResponse(responsePath, {
+            response:
+              `The ${kind} CLI is installed but could not answer:\n\n${error}\n\n` +
+              'Falling back to manual relay — paste the prompt below into your agent ' +
+              'and it will reply here via the sprang_respond MCP tool.\n\n' +
+              '```\n' + relayPrompt + '```',
+            question: userMessage,
+            written_at: new Date().toISOString(),
+            bridge: 'relay',
+            degraded_from: kind,
+            error,
+          });
+        };
+
         if (bridge.kind === 'devin') {
-          askDevinBackground(userMessage, sprangRoot, responsePath);
+          askDevinBackground(userMessage, sprangRoot, responsePath, degradeToRelay('devin'));
         } else if (bridge.kind === 'claude') {
-          askClaudeBackground(userMessage, sprangRoot, responsePath);
+          askClaudeBackground(userMessage, sprangRoot, responsePath, degradeToRelay('claude'));
         } else if (bridge.kind === 'copilot') {
-          askCopilotBackground(userMessage, sprangRoot, responsePath);
+          askCopilotBackground(userMessage, sprangRoot, responsePath, degradeToRelay('copilot'));
         }
       } catch {
         res.statusCode = 400; res.end(JSON.stringify({ error: 'Invalid JSON body' }));
