@@ -102,4 +102,42 @@ describe('scan --if-stale', () => {
 
     writeSpy.mockRestore();
   });
+
+  it('refuses to overwrite an enriched graph with a Phase 1 skeleton', async () => {
+    // The post-commit hook runs `scan --phase1-only --if-stale`. Unguarded, a
+    // single commit silently replaced a `complete` graph (980 nodes: summaries,
+    // layers, tours, domains, risk scores) with a 270-node skeleton. A stale
+    // enriched graph is strictly more useful than a fresh empty one.
+    mockedReadFile.mockResolvedValue(
+      JSON.stringify({ phase: 'complete', stats: { gitCommitHash: 'oldhash' } }) as unknown as Buffer,
+    );
+    mockedExecSync.mockReturnValue((FAKE_COMMIT + '\n') as unknown as Buffer);
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const { makeScanCommand } = await import('../../src/commands/scan.js');
+    await makeScanCommand().parseAsync(['--if-stale', '--phase1-only', '/tmp/fake-project'], { from: 'user' });
+
+    const output = writeSpy.mock.calls.map((c) => String(c[0])).join('');
+    expect(output).toContain('Refusing to overwrite');
+    expect(output).toMatch(/sprang scan|sprang-analyze/);
+    // The scan itself must not have run.
+    const core = await import('@sprang/core');
+    expect(vi.mocked(core.runPhase1Only)).not.toHaveBeenCalled();
+    writeSpy.mockRestore();
+  });
+
+  it('still refreshes a stale skeleton graph', async () => {
+    mockedReadFile.mockResolvedValue(
+      JSON.stringify({ phase: 'skeleton', stats: { gitCommitHash: 'oldhash' } }) as unknown as Buffer,
+    );
+    mockedExecSync.mockReturnValue((FAKE_COMMIT + '\n') as unknown as Buffer);
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const { makeScanCommand } = await import('../../src/commands/scan.js');
+    await makeScanCommand().parseAsync(['--if-stale', '--phase1-only', '/tmp/fake-project'], { from: 'user' });
+
+    const output = writeSpy.mock.calls.map((c) => String(c[0])).join('');
+    expect(output).not.toContain('Refusing to overwrite');
+    writeSpy.mockRestore();
+  });
 });
