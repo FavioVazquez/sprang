@@ -6,7 +6,7 @@
         "packages/mcp/dist/server.js"
       ],
       "env": {
-        "SPRANG_ROOT": "${workspaceFolder}"
+        "SPRANG_ROOT": "."
       }
     }
   }

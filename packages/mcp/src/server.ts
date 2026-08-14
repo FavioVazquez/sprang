@@ -20,7 +20,10 @@ import type { SprangAnnotateInput } from './tools/sprang_annotate.js';
 import { sprangRespond } from './tools/sprang_respond.js';
 import type { SprangRespondInput } from './tools/sprang_respond.js';
 
-const sprangRoot = process.env['SPRANG_ROOT'] ?? process.cwd();
+// `||`, not `??`: Devin substitutes an unset ${...} in an MCP env value with an
+// EMPTY STRING rather than leaving it unset, so `??` would keep "" and every
+// graph path would resolve against the filesystem root instead of the project.
+const sprangRoot = process.env['SPRANG_ROOT'] || process.cwd();
 const loader = new GraphLoader(sprangRoot);
 
 // Injected at build time by tsup `define` (see tsup.config.ts) so it always

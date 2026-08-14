@@ -128,20 +128,23 @@ describe('manifests', () => {
     }
   });
 
-  it('does not use ${workspaceFolder} in MCP args — it is only expanded in env', () => {
-    // Tempting, because `env.SPRANG_ROOT` uses it and works. It is not expanded
-    // in `args`: Devin's MCP config documents only ${env:VAR} and ${file:/path}.
-    // Putting it in args makes node try to open a literal "${workspaceFolder}/..."
-    // path, the server never starts, and every Sprang tool silently disappears
-    // from the session. Verified the hard way.
+  it('never references ${workspaceFolder} in an MCP config', () => {
+    // It looks supported and is not. Devin's MCP loader treats ${NAME} as an
+    // environment variable lookup (only ${env:VAR} / ${file:/path} are real),
+    // so an unset `workspaceFolder` is substituted with an EMPTY STRING:
+    //   [MCP] environment variable 'workspaceFolder' is not set; substituting empty string
+    // In `args` that means node opens a literal "/packages/mcp/dist/server.js"
+    // and the server never starts. In `env` it means SPRANG_ROOT="" and every
+    // graph path resolves against the filesystem root. Both fail silently —
+    // the tools simply vanish from the session. The server is spawned with the
+    // workspace as cwd, so "." is the correct value.
     for (const relPath of ['.devin/mcp_config.json', '.vscode/mcp.json', '.mcp.json']) {
       const manifest = readJson(relPath);
-      const args = ((manifest.mcpServers ?? manifest.servers).sprang.args as string[]);
-      for (const arg of args) {
-        expect(arg, `${relPath} args must not interpolate workspaceFolder`).not.toContain(
-          'workspaceFolder',
-        );
-      }
+      const server = (manifest.mcpServers ?? manifest.servers).sprang;
+      expect(JSON.stringify(server), `${relPath} must not use \${workspaceFolder}`).not.toContain(
+        'workspaceFolder',
+      );
+      expect(server.env.SPRANG_ROOT, `${relPath} SPRANG_ROOT`).toBeTruthy();
     }
   });
 

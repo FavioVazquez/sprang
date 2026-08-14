@@ -22,5 +22,17 @@
         }
       ]
     }
+  ],
+  "Stop": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/stop-dashboard-question.sh",
+          "timeout": 10
+        }
+      ]
+    }
   ]
 }
