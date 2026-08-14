@@ -63,7 +63,11 @@ fi
 #   panel closes.
 GRACE_SECONDS="${SPRANG_GRACE_SECONDS:-20}"
 LISTEN_SECONDS="${SPRANG_LISTEN_SECONDS:-600}"
-HEARTBEAT_MAX_AGE="${SPRANG_HEARTBEAT_MAX_AGE:-20}"
+# Generous on purpose. The panel retracts this file explicitly when it closes,
+# so the age check is only a safety net for a browser that died without
+# cleaning up. A tight window fails constantly instead: browsers throttle timers
+# in hidden tabs, and the tab is hidden precisely when this hook runs.
+HEARTBEAT_MAX_AGE="${SPRANG_HEARTBEAT_MAX_AGE:-900}"
 
 heartbeat_is_fresh() {
   [ -f "$HEARTBEAT" ] || return 1

@@ -172,9 +172,23 @@ export function AskAgentPanel() {
   useEffect(() => {
     if (!open) return;
     const ping = () => { void fetch('/agent-heartbeat', { method: 'POST' }).catch(() => null); };
+    const clear = () => {
+      // sendBeacon survives tab close; fetch does not.
+      if (!navigator.sendBeacon?.('/agent-heartbeat?close=1')) {
+        void fetch('/agent-heartbeat', { method: 'DELETE', keepalive: true }).catch(() => null);
+      }
+    };
     ping();
+    // The interval is best-effort only — a hidden tab is throttled, and the tab
+    // is hidden exactly when the editor-side hook needs this signal. Closing the
+    // panel is what actually retracts it.
     const id = setInterval(ping, HEARTBEAT_INTERVAL_MS);
-    return () => clearInterval(id);
+    window.addEventListener('pagehide', clear);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('pagehide', clear);
+      clear();
+    };
   }, [open]);
 
   const startPolling = useCallback((sentQuestion: string, bridge?: BridgeKind) => {

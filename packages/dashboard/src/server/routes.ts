@@ -206,12 +206,23 @@ export function registerRoutes(
   // a few seconds listening for a question. Without the signal it returns
   // instantly, so ordinary work is untouched; with it, a question asked from
   // the dashboard is picked up with no keystroke at all.
-  register('/agent-heartbeat', (_req, res) => {
+  register('/agent-heartbeat', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
+    const marker = path.join(getRoot(), '.sprang', '.dashboard-listening');
     try {
-      const dir = path.join(getRoot(), '.sprang');
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, '.dashboard-listening'), new Date().toISOString());
+      // sendBeacon can only POST, so it signals closure with ?close=1.
+      const closing = req.method === 'DELETE' || (req.url ?? '').includes('close=1');
+      if (closing) {
+        // Explicit close beats any timeout: browsers throttle timers in hidden
+        // tabs, so "recently pinged" is not a reliable proxy for "panel open" —
+        // and the tab is *always* hidden at the moment this matters, because the
+        // user has switched to the editor.
+        if (fs.existsSync(marker)) fs.unlinkSync(marker);
+      } else {
+        const dir = path.dirname(marker);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(marker, new Date().toISOString());
+      }
       res.statusCode = 200;
       res.end(JSON.stringify({ ok: true }));
     } catch {
