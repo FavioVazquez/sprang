@@ -75,3 +75,4 @@ generate_images.py
 
 # Nested .sprang dirs from e2e test fixtures (vite server CWD artifacts)
 packages/dashboard/.sprang/
+.sprang/devin-cli-config.json

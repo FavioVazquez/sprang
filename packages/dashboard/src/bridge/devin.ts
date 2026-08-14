@@ -21,6 +21,22 @@ import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+/**
+ * Environment the `devin` CLI must NOT inherit.
+ *
+ * The dashboard is usually launched from a terminal inside Devin Desktop, which
+ * exports ACP_BACKEND. With it set the CLI switches to ACP mode, where — in its
+ * own words — "ACP host is the sole source of credentials. Local CLI
+ * credentials (env vars, on-disk REPL store) will NOT be used." The result is a
+ * CLI that is genuinely logged in yet reports "Not logged in", because it is
+ * waiting for an ACP host that will never call authenticate.
+ */
+function cliEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env['ACP_BACKEND'];
+  return env;
+}
+
 const SESSION_FILE = '.sprang/devin-session.json';
 const DEVIN_TIMEOUT_MS = 180_000; // 3 min max per call
 
@@ -36,7 +52,7 @@ interface DevinSessionData {
  */
 export function resolveDevinBinary(): string | null {
   try {
-    execFileSync('devin', ['--version'], { timeout: 5000, stdio: 'pipe' });
+    execFileSync('devin', ['--version'], { timeout: 5000, stdio: 'pipe', env: cliEnv() });
     return 'devin';
   } catch {
     return null;
@@ -72,6 +88,7 @@ export function isDevinCLIAvailable(): boolean {
       timeout: 8000,
       stdio: 'pipe',
       encoding: 'utf-8',
+      env: cliEnv(),
     });
     return !/not logged in/i.test(out);
   } catch {
@@ -107,11 +124,63 @@ Be concise — this answer will be displayed in a small chat panel.
 Question: ${question}`;
 }
 
-function buildArgs(question: string, continueSession: boolean): string[] {
+/**
+ * Grant exactly the Sprang MCP tools, and nothing else.
+ *
+ * In non-interactive mode `--permission-mode auto` approves read-only tools but
+ * not MCP calls, so the agent answers "rejected a tool call that requires
+ * confirmation" and gives up. The CLI's own advice is `--permission-mode
+ * dangerous`, which auto-approves *everything* — an unacceptable trade for
+ * answering a question about a codebase.
+ *
+ * A generated config granting `mcp__sprang__*` is the narrow equivalent:
+ * verified to let sprang_health through while leaving every other tool behind
+ * the normal prompt.
+ */
+function writePermissionConfig(sprangRoot: string): string | null {
+  try {
+    const dir = path.join(sprangRoot, '.sprang');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, 'devin-cli-config.json');
+    fs.writeFileSync(file, JSON.stringify({ permissions: { allow: ['mcp__sprang__*'] } }, null, 2));
+    return file;
+  } catch {
+    return null;
+  }
+}
+
+function buildArgs(question: string, continueSession: boolean, configPath: string | null): string[] {
   const args = ['--respect-workspace-trust', 'false', '--permission-mode', 'auto'];
+  if (configPath) args.push('--config', configPath);
   if (continueSession) args.push('--continue');
   args.push('-p', buildPrompt(question));
   return args;
+}
+
+/**
+ * Strip the CLI's first-run chrome. `devin -p` prints a welcome banner and
+ * login confirmation on stdout ahead of the answer, which would otherwise be
+ * shown to the user as part of the reply.
+ */
+export function cleanDevinOutput(raw: string): string {
+  const BANNER = [
+    /^welcome to devin cli!?$/i,
+    /^logged in as .*$/i,
+    /^you're all set\..*$/i,
+    /^✓?\s*organization: .*$/i,
+    /^run devin to get started\.?$/i,
+  ];
+  const lines = raw
+    // eslint-disable-next-line no-control-regex
+    .replace(/\u001b\[[0-9;]*m/g, '')  // ANSI colour
+    .split('\n');
+  let start = 0;
+  while (start < lines.length) {
+    const line = lines[start]!.trim();
+    if (line === '' || BANNER.some((re) => re.test(line))) start++;
+    else break;
+  }
+  return lines.slice(start).join('\n').trim();
 }
 
 export type DevinAskResult =
@@ -124,7 +193,7 @@ export function askDevin(question: string, sprangRoot: string): DevinAskResult {
   if (!bin) return { ok: false, error: 'devin CLI not found on PATH' };
 
   const previous = loadSession(sprangRoot);
-  const args = buildArgs(question, previous !== null);
+  const args = buildArgs(question, previous !== null, writePermissionConfig(sprangRoot));
 
   let result: ReturnType<typeof spawnSync>;
   try {
@@ -133,6 +202,7 @@ export function askDevin(question: string, sprangRoot: string): DevinAskResult {
       timeout: DEVIN_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024,
       encoding: 'utf-8',
+      env: cliEnv(),
       // See STDIN note in askDevinBackground.
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -142,7 +212,7 @@ export function askDevin(question: string, sprangRoot: string): DevinAskResult {
 
   if (result.error) return { ok: false, error: `devin CLI error: ${result.error.message}` };
 
-  const stdout = String(result.stdout ?? '').trim();
+  const stdout = cleanDevinOutput(String(result.stdout ?? ''));
   if (result.status !== 0) {
     const stderr = String(result.stderr ?? '').slice(0, 500) || stdout.slice(0, 500);
     return { ok: false, error: `devin exited with code ${result.status}: ${stderr}` };
@@ -173,9 +243,10 @@ export function askDevinBackground(
   // Close stdin: these CLIs block waiting for piped input when stdin is
   // inherited from a server process, then exit non-zero ("no stdin data
   // received in 3s"). The prompt is passed as an argument, not on stdin.
-  const child = spawn(bin, buildArgs(question, previous !== null), {
+  const child = spawn(bin, buildArgs(question, previous !== null, writePermissionConfig(sprangRoot)), {
     cwd: sprangRoot,
     timeout: DEVIN_TIMEOUT_MS,
+    env: cliEnv(),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -186,7 +257,7 @@ export function askDevinBackground(
   child.on('error', (err) => onFailure?.(`devin could not be started: ${err.message}`));
 
   child.on('close', (code) => {
-    const text = stdout.trim();
+    const text = cleanDevinOutput(stdout);
     if (code !== 0 || !text) {
       onFailure?.(`devin exited with code ${code}: ${(stderr || text).trim().slice(0, 300)}`);
       return;

@@ -24,6 +24,7 @@ vi.mock('node:child_process', () => ({
 
 // Now import the modules under test (they will use the mocked child_process)
 import { isDevinLocalAvailable } from '../devin-local.js';
+import { cleanDevinOutput } from '../devin.js';
 import {
   isDevinCLIAvailable,
   isClaudeCLIAvailable,
@@ -76,6 +77,32 @@ beforeEach(() => {
 });
 
 // ─── detect.ts ───────────────────────────────────────────────────────────────
+
+describe('cleanDevinOutput', () => {
+  it('strips the CLI welcome banner that precedes the answer', () => {
+    const raw = [
+      '\u001b[1mWelcome to Devin CLI!\u001b[0m',
+      'Logged in as someone@example.com.',
+      '',
+      "You're all set. Run devin to get started.",
+      '✓ Organization: EDO',
+      '',
+      'Health grade: A (91)',
+      'Node count: 982',
+    ].join('\n');
+    expect(cleanDevinOutput(raw)).toBe('Health grade: A (91)\nNode count: 982');
+  });
+
+  it('leaves a normal answer untouched', () => {
+    expect(cleanDevinOutput('  Just the answer.  ')).toBe('Just the answer.');
+  });
+
+  it('does not eat an answer that merely mentions Devin', () => {
+    expect(cleanDevinOutput('Devin CLI is spawned by the bridge.')).toBe(
+      'Devin CLI is spawned by the bridge.',
+    );
+  });
+});
 
 describe('isDevinLocalAvailable', () => {
   let tmpDir: string;
@@ -174,10 +201,22 @@ describe('detectBridge priority', () => {
       handler(bin as string, args as string[]));
   }
 
-  it('prefers the local Devin session over every CLI', () => {
-    // Devin local is already authenticated; the CLI needs a second, separate
-    // login, so preferring the CLI would push users through pointless friction.
+  it('prefers an authenticated devin CLI, which answers even when the editor is idle', () => {
+    // Hooks can only deliver when something happens in the editor session, so a
+    // question asked while it sits idle waits. The CLI has no such gap.
     stubProbes(() => Buffer.from('ok'));
+    fs.mkdirSync(path.join(tmpDir, '.devin'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.devin', 'hooks.v1.json'),
+      JSON.stringify({ Stop: [{ hooks: [{ command: 'bash .devin/hooks/stop-dashboard-question.sh' }] }] }));
+    expect(detectBridge(tmpDir).kind).toBe('devin');
+  });
+
+  it('falls back to the in-editor hooks when the CLI is not authenticated', () => {
+    stubProbes((bin, argv) => {
+      if (bin === 'devin' && argv[0] === 'auth') return Buffer.from('Not logged in.');
+      if (bin === 'devin') return Buffer.from('devin 3000.4.25');
+      throw new Error('not found');
+    });
     fs.mkdirSync(path.join(tmpDir, '.devin'), { recursive: true });
     fs.writeFileSync(path.join(tmpDir, '.devin', 'hooks.v1.json'),
       JSON.stringify({ Stop: [{ hooks: [{ command: 'bash .devin/hooks/stop-dashboard-question.sh' }] }] }));

@@ -121,18 +121,22 @@ export function listBridges(sprangRoot: string): BridgeOption[] {
 
 /** Detect the best available bridge. */
 export function detectBridge(sprangRoot: string): BridgeStatus {
-  if (isDevinLocalAvailable(sprangRoot)) {
-    return {
-      kind: 'devin-local',
-      detail: 'Devin session in your editor — delivered by the Sprang lifecycle hooks',
-    };
-  }
+  // An authenticated CLI outranks the in-editor hooks on purpose: hooks can only
+  // deliver when something happens in the session, so a question asked while the
+  // editor is idle waits until you come back. The CLI always answers. Users who
+  // prefer in-context replies can pick devin-local in the dashboard.
   if (isDevinCLIAvailable()) {
     return {
       kind: 'devin',
       detail: process.env['WINDSURF_API_KEY']
         ? 'devin CLI authenticated via WINDSURF_API_KEY (same account as the IDE)'
-        : 'devin CLI available',
+        : 'devin CLI, authenticated — answers even while the editor session is idle',
+    };
+  }
+  if (isDevinLocalAvailable(sprangRoot)) {
+    return {
+      kind: 'devin-local',
+      detail: 'Devin session in your editor — delivered by the Sprang lifecycle hooks',
     };
   }
   if (isClaudeCLIAvailable()) {
