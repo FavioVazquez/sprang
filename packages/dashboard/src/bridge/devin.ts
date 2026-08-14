@@ -198,7 +198,6 @@ export function cleanDevinOutput(raw: string): string {
     /^run devin to get started\.?$/i,
   ];
   const lines = raw
-    // eslint-disable-next-line no-control-regex
     .replace(/\u001b\[[0-9;]*m/g, '')  // ANSI colour
     .split('\n');
   let start = 0;

@@ -41,6 +41,18 @@ export function makeStatusCommand(): Command {
 
       if (!graph) return;
 
+      // `status` is the command you reach for *because* something looks wrong,
+      // so it must survive a malformed graph rather than crashing with a
+      // TypeError on graph.edges.length. Report the shape problem as a state.
+      if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) {
+        process.stdout.write(
+          `  Graph:    ${graphPath}\n` +
+            '  State:    malformed — parsed as JSON but missing a nodes/edges array\n' +
+            '  Fix:      re-run `sprang merge` or /sprang-analyze (a re-scan overwrites the evidence)\n'
+        );
+        return;
+      }
+
       // Check if Phase 2 is running
       let phase2Running = false;
       let phase2Agents: Record<string, { status: string }> = {};

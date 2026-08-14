@@ -195,6 +195,51 @@ jobs:
 
           echo "✓ sprang scan produced a valid knowledge graph"
 
+      - name: Verify sprang init scaffolds non-interactively
+        run: |
+          # GitHub Actions gives steps no TTY, which is the point: `init` used to
+          # prompt for a project root, never receive an answer, and exit 0 having
+          # written nothing. The smoke test only ever ran --version and scan, so
+          # the documented install command was broken for two releases.
+          FIXTURE=$(mktemp -d)
+          cd "$FIXTURE"
+          git init -q .
+          echo 'export const a = 1;' > a.ts
+
+          "$SPRANG_INSTALL_DIR/node_modules/.bin/sprang" init --platform devin
+
+          [ -d .devin/skills ] || (echo "ERROR: init wrote no .devin/skills" && exit 1)
+          COUNT=$(ls .devin/skills | wc -l)
+          [ "$COUNT" = "11" ] || (echo "ERROR: expected 11 skills, got $COUNT" && exit 1)
+          [ -f .devin/mcp_config.json ] || (echo "ERROR: no .devin/mcp_config.json" && exit 1)
+          echo "✓ sprang init scaffolded $COUNT skills with no TTY"
+
+      - name: Verify failure modes exit non-zero
+        run: |
+          # A command that cannot do its job must not report success, or
+          # `sprang health && deploy` ships on a missing graph.
+          FIXTURE=$(mktemp -d)
+          cd "$FIXTURE"
+          SPRANG="$SPRANG_INSTALL_DIR/node_modules/.bin/sprang"
+
+          if "$SPRANG" health > out.txt 2>&1; then
+            echo "ERROR: health exited 0 with no graph"; cat out.txt; exit 1
+          fi
+
+          mkdir -p .sprang
+          echo '{"metadata":{},"nodes":"not-an-array"}' > .sprang/knowledge-graph.json
+          if "$SPRANG" health > out.txt 2>&1; then
+            echo "ERROR: health exited 0 on an invalid graph"; cat out.txt; exit 1
+          fi
+          grep -q "failed schema validation" out.txt || \
+            (echo "ERROR: invalid graph misreported as missing:" && cat out.txt && exit 1)
+
+          # status must survive the thing it exists to diagnose
+          "$SPRANG" status > st.txt 2>&1
+          grep -qE "TypeError|Cannot read properties" st.txt && \
+            (echo "ERROR: status crashed on a malformed graph" && cat st.txt && exit 1)
+          echo "✓ failure modes are loud and diagnosable"
+
       - name: Verify MCP server starts and lists 9 tools
         run: |
           cd "$SPRANG_INSTALL_DIR"

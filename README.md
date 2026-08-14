@@ -16,7 +16,7 @@
   <a href="#installation"><img src="https://img.shields.io/badge/npm-%40faviovazquez%2Fsprang-CB3837?style=flat-square&logo=npm" alt="npm install -g @faviovazquez/sprang"/></a>
   <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-9_tools-7C3AED?style=flat-square" alt="9 MCP tools"/></a>
   <a href="#skills--slash-commands"><img src="https://img.shields.io/badge/skills-11-3B82F6?style=flat-square" alt="11 skills"/></a>
-  <img src="https://img.shields.io/badge/version-0.3.0-8B5CF6?style=flat-square" alt="version 0.3.0"/>
+  <img src="https://img.shields.io/badge/version-0.3.1-8B5CF6?style=flat-square" alt="version 0.3.1"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
 </p>
 
@@ -465,7 +465,7 @@ pnpm build
 
 cd packages/cli && pnpm link --global && cd ../..
 which sprang        # verify
-sprang --version    # 0.3.0
+sprang --version    # 0.3.1
 ```
 
 ---
@@ -504,6 +504,23 @@ sprang open /path/to/project --port 8080
 sprang open /path/to/project --auto-scan   # run Phase 1 immediately
 sprang open                                # standalone: type a path or paste a GitHub URL
 ```
+
+### Scripting and CI
+
+Every command runs unattended — no prompts, no TTY required. `sprang init` uses the
+working directory unless you pass a path or `-y`.
+
+Commands that cannot do their job exit **non-zero**, so `sprang health && deploy`
+is safe to write:
+
+| Situation | Behaviour |
+|---|---|
+| No graph | `health`, `query`, `diagram` exit 1 |
+| Graph present but schema-invalid | Same, and the message says *invalid*, lists the failing fields, and points at `sprang merge` — not `sprang scan`, which would overwrite the evidence |
+| Graph malformed or truncated | `status` reports it as a state and exits 0; it is a diagnostic, like `git status`, and never crashes |
+
+*(Before v0.3.1 `init` silently did nothing without a TTY, and `health` / `query`
+exited 0 with no graph.)*
 
 `sprang merge` defaults `--intermediate` to `<root>/.sprang/intermediate` — the directory every skill actually writes to. (Before v0.3.0 it defaulted to `<root>/intermediate`, so the documented command always failed; the old value is still accepted as a fallback.) `--kind` must match the graph you are assembling: `codebase` for source trees, `knowledge` for markdown vaults.
 
