@@ -77,3 +77,4 @@ generate_images.py
 packages/dashboard/.sprang/
 .sprang/devin-cli-config.json
 .sprang/bridge.log
+.sprang/.dashboard-listening
