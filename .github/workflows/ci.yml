@@ -94,7 +94,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build dashboard
-        run: pnpm --filter @sprang/dashboard build
+        # The `...` suffix builds workspace dependencies first. The dashboard
+        # server imports @sprang/core (to validate graphs for /graph-status),
+        # so building the dashboard alone fails on a clean checkout where
+        # packages/core/dist does not exist yet.
+        run: pnpm --filter '@sprang/dashboard...' build
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4

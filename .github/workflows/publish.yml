@@ -69,7 +69,7 @@ jobs:
         run: pnpm build
 
       - name: Build dashboard static files
-        run: pnpm --filter @sprang/dashboard build
+        run: pnpm --filter '@sprang/dashboard...' build
 
       - name: Resolve & verify version
         id: ver
