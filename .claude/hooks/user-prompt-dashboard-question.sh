@@ -14,7 +14,11 @@
 
 set -uo pipefail
 
+HOOK_LOG="${SPRANG_HOOK_LOG:-$HOME/.sprang-hooks.log}"
+hlog() { printf '[%s] prompt-hook: %s\n' "$(date -Is)" "$1" >> "$HOOK_LOG" 2>/dev/null || true; }
+
 cat >/dev/null 2>&1 || true   # drain stdin; the prompt text is not needed
+hlog "invoked"
 
 PROJECT_DIR="${DEVIN_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 cd "$PROJECT_DIR" 2>/dev/null || exit 0
@@ -29,6 +33,7 @@ mv -f "$QUESTION_FILE" "$CONSUMED" 2>/dev/null || exit 0
 
 QUESTION=$(cat "$CONSUMED" 2>/dev/null)
 [ -n "$QUESTION" ] || exit 0
+hlog "delivering a pending question"
 
 node -e '
   const question = process.argv[1];

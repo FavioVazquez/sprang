@@ -30,7 +30,16 @@
 
 set -uo pipefail
 
+# Diagnostics. A hook that is never invoked, and one that is invoked and then
+# killed by its timeout, look identical from the outside — both simply do
+# nothing. Logging entry/exit is the only way to tell them apart.
+HOOK_LOG="${SPRANG_HOOK_LOG:-$HOME/.sprang-hooks.log}"
+hlog() { printf '[%s] stop-hook: %s\n' "$(date -Is)" "$1" >> "$HOOK_LOG" 2>/dev/null || true; }
+trap 'hlog "exited (code=$?) after ${SECONDS}s"' EXIT
+
 PAYLOAD=$(cat 2>/dev/null || echo "")
+hlog "invoked"
+
 
 PROJECT_DIR="${DEVIN_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 cd "$PROJECT_DIR" 2>/dev/null || exit 0
@@ -81,7 +90,8 @@ deliver() {
 
 # Already waiting → deliver now.
 if [ -f "$QUESTION_FILE" ]; then
-  deliver && exit 0
+  hlog "question already pending — delivering"
+  deliver
   exit 0
 fi
 
@@ -92,8 +102,10 @@ now=$(date +%s)
 deadline=$(( now + GRACE_SECONDS ))
 hard_stop=$(( now + LISTEN_SECONDS ))
 
+hlog "listening (grace=${GRACE_SECONDS}s, max=${LISTEN_SECONDS}s, heartbeat=$(heartbeat_is_fresh && echo fresh || echo none))"
 while [ "$(date +%s)" -lt "$deadline" ]; do
   if [ -f "$QUESTION_FILE" ]; then
+    hlog "question arrived after ${SECONDS}s — delivering"
     deliver
     exit 0
   fi
