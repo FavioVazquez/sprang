@@ -561,14 +561,28 @@ The **Ask Agent** panel routes a question from the dashboard to whichever agent 
 
 | Priority | Bridge | How it works |
 |---|---|---|
-| 1 | **Devin CLI** | Spawns `devin -p "<question>"` with `--continue` (conversation continuity) and `--respect-workspace-trust false` (print mode can't answer a trust prompt). Sync. |
-| 2 | **Claude Code** | Spawns `claude -p "<question>" --output-format json`; session id persisted to `.sprang/claude-session.json` and reused via `--resume`. Sync. |
-| 3 | **Copilot CLI** | Spawns `copilot --prompt "<question>"`; session id persisted to `.sprang/copilot-session.json` and reused via `--resume=<id>`. Sync. |
-| 4 | **Relay** | No drivable CLI: the dashboard writes the question to `.sprang/agent-question.md` and shows it for copy/paste. Your agent answers and calls the `sprang_respond` MCP tool. Async (the dashboard polls). |
+| 1 | **Devin local** | The Devin session in your IDE. The dashboard writes `.sprang/agent-question.md`; the Sprang Devin Bridge extension pushes it into the chat. Async. **No extra login** — this session is already authenticated. |
+| 2 | **Devin CLI** | Spawns `devin -p "<question>"` with `--continue` (conversation continuity) and `--respect-workspace-trust false` (print mode can't answer a trust prompt). Sync. |
+| 3 | **Claude Code** | Spawns `claude -p "<question>" --output-format json`; session id persisted to `.sprang/claude-session.json` and reused via `--resume`. Sync. |
+| 4 | **Copilot CLI** | Spawns `copilot --prompt "<question>"`; session id persisted to `.sprang/copilot-session.json` and reused via `--resume=<id>`. Sync. |
+| 5 | **Relay** | Nothing drivable: the dashboard stages the same question file and shows it for copy/paste. Your agent answers and calls `sprang_respond`. Async. |
 
-Relay is always available, so there is no "no bridge detected" state.
+Relay is always available, so there is no "no bridge detected" state. And if a CLI is installed but cannot actually answer — a revoked token, an unsupported model, a rate limit — the bridge degrades to relay and reports the underlying error, rather than leaving the panel spinning.
 
-> The Devin bridge requires the **standalone** Devin CLI *and* `devin auth login`. The `devin` binary bundled inside Devin Desktop is not authenticated, so Desktop users fall through to the relay bridge — which is the right answer there anyway, since the IDE agent can call `sprang_respond` directly.
+### Devin local (Devin Desktop)
+
+Devin local is already signed in, but it is **not** a spawnable process: its credentials live in the IDE, not in the CLI credential store, so `devin auth status` reports *Not logged in* while the IDE works fine. Driving it requires the editor command `devin.sendChatActionMessage`, which nothing outside the editor can invoke — so this bridge ships as a small extension:
+
+```bash
+devin-desktop --install-extension sprang-devin-bridge-0.3.0.vsix --force
+# then reload the window
+```
+
+The extension watches `.sprang/agent-question.md`, pushes it into the Devin chat, and writes `.sprang/.devin-bridge-active` while it is running. Detection requires that marker — being inside Devin Desktop is not sufficient, because without the extension nothing is listening. A marker older than 24h (a crashed window) is ignored.
+
+Only the `.vsix` is committed. Because a `.vsix` is a zip containing `extension/src/`, the source travels inside the artifact and can be recovered with `unzip` at any time.
+
+> Devin local and Relay use exactly the same mechanism — the same staged file, the same prompt, the same `sprang_respond` reply path. The extension only changes *who* performs the paste, so uninstalling it degrades gracefully instead of breaking anything.
 
 Every bridge converges on the same file: `.sprang/cascade-response.json`, which the dashboard polls. `sprang_respond` also appends each exchange to `.sprang/agent-conversation.md`, so the conversation survives across bridges and sessions.
 
@@ -577,7 +591,8 @@ Every bridge converges on the same file: `.sprang/cascade-response.json`, which 
 | File | Purpose |
 |---|---|
 | `.sprang/cascade-response.json` | The answer, whichever bridge produced it — polled by the dashboard |
-| `.sprang/agent-question.md` | Pending relay question, staged for copy/paste |
+| `.sprang/agent-question.md` | Pending question — read by the Devin Bridge extension, or copy/pasted |
+| `.sprang/.devin-bridge-active` | Written while the Devin Bridge extension is running |
 | `.sprang/agent-conversation.md` | Running transcript, appended by `sprang_respond` |
 | `.sprang/claude-session.json` | Claude Code session id for `--resume` |
 | `.sprang/copilot-session.json` | Copilot CLI session id for `--resume=<id>` |
@@ -1022,7 +1037,7 @@ Or call it directly: `node packages/cli/dist/index.js <command>`.
 
 **`pnpm --filter @sprang/dashboard preview` fails outside the repo** — expected. Use `sprang open <path>`.
 
-**Ask Agent falls back to relay** — no authenticated agent CLI was found on `PATH`. Check `devin auth status`, `claude --version`, `copilot --version`. Relay still works: copy the question, answer it in your agent, and have it call `sprang_respond`.
+**Ask Agent falls back to relay** — nothing drivable was found. In Devin Desktop, install `sprang-devin-bridge-0.3.0.vsix` and reload the window (check `.sprang/.devin-bridge-active` exists and `~/.sprang-devin-bridge.log` for activity). Otherwise check `devin auth status`, `claude --version`, `copilot --version`. Relay still works regardless: copy the question, answer it in your agent, and have it call `sprang_respond`.
 
 ### Still stuck?
 

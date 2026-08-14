@@ -276,9 +276,11 @@ export function registerRoutes(
         const bridge = detectBridge(sprangRoot);
         const responsePath = getResponsePath(sprangRoot);
         if (fs.existsSync(responsePath)) { try { fs.unlinkSync(responsePath); } catch { /* ignore */ } }
-        // The relay bridge cannot answer on its own — return the prompt so the UI
-        // can offer it for copy/paste into an IDE-hosted agent.
-        const prompt = bridge.kind === 'relay' ? writeRelayQuestion(userMessage, sprangRoot) : undefined;
+        // devin-local and relay both work by staging the question file. With the
+        // Sprang Devin Bridge extension installed it is picked up automatically
+        // and pushed into the Devin chat; without it the user pastes the prompt.
+        const staged = bridge.kind === 'devin-local' || bridge.kind === 'relay';
+        const prompt = staged ? writeRelayQuestion(userMessage, sprangRoot) : undefined;
         res.statusCode = 200;
         res.end(JSON.stringify({ ok: true, sent: userMessage, mode: 'async', bridge: bridge.kind, prompt }));
         // A CLI can be installed and still be unable to answer — a revoked

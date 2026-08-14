@@ -23,6 +23,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 // Now import the modules under test (they will use the mocked child_process)
+import { isDevinLocalAvailable } from '../devin-local.js';
 import {
   isDevinCLIAvailable,
   isClaudeCLIAvailable,
@@ -75,6 +76,33 @@ beforeEach(() => {
 });
 
 // ─── detect.ts ───────────────────────────────────────────────────────────────
+
+describe('isDevinLocalAvailable', () => {
+  let tmpDir: string;
+  beforeEach(() => { tmpDir = makeTmp(); });
+  afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
+
+  const marker = (root: string) => path.join(root, '.sprang', '.devin-bridge-active');
+
+  it('is false without the bridge extension marker', () => {
+    expect(isDevinLocalAvailable(tmpDir)).toBe(false);
+  });
+
+  it('is true while the bridge extension is active', () => {
+    fs.writeFileSync(marker(tmpDir), new Date().toISOString());
+    expect(isDevinLocalAvailable(tmpDir)).toBe(true);
+  });
+
+  it('ignores a marker left behind by a crashed window', () => {
+    // Otherwise a stale marker would strand every question on a bridge that
+    // has nothing listening, instead of falling through to a working one.
+    const file = marker(tmpDir);
+    fs.writeFileSync(file, 'old');
+    const twoDaysAgo = Date.now() - 48 * 60 * 60 * 1000;
+    fs.utimesSync(file, twoDaysAgo / 1000, twoDaysAgo / 1000);
+    expect(isDevinLocalAvailable(tmpDir)).toBe(false);
+  });
+});
 
 describe('isDevinCLIAvailable', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -143,6 +171,14 @@ describe('detectBridge priority', () => {
     mockExecFileSync.mockImplementation((bin: unknown, args: unknown) =>
       handler(bin as string, args as string[]));
   }
+
+  it('prefers the local Devin session over every CLI', () => {
+    // Devin local is already authenticated; the CLI needs a second, separate
+    // login, so preferring the CLI would push users through pointless friction.
+    stubProbes(() => Buffer.from('ok'));
+    fs.writeFileSync(path.join(tmpDir, '.sprang', '.devin-bridge-active'), new Date().toISOString());
+    expect(detectBridge(tmpDir).kind).toBe('devin-local');
+  });
 
   it('prefers devin when an authenticated devin CLI is present', () => {
     stubProbes((bin) => {
@@ -346,6 +382,18 @@ describe('askAgent', () => {
   let tmpDir: string;
   beforeEach(() => { tmpDir = makeTmp(); });
   afterEach(() => { cleanTmp(tmpDir); vi.restoreAllMocks(); });
+
+  it('stages the question for the bridge extension when Devin local is active', () => {
+    stubExecFileSync(true);
+    fs.writeFileSync(path.join(tmpDir, '.sprang', '.devin-bridge-active'), new Date().toISOString());
+    const result = askAgent('what does auth.ts do?', tmpDir);
+    expect(result.bridge).toBe('devin-local');
+    expect(result.mode).toBe('async');
+    // Same file the manual relay uses — the extension just performs the paste.
+    const staged = fs.readFileSync(path.join(tmpDir, '.sprang', 'agent-question.md'), 'utf-8');
+    expect(staged).toContain('what does auth.ts do?');
+    expect(staged).toContain('sprang_respond');
+  });
 
   it('stages the question for manual relay when no CLI is available', () => {
     stubExecFileSync(true);

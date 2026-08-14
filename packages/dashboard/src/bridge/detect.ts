@@ -2,21 +2,25 @@
  * Bridge detection — determines how the dashboard can reach an AI agent.
  *
  * Priority order:
- *  1. devin    — `devin` CLI on PATH and authenticated
- *  2. claude   — `claude` CLI available (Claude Code)
- *  3. copilot  — `copilot` CLI available (GitHub Copilot CLI)
- *  4. relay    — no drivable CLI; the user relays the question to their agent,
- *                which answers via the `sprang_respond` MCP tool
+ *  1. devin-local — a Devin session in the surrounding IDE, reachable through
+ *                   the Sprang Devin Bridge extension. First because it is
+ *                   already authenticated: it needs no second login, unlike the
+ *                   CLI, whose credential store is separate from the IDE's.
+ *  2. devin       — `devin` CLI on PATH and authenticated
+ *  3. claude      — `claude` CLI available (Claude Code)
+ *  4. copilot     — `copilot` CLI available (GitHub Copilot CLI)
+ *  5. relay       — nothing drivable; the user pastes the question themselves
  *
- * `relay` is always reachable, so there is no "no bridge" state: an IDE-hosted
- * agent (Devin Desktop, Cursor, …) has no CLI for the server to spawn but can
- * still answer through MCP.
+ * Every option below the first converges on the same response file, so the
+ * dashboard's polling path never changes. `relay` is always reachable, so
+ * there is no "no bridge" state.
  */
 
 import { execFileSync } from 'node:child_process';
 import { isDevinCLIAvailable } from './devin.js';
+import { isDevinLocalAvailable, isInsideDevinDesktop } from './devin-local.js';
 
-export type BridgeKind = 'devin' | 'claude' | 'copilot' | 'relay';
+export type BridgeKind = 'devin-local' | 'devin' | 'claude' | 'copilot' | 'relay';
 
 export interface BridgeStatus {
   kind: BridgeKind;
@@ -43,10 +47,13 @@ export function isCopilotCLIAvailable(): boolean {
   }
 }
 
-export { isDevinCLIAvailable };
+export { isDevinCLIAvailable, isDevinLocalAvailable };
 
 /** Detect the best available bridge. */
-export function detectBridge(_sprangRoot: string): BridgeStatus {
+export function detectBridge(sprangRoot: string): BridgeStatus {
+  if (isDevinLocalAvailable(sprangRoot)) {
+    return { kind: 'devin-local', detail: 'Devin local session (Sprang Devin Bridge extension active)' };
+  }
   if (isDevinCLIAvailable()) {
     return { kind: 'devin', detail: 'devin CLI available' };
   }
@@ -58,8 +65,11 @@ export function detectBridge(_sprangRoot: string): BridgeStatus {
   }
   return {
     kind: 'relay',
-    detail:
-      'No agent CLI detected. Copy the question into your agent (Devin Desktop, Cursor, …) — ' +
-      'it will answer via the sprang_respond MCP tool and the reply appears here.',
+    detail: isInsideDevinDesktop()
+      ? 'Running inside Devin Desktop, but the Sprang Devin Bridge extension is not active — ' +
+        'install it to push questions straight into Devin, or copy the question across manually. ' +
+        'Either way Devin answers via the sprang_respond MCP tool.'
+      : 'No agent CLI detected. Copy the question into your agent (Devin Desktop, Cursor, …) — ' +
+        'it will answer via the sprang_respond MCP tool and the reply appears here.',
   };
 }

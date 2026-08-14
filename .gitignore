@@ -64,6 +64,7 @@ generate_images.py
 # Agent bridge runtime files (generated, never committed)
 .sprang/agent-conversation.md
 .sprang/agent-question.md
+.sprang/.devin-bridge-active
 .sprang/cascade-response.json
 .sprang/devin-session.json
 .sprang/claude-session.json

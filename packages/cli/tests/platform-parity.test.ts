@@ -140,6 +140,17 @@ describe('manifests', () => {
       expect(existsSync(join(REPO_ROOT, gone)), `${gone} should be removed in v0.3.0`).toBe(false);
     }
   });
+
+  it('ships the Devin Bridge extension, with its source inside the artifact', () => {
+    // Only the .vsix is committed. A .vsix is a zip, and vsce packs src/ into
+    // it, so the source stays recoverable without a package in the monorepo —
+    // which is how the previous extension's "lost" source was recovered.
+    const vsix = join(REPO_ROOT, 'sprang-devin-bridge-0.3.0.vsix');
+    expect(existsSync(vsix), 'sprang-devin-bridge-0.3.0.vsix should be committed').toBe(true);
+    const listing = execFileSync('unzip', ['-l', vsix], { encoding: 'utf-8' });
+    expect(listing).toContain('extension/dist/extension.js');
+    expect(listing).toContain('extension/src/extension.ts');
+  });
 });
 
 describe('skills', () => {

@@ -54,9 +54,11 @@ export function askAgent(question: string, sprangRoot: string): AskAgentResult {
     try { fs.unlinkSync(responsePath); } catch { /* ignore */ }
   }
 
-  if (bridge.kind === 'relay') {
+  // devin-local and relay share one mechanism: stage the question file. The
+  // only difference is who picks it up — the bridge extension, or the user.
+  if (bridge.kind === 'devin-local' || bridge.kind === 'relay') {
     const prompt = writeRelayQuestion(question, sprangRoot);
-    return { mode: 'async', ok: true, bridge: 'relay', prompt };
+    return { mode: 'async', ok: true, bridge: bridge.kind, prompt };
   }
 
   const ask = bridge.kind === 'devin' ? askDevin

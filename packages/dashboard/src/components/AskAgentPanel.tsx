@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Send, Loader2, X, AlertCircle, MessageSquare, Trash2 } from 'lucide-react';
 
-type BridgeKind = 'devin' | 'claude' | 'copilot' | 'relay';
+type BridgeKind = 'devin-local' | 'devin' | 'claude' | 'copilot' | 'relay';
 
 interface BridgeStatus {
   kind: BridgeKind;
@@ -10,6 +10,7 @@ interface BridgeStatus {
 }
 
 const BRIDGE_LABELS: Record<BridgeKind, string> = {
+  'devin-local': 'Devin',
   devin: 'Devin CLI',
   claude: 'Claude Code',
   copilot: 'Copilot CLI',
