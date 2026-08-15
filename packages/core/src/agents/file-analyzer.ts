@@ -15,8 +15,9 @@ import { BaseAgent } from './base.js';
 import type { AgentContext, AgentResult } from './base.js';
 import { writeFileAtomic } from '../utils/fs.js';
 import { resolveLanguageImport } from './project-scanner.js';
-import { parseSymbols } from './language-parsers/index.js';
+import { parseSymbolsBest } from './language-parsers/index.js';
 import { SYMBOL_PARSED_LANGUAGES } from './language-parsers/provenance.js';
+import type { ParserProvenance } from './language-parsers/provenance.js';
 
 function complexityFromLoc(loc: number): 'simple' | 'moderate' | 'complex' {
   if (loc < 20) return 'simple';
@@ -264,9 +265,28 @@ export class FileAnalyzerAgent extends BaseAgent {
         const fileNodeId = `file:${fileRecord.path}`;
 
         const lang = fileRecord.language;
-        const isNative = lang === 'typescript' || lang === 'javascript';
-        const fnMatches = isNative ? findFunctions(source) : parseSymbols(lang, source).functions;
-        const classMatches = isNative ? findClasses(source) : parseSymbols(lang, source).classes;
+
+        // Tree-sitter when a grammar loads, regex otherwise. The AST finds
+        // things the line-oriented parsers structurally cannot: methods inside
+        // classes, multi-line signatures, and declarations that appear inside
+        // strings or comments are correctly ignored.
+        const parsed = await parseSymbolsBest(lang, source);
+        let fnMatches = parsed.symbols.functions;
+        let classMatches = parsed.symbols.classes;
+        let parserUsed: ParserProvenance = parsed.provenance;
+
+        // The hand-written TS/JS extractor still wins on one thing the generic
+        // AST walk does not cover: arrow functions assigned to consts, which
+        // are most of a modern TypeScript codebase. Merge rather than choose.
+        if (lang === 'typescript' || lang === 'javascript') {
+          const nativeFns = findFunctions(source);
+          const seen = new Set(fnMatches.map((f) => `${f.name}:${f.startLine}`));
+          for (const fn of nativeFns) {
+            if (!seen.has(`${fn.name}:${fn.startLine}`)) fnMatches = [...fnMatches, fn];
+          }
+          if (classMatches.length === 0) classMatches = findClasses(source);
+          if (parserUsed !== 'tree-sitter') parserUsed = 'heuristic-regex';
+        }
 
         const functions: FunctionRecord[] = [];
         const classes: ClassRecord[] = [];
@@ -372,11 +392,13 @@ export class FileAnalyzerAgent extends BaseAgent {
 
         // Detect and attach patterns to the existing file node in graph
         const filePatterns = detectPatterns(source);
-        if (filePatterns.length > 0) {
-          const existingFileNode = graph.nodes.find(n => n.id === fileNodeId);
-          if (existingFileNode) {
-            existingFileNode.detected_patterns = filePatterns;
-          }
+        const existingFileNode = graph.nodes.find((n) => n.id === fileNodeId);
+        if (existingFileNode) {
+          if (filePatterns.length > 0) existingFileNode.detected_patterns = filePatterns;
+          // Overwrite the scanner's static guess with what actually ran. The
+          // scanner can only say which parsers exist; only this point knows
+          // whether the grammar loaded for this file.
+          existingFileNode.metadata = { ...existingFileNode.metadata, parser: parserUsed };
         }
 
         // Write per-file analysis

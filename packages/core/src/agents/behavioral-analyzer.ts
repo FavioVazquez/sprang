@@ -51,6 +51,12 @@ export class BehavioralAnalyzerAgent extends BaseAgent {
     const complexityByPath = new Map<string, number>();
     for (const node of graph.nodes) {
       if (node.type !== 'file' || !node.location?.file) continue;
+      // Source only. A lockfile is enormous and churns constantly, so it wins
+      // any complexity-times-churn ranking outright while telling you nothing;
+      // the same is true of a changelog. Ranking them as hotspots buries the
+      // handful of files that genuinely are.
+      const category = node.metadata?.['fileCategory'];
+      if (category !== undefined && category !== 'source') continue;
       const loc = Number(node.metadata?.['sizeLines'] ?? 0);
       if (loc > 0) complexityByPath.set(node.location.file, loc);
     }
