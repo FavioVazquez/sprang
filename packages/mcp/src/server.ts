@@ -15,6 +15,7 @@ import { sprangDomain } from './tools/sprang_domain.js';
 import type { SprangDomainInput } from './tools/sprang_domain.js';
 import { sprangHealth } from './tools/sprang_health.js';
 import { sprangWhy } from './tools/sprang_why.js';
+import { sprangCoupled } from './tools/sprang_coupled.js';
 import { sprangAnnotate } from './tools/sprang_annotate.js';
 import type { SprangAnnotateInput } from './tools/sprang_annotate.js';
 import { sprangRespond } from './tools/sprang_respond.js';
@@ -168,6 +169,28 @@ const TOOLS = [
     },
   },
   {
+    name: 'sprang_coupled',
+    description:
+      'Files that historically change together with this file, from git history. Surfaces HIDDEN couplings: ' +
+      'files with no import or call path between them that nonetheless change together. Static analysis cannot ' +
+      'find these. Call before considering a change complete.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        file: {
+          type: 'string',
+          description: 'File path (or file:<path> node id) to find co-changing files for.',
+        },
+        since_months: {
+          type: 'number',
+          description: 'Months of history to consider. Defaults to 12.',
+        },
+        limit: { type: 'number', description: 'Maximum couplings to return. Defaults to 10.' },
+      },
+      required: ['file'],
+    },
+  },
+  {
     name: 'sprang_annotate',
     description:
       'Write a team annotation for a node. Creates or overwrites `.sprang/annotations/<node-id>.md` with YAML frontmatter and the provided content.',
@@ -281,6 +304,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'sprang_why': {
         result = await sprangWhy(loader, { node_id: input['node_id'] as string }, sprangRoot);
+        break;
+      }
+
+      case 'sprang_coupled': {
+        const coupledInput: Parameters<typeof sprangCoupled>[1] = {
+          file: input['file'] as string,
+        };
+        if (input['since_months'] !== undefined) {
+          coupledInput.since_months = input['since_months'] as number;
+        }
+        if (input['limit'] !== undefined) coupledInput.limit = input['limit'] as number;
+        result = await sprangCoupled(loader, coupledInput, sprangRoot);
         break;
       }
 

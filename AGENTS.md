@@ -37,7 +37,7 @@ For architecture questions, read `.sprang/SPRANG_REPORT.md` first.
 
 ---
 
-## MCP tools (9)
+## MCP tools (10)
 
 | Tool | One-liner |
 |---|---|
@@ -45,6 +45,7 @@ For architecture questions, read `.sprang/SPRANG_REPORT.md` first.
 | `sprang_node` | `{ node_id }` — full node, 1-hop neighbors, layer, degrees, annotation status |
 | `sprang_diff_impact` | `{ files }` — BFS blast radius, risk-ranked |
 | `sprang_why` | `{ node_id }` — git decision context + team annotation |
+| `sprang_coupled` | `{ file, since_months?, limit? }` — files that historically change together with this one, from git. Flags **hidden** couplings with no dependency path — the ones static analysis cannot find. |
 | `sprang_health` | `{}` — grade A–F, score, smells, security summary, top-10 risk, history |
 | `sprang_tour` | `{ tour_id?, persona? }` — ordered guided tour |
 | `sprang_domain` | `{ domain_name? }` — business domains, flows, entry points |
