@@ -12,6 +12,8 @@ export * from './graph/communities.js';
 export * from './context/select.js';
 export * from './eval/metrics.js';
 export * from './eval/run.js';
+export * from './export/wiki.js';
+export * from './export/mermaid.js';
 export { StructureAnalyzerAgent } from './agents/structure-analyzer.js';
 export * from './artifacts/events.js';
 export * from './artifacts/non-code.js';
