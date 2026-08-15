@@ -16,6 +16,8 @@ import type { SprangDomainInput } from './tools/sprang_domain.js';
 import { sprangHealth } from './tools/sprang_health.js';
 import { sprangWhy } from './tools/sprang_why.js';
 import { sprangCoupled } from './tools/sprang_coupled.js';
+import { sprangTraps } from './tools/sprang_traps.js';
+import { sprangOwners } from './tools/sprang_owners.js';
 import { sprangAnnotate } from './tools/sprang_annotate.js';
 import type { SprangAnnotateInput } from './tools/sprang_annotate.js';
 import { sprangRespond } from './tools/sprang_respond.js';
@@ -191,6 +193,35 @@ const TOOLS = [
     },
   },
   {
+    name: 'sprang_traps',
+    description:
+      'Past changes to this code that were reverted or urgently fixed. Read before editing a file so the ' +
+      'same mistake is not repeated. Omit `file` for a repository-wide report.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        file: { type: 'string', description: 'File path or file:<path>. Omit for the whole repo.' },
+        since_months: { type: 'number', description: 'History window. Defaults to 12.' },
+        limit: { type: 'number', description: 'Maximum entries. Defaults to 15.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'sprang_owners',
+    description:
+      'Who actually knows this file: recency-weighted ownership shares, main developer, bus factor, ' +
+      'knowledge diffusion and minor-contributor count. Use to pick a reviewer or to spot a bus factor of 1.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        file: { type: 'string', description: 'File path or file:<path> node id.' },
+        since_months: { type: 'number', description: 'History window. Defaults to 24.' },
+      },
+      required: ['file'],
+    },
+  },
+  {
     name: 'sprang_annotate',
     description:
       'Write a team annotation for a node. Creates or overwrites `.sprang/annotations/<node-id>.md` with YAML frontmatter and the provided content.',
@@ -316,6 +347,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         if (input['limit'] !== undefined) coupledInput.limit = input['limit'] as number;
         result = await sprangCoupled(loader, coupledInput, sprangRoot);
+        break;
+      }
+
+      case 'sprang_traps': {
+        const trapsInput: Parameters<typeof sprangTraps>[0] = {};
+        if (input['file'] !== undefined) trapsInput.file = input['file'] as string;
+        if (input['since_months'] !== undefined) trapsInput.since_months = input['since_months'] as number;
+        if (input['limit'] !== undefined) trapsInput.limit = input['limit'] as number;
+        result = await sprangTraps(trapsInput, sprangRoot);
+        break;
+      }
+
+      case 'sprang_owners': {
+        const ownersInput: Parameters<typeof sprangOwners>[0] = {
+          file: input['file'] as string,
+        };
+        if (input['since_months'] !== undefined) ownersInput.since_months = input['since_months'] as number;
+        result = await sprangOwners(ownersInput, sprangRoot);
         break;
       }
 

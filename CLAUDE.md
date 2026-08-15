@@ -2,7 +2,7 @@
 
 # Claude Code — Sprang specifics
 
-`AGENTS.md` above carries the graph location, the before-editing workflow, the 11 skills and the 10 MCP tools. This file only covers what is Claude-specific.
+`AGENTS.md` above carries the graph location, the before-editing workflow, the 11 skills and the 12 MCP tools. This file only covers what is Claude-specific.
 
 ---
 
