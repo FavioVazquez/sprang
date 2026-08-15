@@ -330,6 +330,13 @@ export function buildEvidenceMatrix(
     // A test file that nothing executes is not a finding about the product.
     if (isTestPath(file)) continue;
 
+    // Neither is a README, a lockfile or a tsconfig. Coverage instruments code
+    // that runs; asking whether `pnpm-lock.yaml` was executed is not a question
+    // with an answer, and 88 revisions of a changelog reported as "liveness
+    // unknown" is the kind of filler that makes a report go unread.
+    const category = nodesByFile.get(file)?.[0]?.metadata?.['fileCategory'];
+    if (category !== undefined && category !== 'source') continue;
+
     const facts = staticFacts.get(file);
     const staticRefs = referrers.get(file)?.size ?? 0;
     const weakest = facts?.weakestConfidence;
