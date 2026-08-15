@@ -4,6 +4,8 @@ export * from './schema/validators.js';
 export { summarizeZodIssues } from './schema/diagnostics.js';
 export * from './graph/store.js';
 export * from './graph/metrics.js';
+export * from './behavioral/history.js';
+export * from './behavioral/analysis.js';
 export * from './agents/language-parsers/provenance.js';
 export * from './graph/query.js';
 export { normalizeGraph } from './graph/normalize.js';
