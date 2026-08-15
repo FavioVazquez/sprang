@@ -245,6 +245,57 @@ export function registerRoutes(
     }
   });
 
+  // GET /coupling.json — temporal coupling for the Coupling view.
+  //
+  // Co-change lives in the intermediate artefacts, not in the knowledge graph:
+  // structure.json carries it when the structural pass computed it, otherwise
+  // behavioral.json does. 404 means "no git-derived coupling here", and the
+  // view falls back to a weaker last_change heuristic that it labels as such.
+  register('/coupling.json', (_req, res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Type', 'application/json');
+    const sources: Array<{ file: string; source: 'structure' | 'behavioral' }> = [
+      { file: 'structure.json', source: 'structure' },
+      { file: 'behavioral.json', source: 'behavioral' },
+    ];
+    for (const { file, source } of sources) {
+      const full = path.join(getRoot(), '.sprang', 'intermediate', file);
+      if (!fs.existsSync(full)) continue;
+      try {
+        const parsed = JSON.parse(fs.readFileSync(full, 'utf-8')) as {
+          coupling?: unknown;
+          window_months?: unknown;
+        };
+        const raw = parsed.coupling;
+        if (!Array.isArray(raw) || raw.length === 0) continue;
+        const pairs = raw
+          .filter((p): p is { a: string; b: string; degree: number; support?: number; lift?: number } =>
+            !!p && typeof p === 'object' &&
+            typeof (p as { a?: unknown }).a === 'string' &&
+            typeof (p as { b?: unknown }).b === 'string' &&
+            typeof (p as { degree?: unknown }).degree === 'number')
+          .map((p) => ({
+            a: p.a, b: p.b, degree: p.degree,
+            ...(typeof p.support === 'number' ? { support: p.support } : {}),
+            ...(typeof p.lift === 'number' ? { lift: p.lift } : {}),
+          }));
+        if (pairs.length === 0) continue;
+        res.statusCode = 200;
+        res.end(JSON.stringify({
+          available: true,
+          source,
+          ...(typeof parsed.window_months === 'number' ? { window_months: parsed.window_months } : {}),
+          pairs,
+        }));
+        return;
+      } catch {
+        // Unreadable artefact — try the next source.
+      }
+    }
+    res.statusCode = 404;
+    res.end(JSON.stringify({ available: false, pairs: [] }));
+  });
+
   // GET /file-content.json?path=<relpath>
   register('/file-content.json', (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');

@@ -105,6 +105,11 @@ export const sprangEdgeSchema = z.object({
   direction: z.enum(['forward', 'backward', 'bidirectional']).optional(),
   description: z.string().optional(),
   weight: z.number().optional(),
+  // Optional so graphs written before 0.4.0 still validate.
+  resolution: z
+    .enum(['same-file', 'imported-unique', 'imported-ambiguous', 'structural'])
+    .optional(),
+  confidence: z.number().min(0).max(1).optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 

@@ -118,3 +118,52 @@ describe('CLI behaviour without a TTY', () => {
     });
   });
 });
+
+// ─── sprang check ─────────────────────────────────────────────────────────────
+
+import { spawnSync } from 'node:child_process';
+
+const tempDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'sprang-check-'));
+
+describe('sprang check', () => {
+  it('exits 1 with a clear message when no rules file exists', () => {
+    const dir = tempDir();
+    try {
+      fs.mkdirSync(path.join(dir, '.sprang'), { recursive: true });
+      const res = spawnSync('node', [CLI, 'check', dir], { encoding: 'utf-8' });
+      expect(res.status).toBe(1);
+      expect(res.stderr).toMatch(/--init/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('--init writes a rules file that parses cleanly', () => {
+    const dir = tempDir();
+    try {
+      fs.mkdirSync(path.join(dir, '.sprang'), { recursive: true });
+      const init = spawnSync('node', [CLI, 'check', dir, '--init'], { encoding: 'utf-8' });
+      expect(init.status ?? 0).toBe(0);
+      expect(fs.existsSync(path.join(dir, '.sprang', 'rules.txt'))).toBe(true);
+      // No graph yet, so it must fail on the graph — not on parsing the rules.
+      const ran = spawnSync('node', [CLI, 'check', dir], { encoding: 'utf-8' });
+      expect(ran.stderr + ran.stdout).not.toMatch(/problem\(s\)/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports per-line parse errors instead of a stack trace', () => {
+    const dir = tempDir();
+    try {
+      fs.mkdirSync(path.join(dir, '.sprang'), { recursive: true });
+      fs.writeFileSync(path.join(dir, '.sprang', 'rules.txt'), 'this is not a rule\n');
+      const res = spawnSync('node', [CLI, 'check', dir], { encoding: 'utf-8' });
+      expect(res.status).toBe(1);
+      expect(res.stderr).toMatch(/line 1/);
+      expect(res.stderr).not.toMatch(/at Object|node:internal/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

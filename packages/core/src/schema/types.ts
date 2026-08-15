@@ -242,6 +242,26 @@ export interface SprangNode {
   languageLesson?: LanguageLesson;
 }
 
+/**
+ * How a `calls` edge was arrived at.
+ *
+ * A call resolved to a function defined in the same file is a fact. A call
+ * matched to the only exported symbol of that name in a directly-imported file
+ * is a good inference. A call matched to one of several same-named candidates
+ * is a guess. Presenting all three identically is how a blast radius comes to
+ * look more authoritative than it is — and blast radius is what people decide
+ * with.
+ */
+export type EdgeResolution =
+  /** Same file, unambiguous. */
+  | 'same-file'
+  /** Unique exported symbol of that name in a directly imported file. */
+  | 'imported-unique'
+  /** Several candidates matched; the first was taken. Treat as approximate. */
+  | 'imported-ambiguous'
+  /** Derived from structure rather than a call site. */
+  | 'structural';
+
 export interface SprangEdge {
   source: string;
   target: string;
@@ -249,6 +269,10 @@ export interface SprangEdge {
   direction?: 'forward' | 'backward' | 'bidirectional';
   description?: string;
   weight?: number;
+  /** How this edge was established. Absent on edges predating 0.4.0. */
+  resolution?: EdgeResolution;
+  /** 0–1. Absent means unknown, which is not the same as low. */
+  confidence?: number;
   metadata?: Record<string, unknown>;
 }
 

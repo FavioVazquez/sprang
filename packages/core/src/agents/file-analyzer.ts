@@ -478,11 +478,26 @@ export class FileAnalyzerAgent extends BaseAgent {
             ensureMeta(internal.nodeId).callers.add(caller.nodeId);
             if (!seenCallEdges.has(key)) {
               seenCallEdges.add(key);
-              newEdges.push({ source: caller.nodeId, target: internal.nodeId, type: 'calls', weight: count });
+              // Same file, one candidate: this is a fact, not an inference.
+              newEdges.push({
+                source: caller.nodeId,
+                target: internal.nodeId,
+                type: 'calls',
+                weight: count,
+                resolution: 'same-file',
+                confidence: 1,
+              });
             }
             continue;
           }
-          // External call — exported function in a directly-imported file
+          // External call — exported function in a directly-imported file.
+          // Count the candidates first: matching a name against several
+          // same-named exports and taking the first is a guess, and the
+          // consumer of a blast radius deserves to know which it got.
+          let candidateCount = 0;
+          for (const fp of importedFiles) {
+            if (exportedByFile.get(fp)?.get(calleeName)) candidateCount += 1;
+          }
           for (const impFile of importedFiles) {
             const target = exportedByFile.get(impFile)?.get(calleeName);
             if (target) {
@@ -491,7 +506,18 @@ export class FileAnalyzerAgent extends BaseAgent {
               ensureMeta(target.nodeId).callers.add(caller.nodeId);
               if (!seenCallEdges.has(key)) {
                 seenCallEdges.add(key);
-                newEdges.push({ source: caller.nodeId, target: target.nodeId, type: 'calls', weight: count });
+                const ambiguous = candidateCount > 1;
+              newEdges.push({
+                source: caller.nodeId,
+                target: target.nodeId,
+                type: 'calls',
+                weight: count,
+                resolution: ambiguous ? 'imported-ambiguous' : 'imported-unique',
+                // A unique match across a resolved import is strong but still
+                // name-based; several candidates is barely better than a coin
+                // toss between them.
+                confidence: ambiguous ? Math.max(0.3, 1 / candidateCount) : 0.8,
+              });
               }
               break;
             }

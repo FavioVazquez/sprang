@@ -10,6 +10,9 @@ import {
   Layers,
   Grid3x3,
   LayoutGrid,
+  Flame,
+  Users,
+  Link2,
   Plus,
 } from 'lucide-react';
 import { TooltipProvider } from './components/ui/Tooltip';
@@ -21,6 +24,9 @@ const DomainView = lazy(() => import('./pages/DomainView').then((m) => ({ defaul
 const ArchitectureView = lazy(() => import('./pages/ArchitectureView').then((m) => ({ default: m.ArchitectureView })));
 const TreemapView = lazy(() => import('./pages/TreemapView').then((m) => ({ default: m.TreemapView })));
 const MatrixView = lazy(() => import('./pages/MatrixView').then((m) => ({ default: m.MatrixView })));
+const HotspotView = lazy(() => import('./pages/HotspotView').then((m) => ({ default: m.HotspotView })));
+const KnowledgeMapView = lazy(() => import('./pages/KnowledgeMapView').then((m) => ({ default: m.KnowledgeMapView })));
+const CouplingView = lazy(() => import('./pages/CouplingView').then((m) => ({ default: m.CouplingView })));
 import { LearnPanel } from './components/LearnPanel';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { WarningBanner } from './components/WarningBanner';
@@ -46,6 +52,9 @@ const NAV_ITEMS: Array<{
   { id: 'architecture', label: 'Architecture', icon: Layers },
   { id: 'treemap', label: 'Treemap', icon: Grid3x3 },
   { id: 'matrix', label: 'Matrix', icon: LayoutGrid },
+  { id: 'hotspots', label: 'Hotspots', icon: Flame },
+  { id: 'knowledge', label: 'Knowledge', icon: Users },
+  { id: 'coupling', label: 'Coupling', icon: Link2 },
   { id: 'learn', label: 'Learn', icon: BookOpen },
 ];
 
@@ -212,7 +221,13 @@ export default function App() {
           setCurrentView('treemap'); break;
         case 'm': case '6':
           setCurrentView('matrix'); break;
-        case 'l': case '7':
+        case 'o': case '7':
+          setCurrentView('hotspots'); break;
+        case 'k': case '8':
+          setCurrentView('knowledge'); break;
+        case 'c': case '9':
+          setCurrentView('coupling'); break;
+        case 'l': case '0':
           setCurrentView('learn'); break;
         case 'r':
           setShowRiskOverlay((v) => !v); break;
@@ -414,6 +429,51 @@ export default function App() {
               >
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center text-surface-500">Loading…</div>}>
                   <MatrixView graph={graph} onNodeSelect={handleNodeSelect} />
+                </Suspense>
+              </motion.div>
+            )}
+
+            {currentView === 'hotspots' && (
+              <motion.div
+                key="hotspots"
+                className="flex-1 flex overflow-hidden"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-surface-500">Loading…</div>}>
+                  <HotspotView graph={graph} onNodeSelect={handleNodeSelect} />
+                </Suspense>
+              </motion.div>
+            )}
+
+            {currentView === 'knowledge' && (
+              <motion.div
+                key="knowledge"
+                className="flex-1 flex overflow-hidden"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-surface-500">Loading…</div>}>
+                  <KnowledgeMapView graph={graph} onNodeSelect={handleNodeSelect} />
+                </Suspense>
+              </motion.div>
+            )}
+
+            {currentView === 'coupling' && (
+              <motion.div
+                key="coupling"
+                className="flex-1 flex overflow-hidden"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-surface-500">Loading…</div>}>
+                  <CouplingView graph={graph} onNodeSelect={handleNodeSelect} />
                 </Suspense>
               </motion.div>
             )}

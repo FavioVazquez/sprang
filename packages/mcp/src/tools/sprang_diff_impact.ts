@@ -12,6 +12,13 @@ export interface ImpactEntry {
   risk_score?: number;
   risk_factors?: RiskFactor[];
   path_from_changed: string[];
+  /**
+   * How much to believe this row, 0–1, bounded by the weakest call edge on the
+   * path. Absent means every edge was certain. See EdgeResolution: a call
+   * matched against several same-named exports is a guess, and a blast radius
+   * built on one should not read like a fact.
+   */
+  path_confidence?: number;
 }
 
 export interface SprangDiffImpactResult {
@@ -75,7 +82,8 @@ export async function sprangDiffImpact(
   // BFS following INCOMING edges (find dependents — who depends on the changed nodes)
   // path tracking: nodeId -> path from its changed source
   const visited = new Map<string, string[]>(); // nodeId -> shortest path from changed node
-  const queue: Array<{ nodeId: string; path: string[] }> = [];
+  const queue: Array<{ nodeId: string; path: string[]; confidence?: number }> = [];
+  const pathConfidence = new Map<string, number>();
 
   for (const nodeId of changedNodeIds) {
     queue.push({ nodeId, path: [nodeId] });
@@ -88,13 +96,23 @@ export async function sprangDiffImpact(
 
     if (visited.has(nodeId)) continue;
     visited.set(nodeId, path);
+    pathConfidence.set(nodeId, item.confidence ?? 1);
 
-    // Find nodes that have edges pointing TO nodeId (dependents)
+    // Find nodes that have edges pointing TO nodeId (dependents).
+    //
+    // The weakest edge on the path bounds how much the whole path is worth
+    // believing: a chain that passes through one ambiguously-resolved call is
+    // only as trustworthy as that call, however solid the rest of it is.
     for (const edge of graph.edges) {
       if (edge.target === nodeId) {
         const dependent = edge.source;
         if (!visited.has(dependent)) {
-          queue.push({ nodeId: dependent, path: [...path, dependent] });
+          const edgeConfidence = edge.confidence ?? 1;
+          queue.push({
+            nodeId: dependent,
+            path: [...path, dependent],
+            confidence: Math.min(item.confidence ?? 1, edgeConfidence),
+          });
         }
       }
     }
@@ -106,7 +124,14 @@ export async function sprangDiffImpact(
     if (changedNodeIds.has(nodeId)) continue;
     const node = nodeMap.get(nodeId);
     if (node) {
-      impactNodes.push(toEntry(node, path));
+      const entry = toEntry(node, path);
+      const confidence = pathConfidence.get(nodeId) ?? 1;
+      // Only stated when it is below certainty; a confidence of 1 on every
+      // row is noise that trains the reader to skip the column.
+      if (confidence < 1) {
+        entry.path_confidence = Math.round(confidence * 100) / 100;
+      }
+      impactNodes.push(entry);
     }
   }
 

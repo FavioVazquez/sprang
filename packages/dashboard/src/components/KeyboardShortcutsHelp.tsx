@@ -11,7 +11,10 @@ const SHORTCUTS = [
   { keys: ['A', '4'], action: 'Architecture view' },
   { keys: ['T', '5'], action: 'Treemap view' },
   { keys: ['M', '6'], action: 'Matrix view' },
-  { keys: ['L', '7'], action: 'Learn view' },
+  { keys: ['O', '7'], action: 'Hotspot map' },
+  { keys: ['K', '8'], action: 'Knowledge map' },
+  { keys: ['C', '9'], action: 'Coupling view' },
+  { keys: ['L', '0'], action: 'Learn view' },
   { keys: ['R'], action: 'Toggle risk overlay' },
   { keys: ['?'], action: 'This help dialog' },
 ];

@@ -18,11 +18,11 @@
     "test:e2e:bridge": "playwright test --config playwright.bridge.config.ts"
   },
   "dependencies": {
-    "@sprang/core": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-scroll-area": "^1.2.2",
     "@radix-ui/react-tabs": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.6",
+    "@sprang/core": "workspace:*",
     "@xyflow/react": "^12.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -47,12 +47,15 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/d3-hierarchy": "^3.1.7",
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/coverage-v8": "^4.1.8",
     "autoprefixer": "^10.4.21",
+    "jsdom": "^30.0.1",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "tsup": "^8.3.5",

@@ -1,0 +1,15 @@
+# Sprang's own architecture rules.
+#
+# These are enforced by `sprang check` in CI. A rule whose `from` selector
+# matches nothing is reported as unmatched — that is a typo, not a pass.
+
+# The core is headless. The UI and CLI depend on it; never the reverse.
+forbid packages/core/** -> packages/dashboard/**   # core must not know the UI exists
+forbid packages/core/** -> packages/cli/**         # the CLI is a shell around core, not a library for it
+forbid packages/core/** -> packages/mcp/**         # same: mcp is a consumer
+
+# The MCP server is a thin adapter over core. It must not reach into the CLI.
+forbid packages/mcp/** -> packages/cli/**          # tools are library calls, not shell-outs
+
+# Production code must not import test fixtures.
+forbid packages/*/src/** -> packages/*/tests/**    # fixtures are for tests only
