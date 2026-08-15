@@ -92,6 +92,8 @@ export const sprangNodeSchema = z.object({
     'high_coupling', 'no_test_coverage', 'frequent_changes',
     'large_blast_radius', 'critical_path', 'single_author',
     'recent_churn', 'has_structural_warnings',
+    // Behavioural, from git history (0.4.0)
+    'previously_reverted', 'repeated_bug_fixes', 'bus_factor_one', 'hotspot',
   ])).optional(),
   annotations: z.array(z.string()).optional(),
 });

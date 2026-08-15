@@ -23,6 +23,11 @@ async function loadRiskScorer() {
   const { RiskScorerAgent } = await import('../agents/risk-scorer.js');
   return new RiskScorerAgent();
 }
+async function loadBehavioralAnalyzer() {
+  const { BehavioralAnalyzerAgent } = await import('../agents/behavioral-analyzer.js');
+  return new BehavioralAnalyzerAgent();
+}
+
 async function loadSecurityScanner() {
   const { SecurityScannerAgent } = await import('../agents/security-scanner.js');
   return new SecurityScannerAgent();
@@ -87,7 +92,8 @@ export async function runPhase2(
   // ── Group 1: parallel (no inter-dependencies) ────────────────────
   const group1 = async () => {
     const ctx = buildCtx(graph);
-    const [archResult, domainResult, gitResult, smellResult, securityResult] = await Promise.allSettled([
+    const [archResult, domainResult, gitResult, smellResult, securityResult, behavioralResult] =
+      await Promise.allSettled([
       (async () => {
         progress.agents['architecture-analyzer'] = { status: 'running' };
         await writeProgress(intermediateDir, progress);
@@ -131,10 +137,26 @@ export async function runPhase2(
         progress.agents['security-scanner'] = { status: r.success ? 'done' : 'failed', error: r.error };
         return r;
       })(),
+      (async () => {
+        progress.agents['behavioral-analyzer'] = { status: 'running' };
+        await writeProgress(intermediateDir, progress);
+        onProgress?.('behavioral-analyzer running...');
+        const agent = await loadBehavioralAnalyzer();
+        const r = await agent.run(ctx);
+        progress.agents['behavioral-analyzer'] = { status: r.success ? 'done' : 'failed', error: r.error };
+        return r;
+      })(),
     ]);
 
     // Merge all group-1 results into graph
-    for (const result of [archResult, domainResult, gitResult, smellResult, securityResult]) {
+    for (const result of [
+      archResult,
+      domainResult,
+      gitResult,
+      smellResult,
+      securityResult,
+      behavioralResult,
+    ]) {
       if (result.status === 'fulfilled' && result.value.success) {
         graph = mergeGraphs(graph, result.value.mutatedGraph);
         progress.tokensUsed += result.value.tokensUsed ?? 0;

@@ -103,7 +103,16 @@ export type RiskFactor =
   | 'critical_path'
   | 'single_author'
   | 'recent_churn'
-  | 'has_structural_warnings';
+  | 'has_structural_warnings'
+  // ── Behavioural, from git history (0.4.0) ──────────────────────────────────
+  /** Has been reverted or urgently fixed before. The strongest of these. */
+  | 'previously_reverted'
+  /** Repeatedly fixed: prior defects are the best predictor of future ones. */
+  | 'repeated_bug_fixes'
+  /** One person holds the knowledge; a change here has no natural reviewer. */
+  | 'bus_factor_one'
+  /** High complexity that is also changed often — Tornhill's hotspot. */
+  | 'hotspot';
 
 export type SecurityCategory =
   | 'hardcoded_secret'

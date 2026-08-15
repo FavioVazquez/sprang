@@ -197,6 +197,39 @@ export class RiskScorerAgent extends BaseAgent {
         riskFactors.push('frequent_changes');
       }
 
+      // ── Behavioural evidence ────────────────────────────────────────────
+      // These are observations about what has actually happened to this file,
+      // not inferences from its shape. A file that was reverted last week is
+      // risky in a way no amount of structural analysis can reveal.
+      const behavioral = node.metadata?.['behavioral'] as
+        | {
+            trap_count?: number;
+            bug_fixes?: number;
+            bus_factor?: number;
+            hotspot_score?: number;
+            revisions?: number;
+          }
+        | undefined;
+
+      // Only source files. A CHANGELOG is touched by every fix commit and so
+      // accumulates the highest bug-fix count in the repository — but it is
+      // not risky, it is a log. Flagging documentation and lockfiles as
+      // dangerous is precisely the kind of fabricated insight that teaches an
+      // agent to ignore every other signal Sprang emits.
+      const fileCategory = node.metadata?.['fileCategory'];
+      const isSource = fileCategory === undefined || fileCategory === 'source';
+
+      if (behavioral && isSource) {
+        if ((behavioral.trap_count ?? 0) > 0) riskFactors.push('previously_reverted');
+        // Two fixes could be coincidence; three is a pattern.
+        if ((behavioral.bug_fixes ?? 0) >= 3) riskFactors.push('repeated_bug_fixes');
+        // Only meaningful once a file has enough history to judge.
+        if (behavioral.bus_factor === 1 && (behavioral.revisions ?? 0) >= 5) {
+          riskFactors.push('bus_factor_one');
+        }
+        if ((behavioral.hotspot_score ?? 0) >= 0.5) riskFactors.push('hotspot');
+      }
+
       if (blastRadiusScore > 0.5) {
         riskFactors.push('large_blast_radius');
       }
