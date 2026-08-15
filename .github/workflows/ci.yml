@@ -265,3 +265,60 @@ jobs:
             if (!d.result?.capabilities) { console.error('Bad MCP init response'); process.exit(1); }
             console.log('✓ MCP initialize OK');
           " || echo "WARNING: MCP JSON-RPC test skipped"
+
+  retrieval-quality:
+    name: Retrieval quality (no regression)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        # Full history: the evaluation is built from this repository's own
+        # bug-fix commits, so a shallow clone yields no examples at all.
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Build the knowledge graph
+        run: node packages/cli/dist/index.js scan
+
+      - name: Evaluate retrieval against this repo's own history
+        # `sprang eval` exits non-zero when the full pipeline stops beating the
+        # keyword baseline at R@10. Retrieval quality is made of heuristic
+        # weights and thresholds, and heuristic weights silently rot — this is
+        # the only thing standing between a tuning change and a quiet
+        # regression that nobody notices for months.
+        run: node packages/cli/dist/index.js eval --since-months 24 --out eval-report.md
+
+      - name: Publish the report
+        if: always()
+        run: |
+          if [ -f eval-report.md ]; then
+            {
+              echo '## Retrieval quality'
+              echo
+              cat eval-report.md
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval-report.md
+          if-no-files-found: ignore

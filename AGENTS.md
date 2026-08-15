@@ -13,7 +13,19 @@ If no graph exists yet, run `/sprang`. New to this codebase? Run `/sprang-onboar
 
 1. `sprang_node(<file-path>)` — check `risk_score`, `structural_warnings`, `in_degree`, `has_annotation`.
 2. If `risk_score > 0.7` — `sprang_why(<node-id>)` and read the decision context and annotation before changing anything.
-3. After the change — `sprang_diff_impact({ files: [...] })`. If `total_impact > 10`, say so and document the scope.
+3. If the node carries `previously_reverted` — `sprang_traps(<file>)`. Someone has already tried this and it was undone; read what corrected it.
+
+A `PreToolUse` hook surfaces the worst of this automatically before an edit, but it only warns — it never blocks, and it cannot see what you have not asked about.
+
+## Before you say you are done
+
+4. `sprang_coupled(<file>)` — files that historically change with this one. Anything marked `hidden` has no dependency path, so nothing else in your toolchain will point you at it.
+5. `sprang_review({ changed_files: [...] })` — compares the blast radius against what you actually read this session and names impacted files you never opened. A verdict of `no_receipts` is not a pass.
+6. `sprang_diff_impact({ files: [...] })`. If `total_impact > 10`, say so and document the scope.
+
+## Starting on unfamiliar code
+
+`sprang_context({ task: "<what you are trying to do>" })` before grepping. It merges symbol, keyword, dependency and change-history channels within a token budget and labels each result with the channel that found it. Measured on this repository's own bug-fix history, it retrieves the right file 2.8x more often than path matching.
 
 For architecture questions, read `.sprang/SPRANG_REPORT.md` first.
 
@@ -37,10 +49,11 @@ For architecture questions, read `.sprang/SPRANG_REPORT.md` first.
 
 ---
 
-## MCP tools (13)
+## MCP tools (14)
 
 | Tool | One-liner |
 |---|---|
+| `sprang_context` | `{ task, budget_tokens?, seed_files?, mentioned_idents? }` — **call this first on unfamiliar code.** Picks what to read for a task within a token budget; every item says which channel found it. |
 | `sprang_query` | `{ query, node_types?, limit?, mode? }` — find nodes; `mode: "semantic"` for embedding search |
 | `sprang_node` | `{ node_id }` — full node, 1-hop neighbors, layer, degrees, annotation status |
 | `sprang_diff_impact` | `{ files }` — BFS blast radius, risk-ranked |

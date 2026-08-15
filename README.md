@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/npm-%40faviovazquez%2Fsprang-CB3837?style=flat-square&logo=npm" alt="npm install -g @faviovazquez/sprang"/></a>
-  <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-13_tools-7C3AED?style=flat-square" alt="13 MCP tools"/></a>
+  <a href="#mcp-tools"><img src="https://img.shields.io/badge/MCP-14_tools-7C3AED?style=flat-square" alt="14 MCP tools"/></a>
   <a href="#skills--slash-commands"><img src="https://img.shields.io/badge/skills-11-3B82F6?style=flat-square" alt="11 skills"/></a>
   <img src="https://img.shields.io/badge/version-0.3.1-8B5CF6?style=flat-square" alt="version 0.3.1"/>
   <img src="https://img.shields.io/badge/license-MIT-gray?style=flat-square" alt="MIT license"/>
@@ -147,7 +147,7 @@ This writes:
 
 | Path | What it does |
 |---|---|
-| `.devin/mcp_config.json` | 13 MCP tools. `${workspaceFolder}` is resolved by Devin, so the config is portable. |
+| `.devin/mcp_config.json` | 14 MCP tools. `${workspaceFolder}` is resolved by Devin, so the config is portable. |
 | `.devin/skills/sprang*/SKILL.md` | The 11 skills, invoked as `/sprang`, `/sprang-onboard`, … |
 | `.devin/rules/*.md` | Always-on / glob-triggered rules (`sprang-context`, `sprang-highrisk`, `sprang-dashboard`) |
 | `.devin/hooks.v1.json` + `.devin/hooks/*.sh` | `SessionStart` stale-graph warning, `PostToolUse` post-commit graph refresh |
@@ -175,7 +175,7 @@ and run `/sprang-onboard` in your Devin session.
 /plugin install sprang
 ```
 
-The first command registers the GitHub repo as a marketplace source (reads `.claude-plugin/marketplace.json`); the second installs the plugin. Then build the MCP server binary in the plugin cache to unlock the 13 tools:
+The first command registers the GitHub repo as a marketplace source (reads `.claude-plugin/marketplace.json`); the second installs the plugin. Then build the MCP server binary in the plugin cache to unlock the 14 tools:
 
 ```bash
 cd "$(ls -d ~/.claude/plugins/cache/sprang/sprang/*/ | tail -1)"
@@ -261,7 +261,7 @@ sprang_health {}
 | **Team annotations** | `sprang_annotate` — write `.sprang/annotations/<id>.md`, committed to the repo |
 | **Knowledge graphs** | `/sprang-knowledge` — Obsidian / Logseq / Dendron / Foam / Zettelkasten / plain markdown |
 | **11 skills** | Full workflow coverage on Devin, Claude Code, and Copilot CLI |
-| **13 MCP tools** | Direct graph access — all agents read and write the graph via MCP |
+| **14 MCP tools** | Direct graph access — all agents read and write the graph via MCP |
 | **< 60s skeleton** | Phase 1 is fully static — runs anywhere, no network, no waiting |
 | **Architecture card view** | React Flow + ELK layer map — one card per layer, weighted cross-layer edges |
 | **Structural fingerprinting** | SHA-256 + signature extraction — SKIP/COSMETIC/STRUCTURAL per file |
@@ -280,7 +280,7 @@ sprang_health {}
 | Blast radius before an edit | ✅ BFS in one call | — | approximate | — |
 | Risk score per node | ✅ deterministic formula | — | subjective | — |
 | Persistent across sessions | ✅ graph on disk | ✅ files | ❌ ephemeral | ✅ |
-| Agent-readable (MCP) | ✅ 13 tools | — | via context | partial |
+| Agent-readable (MCP) | ✅ 14 tools | — | via context | partial |
 | Works offline, no API key | ✅ Phase 1 | ✅ | ❌ | ❌ |
 | Knowledge bases (Obsidian etc.) | ✅ | — | — | — |
 | Team annotations committed to repo | ✅ | — | — | ✅ (notebooks) |
@@ -379,7 +379,7 @@ sprang query "regularization techniques" --semantic
 packages/
 ├── core/       Pipeline: 9 agents, schema, watcher, graph store, fingerprinting, semantic search
 ├── cli/        sprang scan | health | query | watch | status | install-hooks | merge | open | diagram | init
-├── mcp/        stdio MCP server — 13 tools for all AI platforms
+├── mcp/        stdio MCP server — 14 tools for all AI platforms
 └── dashboard/  React + Vite + Sigma.js — 7 views (Graph/Health/Domains/Architecture/Treemap/Matrix/Learn)
 
 skills/         ← CANONICAL: the 11 skills (SKILL.md, REFERENCE.md, merge.py)
@@ -831,7 +831,7 @@ risk_score = clamp(
 
 <!-- MCP tools reference — generated with Gemini gemini-3.1-flash-image-preview -->
 <p align="center">
-  <img src="assets/mcp-tools.png" alt="Sprang MCP server — 13 tools for all AI platforms" width="100%" />
+  <img src="assets/mcp-tools.png" alt="Sprang MCP server — 14 tools for all AI platforms" width="100%" />
 </p>
 
 | Tool | Input | Output |
@@ -840,6 +840,7 @@ risk_score = clamp(
 | `sprang_query` | `{ query, node_types?, limit?, mode? }` | Fuzzy or semantic-ranked nodes with summaries |
 | `sprang_diff_impact` | `{ files: string[] }` | BFS blast-radius, risk-ranked impact list |
 | `sprang_why` | `{ node_id }` | Decision context + git history + team annotation |
+| `sprang_context` | `{ task, budget_tokens?, seed_files?, mentioned_idents? }` — pick what to read for a task within a token budget. Merges four channels, reranks by PageRank, labels every item with the channel that found it. |
 | `sprang_coupled` | `{ file, since_months?, limit? }` — files that historically change together with this one, from git. Flags **hidden** couplings with no dependency path — the ones static analysis cannot find. |
 | `sprang_traps` | `{ file?, since_months?, limit? }` — past changes here that were reverted or urgently fixed. Read before editing so the same mistake is not repeated. |
 | `sprang_owners` | `{ file, since_months? }` — recency-weighted ownership, main developer, bus factor, knowledge diffusion. |
@@ -1103,7 +1104,7 @@ CI runs `node scripts/sync-agent-assets.mjs --check` and fails if a generated tr
 |---|---|---|
 | `@sprang/core` | Vitest | Schema, 9 agents, pipeline, fingerprinting, language lessons, graph normalization (incl. assembled-graph coercion and node-warning re-attachment), semantic search, health grade, call graph, layer violations |
 | `@sprang/dashboard` | Vitest | Zustand store, BFS pathfinder, ArchitectureView logic, edge aggregation, ELK layout, bridge detection/priority |
-| `@sprang/mcp` | Vitest | GraphLoader (incl. `GRAPH_INVALID` diagnostics), all 13 tools |
+| `@sprang/mcp` | Vitest | GraphLoader (incl. `GRAPH_INVALID` diagnostics), all 14 tools |
 | `sprang` (CLI) | Vitest | `init --platform`, `scan --if-stale`, `install-hooks`, `query`, `merge` + `merge.py` normalization, hook scripts driven with real JSON on stdin, cross-platform asset parity |
 | `@sprang/dashboard` | Playwright | Full UI e2e + bridge e2e against mock `devin`/`claude`/`copilot` CLIs |
 

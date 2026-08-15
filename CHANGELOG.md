@@ -15,6 +15,15 @@ known failure?**
 
 ### Added
 
+- **`sprang_context`** — token-budgeted context selection across four channels (exact symbol, keyword, dependency proximity, change history), fused by reciprocal rank and reranked by personalized PageRank. Every item reports the channel that found it.
+- **`sprang eval`** — measure retrieval quality against your own repository's bug-fix history, as a five-arm ablation ladder. Exits non-zero if the full pipeline stops beating the keyword baseline, so CI can catch a regression.
+- **Tree-sitter parsing** for 13 languages, merged as a union with the regex parsers so a weak grammar can never lose symbols. 38% more symbols found on this repository.
+- **Typed MCP output** — every tool now declares an `outputSchema` and returns `structuredContent`, plus `readOnlyHint`/`openWorldHint` annotations so a team can auto-approve the twelve read-only tools. Results above 60k characters are truncated deterministically with a `_truncated` marker rather than being cut arbitrarily by the client.
+- **Structural analysis in Phase 2** — Louvain communities (Q = 0.70 here, rediscovering the package boundaries from imports alone), Tarjan cycles with a suggested cut, Martin's instability/abstractness metrics, clone detection, and dead code.
+- **Non-code artifacts as graph nodes** — CI jobs, Docker stages, Kubernetes resources, Terraform, SQL migrations, OpenAPI endpoints and package manifests, with `configures`, `deploys`, `triggers`, `migrates` and `routes` edges. Migrations that drop a column are flagged as destructive.
+- **Test selection** — which tests actually reach a change, with a paste-able command, and an explicit `unverifiable` verdict naming the nearest seam when nothing does.
+- **Coverage import** (lcov, cobertura) with longest-suffix path matching and a warning when more than 10% of paths fail to match.
+- **Env-var and event-topic analysis** — a variable read but declared nowhere, and a topic published with no subscriber, are both real bugs invisible to a call graph.
 - **`sprang_review`** — compares the blast radius of a change against the nodes the session actually read, and reports impacted files that were never opened, ranked by risk. Attacks *partial completion*, which Sourcegraph's 1,281-run study calls the most dangerous agent failure mode because it looks like success. With no receipts it answers `no_receipts`, never `looks_complete`.
 - **`sprang_coupled`** — files that historically change together, with degree, support and lift, cross-referenced against the graph to flag **hidden** couplings that have no dependency path. `install.sh` ↔ `install.ps1` at 100% over 7 commits is the canonical example: no static analyser can ever find it.
 - **`sprang_traps`** — changes that were reverted or urgently fixed, mined from git. `reverted` and `quick_fix` are reported separately rather than blended, because one is definitive and the other is a heuristic.

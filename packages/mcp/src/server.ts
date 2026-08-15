@@ -25,6 +25,22 @@ import { sprangAnnotate } from './tools/sprang_annotate.js';
 import type { SprangAnnotateInput } from './tools/sprang_annotate.js';
 import { sprangRespond } from './tools/sprang_respond.js';
 import type { SprangRespondInput } from './tools/sprang_respond.js';
+import {
+  SPRANG_QUERY_OUTPUT,
+  SPRANG_NODE_OUTPUT,
+  SPRANG_DIFF_IMPACT_OUTPUT,
+  SPRANG_TOUR_OUTPUT,
+  SPRANG_DOMAIN_OUTPUT,
+  SPRANG_HEALTH_OUTPUT,
+  SPRANG_WHY_OUTPUT,
+  SPRANG_COUPLED_OUTPUT,
+  SPRANG_TRAPS_OUTPUT,
+  SPRANG_OWNERS_OUTPUT,
+  SPRANG_REVIEW_OUTPUT,
+  SPRANG_CONTEXT_OUTPUT,
+  SPRANG_ANNOTATE_OUTPUT,
+  SPRANG_RESPOND_OUTPUT,
+} from './schemas.js';
 
 // `||`, not `??`: Devin substitutes an unset ${...} in an MCP env value with an
 // EMPTY STRING rather than leaving it unset, so `??` would keep "" and every
@@ -82,6 +98,42 @@ const server = new Server(
   }
 );
 
+/**
+ * Annotation presets.
+ *
+ * `annotations` are HINTS. The spec is explicit that a client may ignore them,
+ * and a client must never treat them as a security boundary — nothing stops a
+ * server from lying. They exist so a client can present the tool honestly and,
+ * more usefully, so a team can write an allowlist policy that means something.
+ *
+ * `readOnlyHint: true` plus `openWorldHint: false` is the pair that matters
+ * here: it says this tool does not modify its environment AND does not reach
+ * outside a closed, local domain (Sprang reads `.sprang/` and the local git
+ * history — no network, no external service). That combination is precisely
+ * what lets a security-conscious team auto-approve the twelve read tools while
+ * still requiring a prompt for anything that writes. Getting these wrong in the
+ * unsafe direction — marking a writer read-only — would silently widen whatever
+ * auto-approval the user has configured, so the contract test asserts them.
+ */
+const READ_ONLY = {
+  readOnlyHint: true,
+  openWorldHint: false,
+} as const;
+
+/**
+ * The two writers. Both only ever create or overwrite a file under `.sprang/`
+ * that Sprang itself owns, so `destructiveHint: false` is accurate: no existing
+ * user content is removed. `idempotentHint: false` because each call stamps a
+ * fresh timestamp (and `sprang_respond` appends to the conversation log), so
+ * repeating a call is not a no-op.
+ */
+const WRITES_ADDITIVELY = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false,
+} as const;
+
 const TOOLS = [
   {
     name: 'sprang_query',
@@ -112,6 +164,8 @@ const TOOLS = [
       },
       required: ['query'],
     },
+    outputSchema: SPRANG_QUERY_OUTPUT,
+    annotations: { title: 'Search the graph', ...READ_ONLY },
   },
   {
     name: 'sprang_node',
@@ -127,6 +181,8 @@ const TOOLS = [
       },
       required: ['node_id'],
     },
+    outputSchema: SPRANG_NODE_OUTPUT,
+    annotations: { title: 'Node detail and neighbours', ...READ_ONLY },
   },
   {
     name: 'sprang_diff_impact',
@@ -144,6 +200,8 @@ const TOOLS = [
       },
       required: ['files'],
     },
+    outputSchema: SPRANG_DIFF_IMPACT_OUTPUT,
+    annotations: { title: 'Blast radius', ...READ_ONLY },
   },
   {
     name: 'sprang_tour',
@@ -165,6 +223,8 @@ const TOOLS = [
       },
       required: [],
     },
+    outputSchema: SPRANG_TOUR_OUTPUT,
+    annotations: { title: 'Guided architecture tour', ...READ_ONLY },
   },
   {
     name: 'sprang_domain',
@@ -180,6 +240,8 @@ const TOOLS = [
       },
       required: [],
     },
+    outputSchema: SPRANG_DOMAIN_OUTPUT,
+    annotations: { title: 'Business domains', ...READ_ONLY },
   },
   {
     name: 'sprang_health',
@@ -190,6 +252,8 @@ const TOOLS = [
       properties: {},
       required: [],
     },
+    outputSchema: SPRANG_HEALTH_OUTPUT,
+    annotations: { title: 'Codebase health report', ...READ_ONLY },
   },
   {
     name: 'sprang_why',
@@ -205,6 +269,8 @@ const TOOLS = [
       },
       required: ['node_id'],
     },
+    outputSchema: SPRANG_WHY_OUTPUT,
+    annotations: { title: 'Why does this exist?', ...READ_ONLY },
   },
   {
     name: 'sprang_coupled',
@@ -227,6 +293,8 @@ const TOOLS = [
       },
       required: ['file'],
     },
+    outputSchema: SPRANG_COUPLED_OUTPUT,
+    annotations: { title: 'Change coupling', ...READ_ONLY },
   },
   {
     name: 'sprang_traps',
@@ -242,6 +310,8 @@ const TOOLS = [
       },
       required: [],
     },
+    outputSchema: SPRANG_TRAPS_OUTPUT,
+    annotations: { title: 'Past traps in this code', ...READ_ONLY },
   },
   {
     name: 'sprang_owners',
@@ -256,6 +326,8 @@ const TOOLS = [
       },
       required: ['file'],
     },
+    outputSchema: SPRANG_OWNERS_OUTPUT,
+    annotations: { title: 'Who knows this code', ...READ_ONLY },
   },
   {
     name: 'sprang_review',
@@ -275,6 +347,8 @@ const TOOLS = [
       },
       required: ['changed_files'],
     },
+    outputSchema: SPRANG_REVIEW_OUTPUT,
+    annotations: { title: 'Is this change complete?', ...READ_ONLY },
   },
   {
     name: 'sprang_context',
@@ -301,6 +375,8 @@ const TOOLS = [
       },
       required: ['task'],
     },
+    outputSchema: SPRANG_CONTEXT_OUTPUT,
+    annotations: { title: 'What to read for this task', ...READ_ONLY },
   },
   {
     name: 'sprang_annotate',
@@ -325,6 +401,8 @@ const TOOLS = [
       },
       required: ['node_id', 'content'],
     },
+    outputSchema: SPRANG_ANNOTATE_OUTPUT,
+    annotations: { title: 'Write a team annotation', ...WRITES_ADDITIVELY },
   },
   {
     name: 'sprang_respond',
@@ -344,11 +422,106 @@ const TOOLS = [
       },
       required: ['response'],
     },
+    outputSchema: SPRANG_RESPOND_OUTPUT,
+    annotations: { title: 'Answer a dashboard question', ...WRITES_ADDITIVELY },
   },
 ];
 
-server.setRequestHandler(ListToolsRequestSchema, async () => {
+/**
+ * Beyond this, the client starts cutting the result for us.
+ *
+ * Claude Code warns above roughly 10k tokens and hard-truncates above 25k, and
+ * other clients have their own limits; 60k characters is a conservative ceiling
+ * that sits under the strictest of them once JSON punctuation is counted.
+ *
+ * The point is not the exact number. It is that being truncated arbitrarily is
+ * strictly worse than truncating deliberately: an arbitrary cut lands mid-token
+ * and produces invalid JSON, drops the tail of a risk-sorted list with no
+ * indication that anything is missing, and leaves the agent believing it has
+ * seen the whole answer. Cutting it ourselves keeps the payload parseable,
+ * keeps the highest-value head of every sorted list (all of them are sorted
+ * worst-first), and — crucially — says so in `_truncated`, so the agent knows
+ * to narrow the query instead of concluding there was nothing more to find.
+ */
+export const MAX_RESULT_CHARS = 60_000;
+
+export interface TruncationMarker {
+  field: string;
+  shown: number;
+  total: number;
+  hint: string;
+}
+
+/**
+ * Shrink an oversized result by trimming its single largest array field.
+ *
+ * One field, not all of them: every Sprang result has exactly one list that
+ * dominates its size (impact_nodes, items, traps, neighbors…), and the scalar
+ * summary fields around it are the part an agent gates on. Trimming the list
+ * and keeping the counts intact means `total_impact` still reports the true
+ * number even when only part of the list is shown.
+ */
+export function truncateOversizedResult(result: unknown): unknown {
+  if (result === null || typeof result !== 'object' || Array.isArray(result)) return result;
+
+  const serialised = JSON.stringify(result);
+  if (typeof serialised !== 'string' || serialised.length <= MAX_RESULT_CHARS) return result;
+
+  const record = { ...(result as Record<string, unknown>) };
+
+  let field: string | null = null;
+  let fieldChars = -1;
+  for (const [key, value] of Object.entries(record)) {
+    if (!Array.isArray(value) || value.length === 0) continue;
+    const chars = JSON.stringify(value)?.length ?? 0;
+    if (chars > fieldChars) {
+      field = key;
+      fieldChars = chars;
+    }
+  }
+  // Nothing array-shaped to trim: a single enormous string, say. Better to hand
+  // it over whole and let the client do what it does than to mangle it here.
+  if (field === null) return result;
+
+  const full = record[field] as unknown[];
+  const total = full.length;
+  const overhead = serialised.length - fieldChars;
+
+  let shown = total;
+  while (shown > 0) {
+    const chars = JSON.stringify(full.slice(0, shown))?.length ?? 0;
+    if (overhead + chars <= MAX_RESULT_CHARS) break;
+    // Geometric backoff, with a floor of one element per step so it terminates.
+    const next = Math.floor(shown * 0.9);
+    shown = next < shown ? next : shown - 1;
+  }
+
+  record[field] = full.slice(0, shown);
+  record['_truncated'] = {
+    field,
+    shown,
+    total,
+    hint:
+      `Result exceeded ${MAX_RESULT_CHARS} characters, so '${field}' was cut to the first ` +
+      `${shown} of ${total} entries (the list is ordered most-important-first). ` +
+      `Narrow the query — a smaller limit, fewer files, or a shorter history window — to see the rest.`,
+  } satisfies TruncationMarker;
+
+  return record;
+}
+
+/** Exported for the contract test; the handler below is the only other caller. */
+export function listTools(): { tools: typeof TOOLS } {
   return { tools: TOOLS };
+}
+
+export { TOOLS };
+
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  // Returned in a fixed order, straight from the TOOLS literal. Clients cache
+  // the tool list and some key their prompt on its order, so it must not vary
+  // between calls.
+  return listTools();
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -507,19 +680,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     // Record what this call exposed, unless the call *is* the audit — counting
     // sprang_review's own output would let it mark its findings as read.
+    // Done before truncation: the agent was shown the full set conceptually,
+    // but only the retained entries are what it can actually act on, so record
+    // the truncated payload to keep coverage honest.
+    const payload = truncateOversizedResult(result);
+
     if (name !== 'sprang_review') {
       const shown = new Set<string>();
-      collectNodeIds(result, shown);
+      collectNodeIds(payload, shown);
       readLog.record(Array.from(shown), name);
     }
+
+    // `structuredContent` is the typed channel the declared outputSchema
+    // describes; the text block stays for backward compatibility, because a
+    // client that predates structured output would otherwise see an empty
+    // result. Both carry the same object.
+    const structured =
+      payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : { value: payload };
 
     return {
       content: [
         {
           type: 'text' as const,
-          text: JSON.stringify(result, null, 2),
+          text: JSON.stringify(payload, null, 2),
         },
       ],
+      structuredContent: structured,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -540,7 +728,11 @@ async function main(): Promise<void> {
   await server.connect(transport);
 }
 
-main().catch((err) => {
-  process.stderr.write(`Fatal: ${err instanceof Error ? err.message : String(err)}\n`);
-  process.exit(1);
-});
+// Guarded so the contract test can import TOOLS and the size guard without the
+// process attaching itself to stdio and hanging. Nothing else sets this.
+if (process.env['SPRANG_MCP_NO_LISTEN'] !== '1') {
+  main().catch((err) => {
+    process.stderr.write(`Fatal: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+  });
+}

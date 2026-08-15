@@ -28,6 +28,11 @@ async function loadBehavioralAnalyzer() {
   return new BehavioralAnalyzerAgent();
 }
 
+async function loadStructureAnalyzer() {
+  const { StructureAnalyzerAgent } = await import('../agents/structure-analyzer.js');
+  return new StructureAnalyzerAgent();
+}
+
 async function loadSecurityScanner() {
   const { SecurityScannerAgent } = await import('../agents/security-scanner.js');
   return new SecurityScannerAgent();
@@ -92,8 +97,15 @@ export async function runPhase2(
   // ── Group 1: parallel (no inter-dependencies) ────────────────────
   const group1 = async () => {
     const ctx = buildCtx(graph);
-    const [archResult, domainResult, gitResult, smellResult, securityResult, behavioralResult] =
-      await Promise.allSettled([
+    const [
+      archResult,
+      domainResult,
+      gitResult,
+      smellResult,
+      securityResult,
+      behavioralResult,
+      structureResult,
+    ] = await Promise.allSettled([
       (async () => {
         progress.agents['architecture-analyzer'] = { status: 'running' };
         await writeProgress(intermediateDir, progress);
@@ -146,6 +158,15 @@ export async function runPhase2(
         progress.agents['behavioral-analyzer'] = { status: r.success ? 'done' : 'failed', error: r.error };
         return r;
       })(),
+      (async () => {
+        progress.agents['structure-analyzer'] = { status: 'running' };
+        await writeProgress(intermediateDir, progress);
+        onProgress?.('structure-analyzer running...');
+        const agent = await loadStructureAnalyzer();
+        const r = await agent.run(ctx);
+        progress.agents['structure-analyzer'] = { status: r.success ? 'done' : 'failed', error: r.error };
+        return r;
+      })(),
     ]);
 
     // Merge all group-1 results into graph
@@ -156,6 +177,7 @@ export async function runPhase2(
       smellResult,
       securityResult,
       behavioralResult,
+      structureResult,
     ]) {
       if (result.status === 'fulfilled' && result.value.success) {
         graph = mergeGraphs(graph, result.value.mutatedGraph);
