@@ -18,6 +18,8 @@ import { sprangWhy } from './tools/sprang_why.js';
 import { sprangCoupled } from './tools/sprang_coupled.js';
 import { sprangTraps } from './tools/sprang_traps.js';
 import { sprangOwners } from './tools/sprang_owners.js';
+import { sprangReview } from './tools/sprang_review.js';
+import { ReadLog } from './receipt.js';
 import { sprangAnnotate } from './tools/sprang_annotate.js';
 import type { SprangAnnotateInput } from './tools/sprang_annotate.js';
 import { sprangRespond } from './tools/sprang_respond.js';
@@ -28,6 +30,39 @@ import type { SprangRespondInput } from './tools/sprang_respond.js';
 // graph path would resolve against the filesystem root instead of the project.
 const sprangRoot = process.env['SPRANG_ROOT'] || process.cwd();
 const loader = new GraphLoader(sprangRoot);
+// Records which nodes this session actually looked at, so `sprang_review` can
+// later report what the agent never opened. See receipt.ts.
+
+/**
+ * Collect every graph node the agent has just been shown.
+ *
+ * Done once over the serialised result rather than per tool: a per-tool hook
+ * would need updating every time a tool is added, and the one that gets
+ * forgotten is the one that silently under-reports coverage — which would make
+ * `sprang_review` claim gaps that do not exist.
+ */
+function collectNodeIds(value: unknown, out: Set<string>, depth = 0): void {
+  if (depth > 8 || value === null || value === undefined) return;
+  if (typeof value === 'string') {
+    if (/^(file|function|class):/.test(value)) out.add(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectNodeIds(item, out, depth + 1);
+    return;
+  }
+  if (typeof value === 'object') {
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      // `path`/`file` fields carry bare paths that are still reads.
+      if ((key === 'path' || key === 'file') && typeof child === 'string' && child.includes('.')) {
+        out.add(child);
+      }
+      collectNodeIds(child, out, depth + 1);
+    }
+  }
+}
+
+const readLog = new ReadLog(sprangRoot, `${process.pid}-${Date.now()}`);
 
 // Injected at build time by tsup `define` (see tsup.config.ts) so it always
 // matches package.json. Falls back to a dev sentinel when run un-bundled via tsx.
@@ -222,6 +257,25 @@ const TOOLS = [
     },
   },
   {
+    name: 'sprang_review',
+    description:
+      'Check whether a change is COMPLETE. Compares the blast radius of the changed files against the nodes ' +
+      'this session actually read, and reports impacted files that were never opened, riskiest first. ' +
+      'Call before declaring work finished.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        changed_files: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Files the change touches (paths or file:<path> ids).',
+        },
+        depth: { type: 'number', description: 'Blast-radius hops to consider. Defaults to 2.' },
+      },
+      required: ['changed_files'],
+    },
+  },
+  {
     name: 'sprang_annotate',
     description:
       'Write a team annotation for a node. Creates or overwrites `.sprang/annotations/<node-id>.md` with YAML frontmatter and the provided content.',
@@ -368,6 +422,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       }
 
+      case 'sprang_review': {
+        const reviewInput: Parameters<typeof sprangReview>[1] = {
+          changed_files: (input['changed_files'] as string[]) ?? [],
+        };
+        if (input['depth'] !== undefined) reviewInput.depth = input['depth'] as number;
+        result = await sprangReview(loader, reviewInput, sprangRoot);
+        break;
+      }
+
       case 'sprang_respond': {
         const respondInput: SprangRespondInput = {
           response: input['response'] as string,
@@ -401,6 +464,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ],
           isError: true,
         };
+    }
+
+    // Record what this call exposed, unless the call *is* the audit — counting
+    // sprang_review's own output would let it mark its findings as read.
+    if (name !== 'sprang_review') {
+      const shown = new Set<string>();
+      collectNodeIds(result, shown);
+      readLog.record(Array.from(shown), name);
     }
 
     return {

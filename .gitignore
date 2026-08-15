@@ -77,6 +77,7 @@ generate_images.py
 packages/dashboard/.sprang/
 .sprang/devin-cli-config.json
 .sprang/bridge.log
+.sprang/receipts/
 .sprang/.dashboard-listening
 
 # v0.4.0 build memory (working notes, not shipped)
