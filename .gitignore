@@ -78,3 +78,6 @@ packages/dashboard/.sprang/
 .sprang/devin-cli-config.json
 .sprang/bridge.log
 .sprang/.dashboard-listening
+
+# v0.4.0 build memory (working notes, not shipped)
+.sprang-v040.md
