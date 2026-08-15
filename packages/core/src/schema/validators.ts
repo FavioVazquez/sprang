@@ -46,6 +46,10 @@ export const securityWarningSchema = z.object({
   line: z.number().int().optional(),
   pattern: z.string(),
   snippet: z.string().optional(),
+  // Defaulted rather than required: graphs written before 0.4.0 have no
+  // confidence field, and making it required would fail validation on every
+  // one of them — turning an honesty improvement into a GRAPH_INVALID outage.
+  confidence: z.enum(['unverified', 'confirmed']).default('unverified'),
 });
 
 export const securitySummarySchema = z.object({

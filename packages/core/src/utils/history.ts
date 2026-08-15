@@ -3,6 +3,7 @@ import { readFile, writeFile, rename } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import type { KnowledgeGraph, HistorySnapshot } from '../schema/types.js';
 import { calcHealthGrade } from './health-grade.js';
+import { computeAvgCoupling } from '../graph/metrics.js';
 
 const HISTORY_FILE = '.sprang/history.json';
 const MAX_SNAPSHOTS = 50;
@@ -33,7 +34,12 @@ export async function appendSnapshot(
   ).length;
 
   const godNodeCount = graph.stats.smell_summary['god_node'] ?? 0;
-  const gradeResult = calcHealthGrade(graph.stats, { orphanCount, circularCount, godNodeCount });
+  const gradeResult = calcHealthGrade(graph.stats, {
+    orphanCount,
+    circularCount,
+    godNodeCount,
+    avgCoupling: computeAvgCoupling(graph),
+  });
 
   const smellCount = Object.values(graph.stats.smell_summary).reduce(
     (a, b) => a + (b ?? 0), 0,

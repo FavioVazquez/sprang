@@ -51,6 +51,8 @@ function scanCode(code: string, _filePath: string): SecurityWarning[] {
         warnings.push({
           category,
           severity,
+          // Regex match only — no dataflow, no reachability. See SecurityWarning.confidence.
+          confidence: 'unverified',
           description,
           line: i + 1,
           pattern: pattern.source.slice(0, 60),

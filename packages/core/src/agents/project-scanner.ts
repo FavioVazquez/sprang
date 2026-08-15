@@ -3,6 +3,7 @@ import { join, basename, extname, relative } from 'node:path';
 import fg from 'fast-glob';
 import type { KnowledgeGraph, ScanResult, FileRecord, SprangNode, FingerprintStats } from '../schema/types.js';
 import { EXTENSION_TO_LANGUAGE, DEFAULT_EXCLUDES, FRAMEWORK_MARKERS } from '../schema/constants.js';
+import { parserProvenanceFor, SYMBOL_PARSED_LANGUAGES } from './language-parsers/provenance.js';
 import { BaseAgent } from './base.js';
 import type { AgentContext, AgentResult } from './base.js';
 import { fileExists } from '../utils/fs.js';
@@ -196,13 +197,50 @@ function extractCSharpImports(source: string): string[] {
   return Array.from(imports);
 }
 
+function extractSwiftImports(source: string): string[] {
+  const imports = new Set<string>();
+  // `import Foundation`, `import class UIKit.UIView`, `@testable import App`
+  const re = /^\s*(?:@testable\s+)?import\s+(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?([\w.]+)/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source)) !== null) {
+    const p = m[1];
+    if (p !== undefined) imports.add(p);
+  }
+  return Array.from(imports);
+}
+
+function extractTerraformImports(source: string): string[] {
+  const imports = new Set<string>();
+  // A Terraform module's dependency is its `source`, which may be a local path
+  // ("../vpc"), a registry address, or a git URL. Local paths are the ones that
+  // resolve to a node in this repo.
+  const re = /^\s*source\s*=\s*"([^"]+)"/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source)) !== null) {
+    const p = m[1];
+    if (p !== undefined) imports.add(p);
+  }
+  return Array.from(imports);
+}
+
+function extractBashImports(source: string): string[] {
+  const imports = new Set<string>();
+  // `source ./lib.sh`, `. ./lib.sh` — how shell scripts compose.
+  const re = /^\s*(?:source|\.)\s+["']?([^"'\s;|&]+)/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source)) !== null) {
+    const p = m[1];
+    // Skip shell builtins/variables that are not paths.
+    if (p !== undefined && !p.startsWith('$') && p !== '/dev/null') imports.add(p);
+  }
+  return Array.from(imports);
+}
+
 // ─── Dispatcher ───────────────────────────────────────────────────────────────
 
-const SOURCE_LANGUAGES = new Set([
-  'typescript', 'javascript', 'python', 'go', 'rust',
-  'java', 'kotlin', 'ruby', 'php', 'c', 'cpp', 'csharp',
-  'swift', 'bash',
-]);
+// Kept as an alias so the intent reads clearly at the call site; the set itself
+// lives with the parsers, which is the only place that can know the truth.
+const SOURCE_LANGUAGES = SYMBOL_PARSED_LANGUAGES;
 
 export function extractImportsForLanguage(lang: string, source: string): string[] {
   switch (lang) {
@@ -227,6 +265,14 @@ export function extractImportsForLanguage(lang: string, source: string): string[
       return extractCImports(source);
     case 'csharp':
       return extractCSharpImports(source);
+    case 'swift':
+      return extractSwiftImports(source);
+    case 'terraform':
+      return extractTerraformImports(source);
+    case 'bash':
+      return extractBashImports(source);
+    // SQL has no import construct worth modelling here; its structure comes
+    // from the symbols (tables, routines), not from file-to-file dependency.
     default:
       return [];
   }
@@ -584,6 +630,8 @@ export class ProjectScannerAgent extends BaseAgent {
             mtime,
             fileCategory,
             changeType,
+            // How this file's symbols were obtained. See ParserProvenance.
+            parser: parserProvenanceFor(language),
           },
         });
       }

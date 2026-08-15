@@ -16,6 +16,7 @@ import type { AgentContext, AgentResult } from './base.js';
 import { writeFileAtomic } from '../utils/fs.js';
 import { resolveLanguageImport } from './project-scanner.js';
 import { parseSymbols } from './language-parsers/index.js';
+import { SYMBOL_PARSED_LANGUAGES } from './language-parsers/provenance.js';
 
 function complexityFromLoc(loc: number): 'simple' | 'moderate' | 'complex' {
   if (loc < 20) return 'simple';
@@ -246,11 +247,9 @@ export class FileAnalyzerAgent extends BaseAgent {
       const analysisDir = join(ctx.intermediateDir, 'file-analysis');
       await ensureDir(analysisDir);
 
-      const SUPPORTED_LANGS = new Set([
-        'typescript', 'javascript', 'python', 'go', 'rust',
-        'java', 'kotlin', 'ruby', 'php', 'c', 'cpp', 'csharp',
-      ]);
-      const tsJsFiles = scanResult.files.filter((f) => SUPPORTED_LANGS.has(f.language));
+      // Single source of truth — see SYMBOL_PARSED_LANGUAGES. A local list here
+      // is how Swift ended up "supported" everywhere except the analyzer.
+      const tsJsFiles = scanResult.files.filter((f) => SYMBOL_PARSED_LANGUAGES.has(f.language));
 
       for (const fileRecord of tsJsFiles) {
         let source: string;

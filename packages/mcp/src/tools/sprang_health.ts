@@ -1,6 +1,6 @@
 import type { GraphLoader, GraphError } from '../graph-loader.js';
 import type { RiskFactor, SmellCategory } from '@sprang/core';
-import { calcHealthGrade, gradeColor, loadHistory } from '@sprang/core';
+import { calcHealthGrade, computeAvgCoupling, gradeColor, loadHistory } from '@sprang/core';
 
 export interface SprangHealthInput {
   // no fields required
@@ -36,6 +36,12 @@ export interface SprangHealthResult {
     coupling_penalty: number;
     security_penalty: number;
   };
+  /**
+   * Regex-matched security hints, not audited findings. No dataflow, no
+   * reachability — every entry is `confidence: "unverified"`. Treat as a
+   * prompt to look, never as evidence of a vulnerability.
+   */
+  security_disclaimer?: string;
   security_summary: {
     total: number;
     by_severity: { high: number; medium: number; low: number };
@@ -106,8 +112,12 @@ export async function sprangHealth(
     orphanCount,
     circularCount: circularDependencyCount,
     godNodeCount,
+    avgCoupling: computeAvgCoupling(graph),
   });
 
+  const securityDisclaimer =
+    'Regex-matched hints only (no dataflow or reachability analysis) — expect false ' +
+    'positives and verify before acting. Not a substitute for Semgrep or CodeQL.';
   const securitySummary = graph.stats.security_summary ?? {
     total: 0,
     by_severity: { high: 0, medium: 0, low: 0 },
@@ -133,6 +143,7 @@ export async function sprangHealth(
     health_grade: gradeResult.grade,
     grade_color: gradeColor(gradeResult.grade),
     grade_breakdown: gradeResult.breakdown,
+    ...(securitySummary.total > 0 ? { security_disclaimer: securityDisclaimer } : {}),
     security_summary: securitySummary,
     history: history.slice(-30),
   };

@@ -1,6 +1,6 @@
 import { resolve, join } from 'node:path';
 import { Command } from 'commander';
-import { loadGraphResult, calcHealthGrade } from '@sprang/core';
+import { loadGraphResult, calcHealthGrade, computeAvgCoupling } from '@sprang/core';
 import { reportGraphFailure } from '../graph-error.js';
 
 function riskBar(count: number, total: number, char: string): string {
@@ -64,7 +64,7 @@ export function makeHealthCommand(): Command {
 
       // Health grade (only meaningful once Phase 2 has scored the graph)
       if (graph.phase !== 'skeleton') {
-        const grade = calcHealthGrade(stats);
+        const grade = calcHealthGrade(stats, { avgCoupling: computeAvgCoupling(graph) });
         process.stdout.write(`  Health Grade: ${grade.grade}  (${grade.score}/100)\n`);
         process.stdout.write('\n');
       }
@@ -122,10 +122,16 @@ export function makeHealthCommand(): Command {
         process.stdout.write('  Code Smells: none detected\n\n');
       }
 
-      // Security findings
+      // Security hints.
+      //
+      // Deliberately not called "findings". These come from ~38 regular
+      // expressions with no dataflow, no type information and no reachability
+      // check, so a fixture password and a real one look identical. Presenting
+      // them with the authority of a scanner like Semgrep or CodeQL would be
+      // dishonest, and a false positive an agent trusts is worse than silence.
       const sec = stats.security_summary;
       if (sec && sec.total > 0) {
-        process.stdout.write('  Security Findings\n');
+        process.stdout.write('  Security Hints (unverified — regex only, expect false positives)\n');
         process.stdout.write('  ' + '-'.repeat(40) + '\n');
         process.stdout.write(
           `  High: ${sec.by_severity.high}   Medium: ${sec.by_severity.medium}   Low: ${sec.by_severity.low}   (total ${sec.total})\n`
@@ -137,7 +143,7 @@ export function makeHealthCommand(): Command {
         }
         process.stdout.write('\n');
       } else if (graph.phase !== 'skeleton') {
-        process.stdout.write('  Security Findings: none detected\n\n');
+        process.stdout.write('  Security Hints: none matched (regex only — not a security audit)\n\n');
       }
 
       process.stdout.write('='.repeat(60) + '\n\n');

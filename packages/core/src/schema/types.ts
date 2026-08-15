@@ -122,6 +122,20 @@ export interface SecurityWarning {
   line?: number;
   pattern: string;  // the regex/pattern that matched
   snippet?: string; // code context (max 80 chars)
+  /**
+   * How much this finding can be trusted.
+   *
+   * `unverified` means a regular expression matched source text with no
+   * dataflow, no type information and no reachability check — it cannot tell a
+   * real credential from a fixture, or a live SQL concatenation from one inside
+   * a comment. Sprang's built-in scanner only ever produces `unverified`.
+   *
+   * This is deliberately explicit. A false positive presented as a finding is
+   * worse than no finding at all: it burns agent context and teaches the agent
+   * to discount everything else Sprang reports. Anything stronger must come
+   * from a real analyser (Semgrep, CodeQL) via import.
+   */
+  confidence: 'unverified' | 'confirmed';
 }
 
 export type DetectedPattern =
