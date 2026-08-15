@@ -1,40 +1,35 @@
 import type { ParsedSymbols } from './index.js';
+import { runLineParser } from './line-parser.js';
+
+/**
+ * Java.
+ *
+ * Types are tested before methods: the method pattern is permissive enough to
+ * match a class declaration's header, so the order is load-bearing.
+ */
+const CONTROL_FLOW = new Set([
+  'if', 'for', 'while', 'switch', 'catch', 'else', 'new', 'return', 'throw',
+]);
+
+const isPublic = (_name: string, line: string): boolean => /\bpublic\b/.test(line);
 
 export function parseJava(source: string): ParsedSymbols {
-  const functions: ParsedSymbols['functions'] = [];
-  const classes: ParsedSymbols['classes'] = [];
-  const lines = source.split('\n');
-
-  // [access] [static] [return_type] methodName( ...
-  const methodRe =
-    /^\s*(?:(?:public|private|protected|static|final|synchronized|native|abstract|default)\s+)*(?!class\s|interface\s|enum\s)(?:[\w<>[\],\s.]+\s+)?(\w+)\s*\(/;
-  // [access] class/interface/enum Name
-  const classRe =
-    /^\s*(?:(?:public|private|protected|static|final|abstract)\s+)*(?:class|interface|enum|record)\s+(\w+)/;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-
-    const clsM = classRe.exec(line);
-    if (clsM) {
-      const name = clsM[1] ?? '';
-      if (name) {
-        const isPublic = /\bpublic\b/.test(line);
-        classes.push({ name, startLine: i + 1, exported: isPublic });
-      }
-      continue;
-    }
-
-    const mM = methodRe.exec(line);
-    if (mM) {
-      const name = mM[1] ?? '';
-      // skip keywords that leaked through
-      if (name && !['if', 'for', 'while', 'switch', 'catch', 'else', 'new', 'return', 'throw'].includes(name)) {
-        const isPublic = /\bpublic\b/.test(line);
-        functions.push({ name, startLine: i + 1, exported: isPublic, isAsync: false });
-      }
-    }
-  }
-
-  return { functions, classes };
+  return runLineParser(source, {
+    rules: [
+      {
+        kind: 'class',
+        pattern:
+          /^\s*(?:(?:public|private|protected|static|final|abstract)\s+)*(?:class|interface|enum|record)\s+(\w+)/,
+        exported: isPublic,
+      },
+      {
+        kind: 'function',
+        pattern:
+          /^\s*(?:(?:public|private|protected|static|final|synchronized|native|abstract|default)\s+)*(?!class\s|interface\s|enum\s)(?:[\w<>[\],\s.]+\s+)?(\w+)\s*\(/,
+        skip: CONTROL_FLOW,
+        exported: isPublic,
+        isAsync: () => false,
+      },
+    ],
+  });
 }

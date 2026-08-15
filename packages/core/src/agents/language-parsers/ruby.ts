@@ -1,40 +1,31 @@
 import type { ParsedSymbols } from './index.js';
+import { runLineParser } from './line-parser.js';
+
+/**
+ * Ruby.
+ *
+ * Top-level indentation stands in for visibility: a `def` at column zero is
+ * reachable from anywhere, one nested inside a class is not, and a leading
+ * underscore is the community's private marker.
+ */
+const atTopLevel = (line: string): boolean => /^\S/.test(line);
 
 export function parseRuby(source: string): ParsedSymbols {
-  const functions: ParsedSymbols['functions'] = [];
-  const classes: ParsedSymbols['classes'] = [];
-  const lines = source.split('\n');
-
-  // def method_name or def self.method_name
-  const fnRe = /^(\s*)def\s+(?:self\.)?(\w+)/;
-  // class Name [< Parent] or module Name
-  const classRe = /^(\s*)(?:class|module)\s+(\w+)/;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    const fnM = fnRe.exec(line);
-    if (fnM) {
-      const indent = fnM[1]?.length ?? 0;
-      const name = fnM[2] ?? '';
-      if (name) {
-        functions.push({
-          name,
-          startLine: i + 1,
-          exported: indent === 0 && !name.startsWith('_'),
-          isAsync: false,
-        });
-      }
-      continue;
-    }
-    const clsM = classRe.exec(line);
-    if (clsM) {
-      const indent = clsM[1]?.length ?? 0;
-      const name = clsM[2] ?? '';
-      if (name) {
-        classes.push({ name, startLine: i + 1, exported: indent === 0 });
-      }
-    }
-  }
-
-  return { functions, classes };
+  return runLineParser(source, {
+    rules: [
+      {
+        kind: 'function',
+        pattern: /^(\s*)def\s+(?:self\.)?(\w+)/,
+        transform: (m) => m[2] ?? '',
+        exported: (name, line) => atTopLevel(line) && !name.startsWith('_'),
+        isAsync: () => false,
+      },
+      {
+        kind: 'class',
+        pattern: /^(\s*)(?:class|module)\s+(\w+)/,
+        transform: (m) => m[2] ?? '',
+        exported: (_name, line) => atTopLevel(line),
+      },
+    ],
+  });
 }

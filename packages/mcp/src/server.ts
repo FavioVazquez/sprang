@@ -3,7 +3,17 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ReadResourceRequestSchema,
+  CompleteRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import {
+  complete,
+  listResources,
+  listResourceTemplates,
+  readResource,
+} from './resources.js';
 import { GraphLoader } from './graph-loader.js';
 import { sprangQuery } from './tools/sprang_query.js';
 import type { SprangQueryInput } from './tools/sprang_query.js';
@@ -94,6 +104,15 @@ const server = new Server(
   {
     capabilities: {
       tools: {},
+      // Resources are application-controlled: a user attaches one from the `@`
+      // menu without the model deciding anything. `listChanged: true` says the
+      // list can change (it does — a `sprang scan` adds the report), so a client
+      // knows to re-list rather than caching the first answer forever.
+      resources: { listChanged: true },
+      // Declared empty, as the spec requires: presence is the signal that
+      // `completion/complete` is supported. Without it clients never probe, and
+      // the node-id autocomplete below is dead code.
+      completions: {},
     },
   }
 );
@@ -722,6 +741,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 });
+
+// ─── Resources, templates and completion ─────────────────────────────────────
+//
+// See resources.ts for why these exist. All four handlers are total: they never
+// throw and never depend on a graph being present.
+
+server.setRequestHandler(ListResourcesRequestSchema, async () => listResources());
+
+server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => listResourceTemplates());
+
+server.setRequestHandler(ReadResourceRequestSchema, async (request) =>
+  readResource(loader, sprangRoot, request.params.uri)
+);
+
+server.setRequestHandler(CompleteRequestSchema, async (request) =>
+  complete(loader, {
+    ref: request.params.ref,
+    argument: request.params.argument,
+  })
+);
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
