@@ -72,6 +72,7 @@ The same infrastructure works for knowledge bases: Obsidian vaults, Logseq datab
 - [CLI usage](#cli-usage)
 - [Skills / slash commands](#skills--slash-commands)
 - [Ask Agent (dashboard chat)](#ask-agent-dashboard-chat)
+- [Did the agent finish the job?](#did-the-agent-finish-the-job)
 - [Two-phase pipeline](#two-phase-pipeline)
 - [The three differentiating agents](#the-three-differentiating-agents)
 - [MCP tools](#mcp-tools)
@@ -646,6 +647,94 @@ Worse, with both routes installed the extension won the race every time — it f
 | `.sprang/copilot-session.json` | Copilot CLI session id for `--resume=<id>` |
 | `.sprang/devin-session.json` | Whether a Devin turn has happened (drives `--continue`) |
 | `.sprang/devin-cli-config.json` | Generated permission grant for the spawned CLI (`mcp__sprang__*` only) |
+
+---
+
+## Did the agent finish the job?
+
+Every tool in this space helps an agent *find* code. None of them check, afterwards,
+whether it found enough.
+
+Sourcegraph's study of 1,281 agent runs across 40+ large repositories named five
+failure modes and singled out **partial completion** as "the most dangerous failure
+mode because it appears to be somewhat successful" — the agent changes a function,
+never notices three of its seven callers, and reports success.
+
+Sprang closes that loop, because a dependency graph makes it nearly free to.
+
+### `sprang_review` — is this change complete?
+
+The MCP server records which nodes each session was actually shown. `sprang_review`
+compares that against the blast radius of what changed:
+
+```
+blast radius: 18 files   coverage: 72%   verdict: gaps_found
+
+never opened:
+  risk 0.16  2 hops  packages/core/src/watcher/watcher.ts
+  risk 0.15  2 hops  packages/core/src/orchestrator/phase2-runner.ts
+```
+
+With no receipts it answers `no_receipts`, never `looks_complete`. Silence would be
+read as approval, which is the failure this exists to prevent.
+
+### `sprang_coupled` — what changes with this
+
+Two files with no import between them that always change together have a real
+dependency that exists only in the team's heads: a schema and its migration, a
+client and a server contract, a fixture and the code it mirrors. Sprang cross-checks
+git history against the graph and flags the ones with **no dependency path**:
+
+```
+100%  n=7  lift=33  [HIDDEN]  install.ps1
+```
+
+Nothing in a dependency graph connects a bash script to a PowerShell script — and
+nothing ever will — but they have never once changed apart.
+
+### `sprang_traps` — has this gone wrong before
+
+Changes that were reverted, or urgently fixed hours later, mined from git. Pure
+archaeology, no model involved. `reverted` (an explicit `Revert "..."` matched to its
+target) and `quick_fix` (a weaker heuristic) are reported separately rather than
+blended, because they deserve different trust.
+
+### `sprang_owners` — who actually knows this
+
+Recency-weighted ownership with a nine-month half-life, bus factor, knowledge
+diffusion, and minor-contributor count. Someone who wrote a file three years ago and
+has not touched it since is not its owner any more.
+
+### The warning arrives without being asked
+
+A `PreToolUse` hook fires before any edit. It injects context and **never blocks** —
+a tool that refuses edits gets uninstalled, and the decision belongs to the agent:
+
+```
+[sprang] packages/dashboard/vite.config.ts
+  - 5 previous change(s) here were reverted or urgently fixed
+  - Risk score 0.29 — frequent_changes, previously_reverted, repeated_bug_fixes
+  - Bus factor 1: one person holds most of the knowledge here
+  - Existing layer violation on this file
+```
+
+### Behavioural analysis
+
+All of the above comes from a single `git log --numstat` traversal in Phase 2, which
+also yields hotspots (percentile complexity × percentile churn), change coupling,
+code age and bug-fix counts. It is language-agnostic, so it works on files no parser
+understands.
+
+Three thresholds separate signal from noise, and they are not adjustable by accident:
+commits touching more than 30 files are excluded (one "reformat everything" commit
+across 400 files would manufacture 80,000 perfectly-correlated pairs), couplings need
+at least five shared commits, and lift is reported beside degree so files that are
+simply touched constantly are discounted.
+
+Behavioural risk factors apply to **source files only**. Without that gate the
+riskiest file in this repository was `CHANGELOG.md`, with the highest bug-fix count
+of anything — because every fix commit touches it. A changelog is not risky; it is a
+log. Flagging it would teach an agent to discount every other signal Sprang emits.
 
 ---
 

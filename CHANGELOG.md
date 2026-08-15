@@ -6,6 +6,36 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.4.0] — unreleased
+
+Sprang stops competing on "understand this codebase" — DeepWiki does that for free,
+and Understand Anything ships the same feature set — and starts answering a question
+nobody else does: **is the agent's change finished, verified, and not a repeat of a
+known failure?**
+
+### Added
+
+- **`sprang_review`** — compares the blast radius of a change against the nodes the session actually read, and reports impacted files that were never opened, ranked by risk. Attacks *partial completion*, which Sourcegraph's 1,281-run study calls the most dangerous agent failure mode because it looks like success. With no receipts it answers `no_receipts`, never `looks_complete`.
+- **`sprang_coupled`** — files that historically change together, with degree, support and lift, cross-referenced against the graph to flag **hidden** couplings that have no dependency path. `install.sh` ↔ `install.ps1` at 100% over 7 commits is the canonical example: no static analyser can ever find it.
+- **`sprang_traps`** — changes that were reverted or urgently fixed, mined from git. `reverted` and `quick_fix` are reported separately rather than blended, because one is definitive and the other is a heuristic.
+- **`sprang_owners`** — recency-weighted ownership (nine-month half-life), bus factor, knowledge diffusion, minor-contributor count.
+- **`PreToolUse` risk gate** — warns before an edit without being asked. Injects context, never blocks, fails open at every step.
+- **Behavioural analysis** in Phase 2 from a single `git log --numstat` pass: hotspots, change coupling, ownership, code age, bug-fix counts, trap history. Language-agnostic. Four new risk factors: `previously_reverted`, `repeated_bug_fixes`, `bus_factor_one`, `hotspot`.
+- **Swift, Bash, SQL and Terraform parsers**, plus Swift/Bash/Terraform import extraction.
+- **`parser` provenance** on every file node. Sprang's parsers are regexes; consumers reasoning about its edges should know that.
+
+### Fixed
+
+- **A fifteen-point term of the health grade was inert.** `calcHealthGrade` accepted `avgCoupling`, defaulted it to zero, and no caller passed it — so the coupling penalty was silently absent from every grade Sprang has ever produced. A densely coupled fixture now moves B/80 → C/70.
+- **Swift, Bash, SQL and Terraform appeared supported but produced no symbols.** The cause was three hand-maintained language lists — the extension map, the scanner's `SOURCE_LANGUAGES`, and the analyzer's `SUPPORTED_LANGS` — that had to agree and did not. Swift was in two of three. Replaced by one registry with a test asserting every registered language actually parses.
+- **Security "findings" are now "hints"** carrying `confidence: 'unverified'`. They are 38 regular expressions with no dataflow or reachability; a fixture password and a real one are indistinguishable. The schema field is defaulted, so graphs written before 0.4.0 still validate.
+
+### Notes
+
+- Behavioural risk factors are gated to source files. Without the gate, the riskiest file in this repository was `CHANGELOG.md` — highest bug-fix count of anything, because every fix commit touches it.
+
+---
+
 ## [0.3.1] — 2026-08-14
 
 Patch release. Smoke-testing the published 0.3.0 tarball surfaced a set of CLI
