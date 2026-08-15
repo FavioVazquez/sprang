@@ -1,4 +1,16 @@
 {
+  "PreToolUse": [
+    {
+      "matcher": "^(edit|write|str_replace_editor|Edit|Write|MultiEdit|NotebookEdit)$",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash .devin/hooks/pre-tool-risk-gate.sh",
+          "timeout": 10
+        }
+      ]
+    }
+  ],
   "SessionStart": [
     {
       "matcher": "",

@@ -214,3 +214,133 @@ describe('post-tool-use.sh', () => {
     }
   });
 });
+
+// ─── PreToolUse risk gate ─────────────────────────────────────────────────────
+
+const RISK_GATE_HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-risk-gate.sh');
+
+function runGate(cwd: string, payload: unknown): { stdout: string; exitCode: number } {
+  const result = spawnSync('bash', [RISK_GATE_HOOK], {
+    cwd,
+    input: JSON.stringify(payload),
+    env: { ...process.env, SPRANG_HOOK_ROOT: cwd },
+    encoding: 'utf-8',
+  });
+  return { stdout: result.stdout ?? '', exitCode: result.status ?? 0 };
+}
+
+function graphWith(nodes: unknown[]) {
+  return JSON.stringify({
+    version: '1.0.0',
+    generated_at: new Date().toISOString(),
+    project_root: '/t',
+    project_name: 't',
+    phase: 'complete',
+    nodes,
+    edges: [],
+    layers: [],
+    tours: [],
+    domains: [],
+    stats: {
+      node_count: nodes.length,
+      edge_count: 0,
+      generated_at: new Date().toISOString(),
+      risk_summary: { high: 0, medium: 0, low: 0 },
+      smell_summary: {},
+    },
+  });
+}
+
+describe('pre-tool-risk-gate hook', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'sprang-gate-'));
+    mkdirSync(join(dir, '.sprang'), { recursive: true });
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  const write = (nodes: unknown[]) =>
+    writeFileSync(join(dir, '.sprang', 'knowledge-graph.json'), graphWith(nodes));
+
+  it('warns before editing a file with prior reverts', () => {
+    write([
+      {
+        id: 'file:src/a.ts',
+        type: 'file',
+        label: 'a.ts',
+        location: { file: 'src/a.ts' },
+        risk_score: 0.8,
+        risk_factors: ['previously_reverted'],
+        metadata: {
+          fileCategory: 'source',
+          behavioral: { trap_count: 3, traps: [{ subject: 'feat: caching' }] },
+        },
+      },
+    ]);
+    const { stdout, exitCode } = runGate(dir, { tool_name: 'Edit', tool_input: { file_path: 'src/a.ts' } });
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.hookSpecificOutput.hookEventName).toBe('PreToolUse');
+    expect(out.hookSpecificOutput.additionalContext).toMatch(/3 previous change/);
+    expect(out.hookSpecificOutput.additionalContext).toMatch(/feat: caching/);
+  });
+
+  it('stays silent for an unremarkable file', () => {
+    write([
+      {
+        id: 'file:src/calm.ts',
+        type: 'file',
+        label: 'calm.ts',
+        location: { file: 'src/calm.ts' },
+        risk_score: 0.1,
+        metadata: { fileCategory: 'source' },
+      },
+    ]);
+    expect(runGate(dir, { tool_name: 'Edit', tool_input: { file_path: 'src/calm.ts' } }).stdout.trim()).toBe('');
+  });
+
+  it('does not make behavioural claims about documentation', () => {
+    // A CHANGELOG accumulates the most "traps" in any repo purely because every
+    // fix commit touches it. Warning about it trains the agent to ignore us.
+    write([
+      {
+        id: 'file:CHANGELOG.md',
+        type: 'file',
+        label: 'CHANGELOG.md',
+        location: { file: 'CHANGELOG.md' },
+        risk_score: 0.1,
+        metadata: { fileCategory: 'document', behavioral: { trap_count: 9, bus_factor: 1, main_developer: 'Ann' } },
+      },
+    ]);
+    expect(runGate(dir, { tool_name: 'Edit', tool_input: { file_path: 'CHANGELOG.md' } }).stdout.trim()).toBe('');
+  });
+
+  it('is silent when the file is not in the graph', () => {
+    write([]);
+    expect(runGate(dir, { tool_name: 'Edit', tool_input: { file_path: 'src/unknown.ts' } }).stdout.trim()).toBe('');
+  });
+
+  it('is silent when no graph exists, and never fails the edit', () => {
+    const { stdout, exitCode } = runGate(dir, { tool_name: 'Edit', tool_input: { file_path: 'src/a.ts' } });
+    expect(stdout.trim()).toBe('');
+    expect(exitCode).toBe(0);
+  });
+
+  it('tolerates malformed payloads without blocking', () => {
+    write([]);
+    const result = spawnSync('bash', [RISK_GATE_HOOK], {
+      cwd: dir,
+      input: 'not json at all',
+      env: { ...process.env, SPRANG_HOOK_ROOT: dir },
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout ?? '').toBe('');
+  });
+
+  it('ignores edits outside the project', () => {
+    write([]);
+    expect(runGate(dir, { tool_name: 'Edit', tool_input: { file_path: '/etc/hosts' } }).stdout.trim()).toBe('');
+  });
+});
