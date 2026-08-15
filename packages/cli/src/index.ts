@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { Command } from 'commander';
 import { makeScanCommand } from './commands/scan.js';
 import { makeHealthCommand } from './commands/health.js';
+import { makeEvalCommand } from './commands/eval.js';
 import { makeQueryCommand } from './commands/query.js';
 import { makeWatchCommand } from './commands/watch.js';
 import { makeStatusCommand } from './commands/status.js';
@@ -29,6 +30,7 @@ program
 program.addCommand(makeScanCommand());
 program.addCommand(makeMergeCommand());
 program.addCommand(makeHealthCommand());
+program.addCommand(makeEvalCommand());
 program.addCommand(makeQueryCommand());
 program.addCommand(makeWatchCommand());
 program.addCommand(makeStatusCommand());
