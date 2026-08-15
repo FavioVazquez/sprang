@@ -19,6 +19,7 @@ import { sprangCoupled } from './tools/sprang_coupled.js';
 import { sprangTraps } from './tools/sprang_traps.js';
 import { sprangOwners } from './tools/sprang_owners.js';
 import { sprangReview } from './tools/sprang_review.js';
+import { sprangContext } from './tools/sprang_context.js';
 import { ReadLog } from './receipt.js';
 import { sprangAnnotate } from './tools/sprang_annotate.js';
 import type { SprangAnnotateInput } from './tools/sprang_annotate.js';
@@ -276,6 +277,32 @@ const TOOLS = [
     },
   },
   {
+    name: 'sprang_context',
+    description:
+      'Choose what to read for a task, within a token budget. Merges exact-symbol, keyword, dependency-graph ' +
+      'and change-history channels, reranks by PageRank, and returns ranked items each labelled with the ' +
+      'channels that found it. Call FIRST on an unfamiliar area instead of grepping.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        task: { type: 'string', description: 'What you are trying to do, in your own words.' },
+        budget_tokens: { type: 'number', description: 'Token ceiling. Defaults to 8000.' },
+        seed_files: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Files already open or being edited. Strong relevance prior.',
+        },
+        mentioned_idents: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Specific identifiers named in the task.',
+        },
+        limit: { type: 'number', description: 'Maximum items. Defaults to 40.' },
+      },
+      required: ['task'],
+    },
+  },
+  {
     name: 'sprang_annotate',
     description:
       'Write a team annotation for a node. Creates or overwrites `.sprang/annotations/<node-id>.md` with YAML frontmatter and the provided content.',
@@ -428,6 +455,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
         if (input['depth'] !== undefined) reviewInput.depth = input['depth'] as number;
         result = await sprangReview(loader, reviewInput, sprangRoot);
+        break;
+      }
+
+      case 'sprang_context': {
+        const ctxInput: Parameters<typeof sprangContext>[1] = { task: input['task'] as string };
+        if (input['budget_tokens'] !== undefined) ctxInput.budget_tokens = input['budget_tokens'] as number;
+        if (input['seed_files'] !== undefined) ctxInput.seed_files = input['seed_files'] as string[];
+        if (input['mentioned_idents'] !== undefined) {
+          ctxInput.mentioned_idents = input['mentioned_idents'] as string[];
+        }
+        if (input['limit'] !== undefined) ctxInput.limit = input['limit'] as number;
+        result = await sprangContext(loader, ctxInput);
         break;
       }
 
