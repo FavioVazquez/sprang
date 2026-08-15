@@ -31,6 +31,7 @@ import { sprangOwners } from './tools/sprang_owners.js';
 import { sprangReview } from './tools/sprang_review.js';
 import { sprangContext } from './tools/sprang_context.js';
 import { ReadLog } from './receipt.js';
+import { projectNode, type DetailLevel } from '@sprang/core';
 import { sprangAnnotate } from './tools/sprang_annotate.js';
 import type { SprangAnnotateInput } from './tools/sprang_annotate.js';
 import { sprangRespond } from './tools/sprang_respond.js';
@@ -68,6 +69,70 @@ const loader = new GraphLoader(sprangRoot);
  * forgotten is the one that silently under-reports coverage — which would make
  * `sprang_review` claim gaps that do not exist.
  */
+
+/**
+ * Apply a detail level to whatever a tool returned.
+ *
+ * Done once over the result tree rather than inside each tool, for the same
+ * reason read receipts and truncation are: fourteen tools with fourteen
+ * implementations means the one that gets forgotten silently returns
+ * everything, and the caller has no way to tell which.
+ *
+ * Node-shaped objects are recognised by an `id` matching the graph's id
+ * grammar. Anything else is left exactly as it was — a health summary or a
+ * guidance string is not a node and must not be projected away.
+ *
+ * The argument for doing this at all: models measurably degrade as context
+ * grows even inside their nominal window, so returning less is not merely
+ * cheaper, it improves answers. `summary` is the default in the schema for
+ * that reason, and a caller that wants everything asks for `full`.
+ */
+const NODE_ID = /^(file|function|class|module|concept|config|service|table|endpoint|pipeline|schema|resource):/;
+
+function applyDetail(value: unknown, level: DetailLevel, depth = 0): unknown {
+  if (level === 'full' || depth > 8 || value === null || value === undefined) return value;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => applyDetail(item, level, depth + 1));
+  }
+  if (typeof value !== 'object') return value;
+
+  const record = value as Record<string, unknown>;
+  const id = record['id'];
+  if (typeof id === 'string' && NODE_ID.test(id) && typeof record['type'] === 'string') {
+    return projectNode(record as never, level);
+  }
+
+  // Some tools return rows that reference a node rather than embedding one —
+  // `sprang_context` items and `sprang_diff_impact` entries use `node_id`.
+  // Passing those to projectNode would produce `{id: undefined}`, so they get
+  // an equivalent field policy here. Without this branch `detail` would appear
+  // to be supported on those tools and quietly do nothing, which is worse than
+  // not offering it.
+  const nodeId = record['node_id'];
+  if (typeof nodeId === 'string' && NODE_ID.test(nodeId)) {
+    if (level === 'ids') return { node_id: nodeId };
+    const KEEP_SUMMARY = new Set([
+      'node_id', 'path', 'kind', 'type', 'label', 'score', 'risk_score', 'found_by',
+    ]);
+    const KEEP_SKELETON = new Set([
+      ...KEEP_SUMMARY, 'risk_factors', 'hops_from_seed', 'path_confidence', 'reason', 'hops',
+    ]);
+    const keep = level === 'summary' ? KEEP_SUMMARY : KEEP_SKELETON;
+    const projected: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(record)) {
+      if (keep.has(key)) projected[key] = child;
+    }
+    return projected;
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(record)) {
+    out[key] = applyDetail(child, level, depth + 1);
+  }
+  return out;
+}
+
 function collectNodeIds(value: unknown, out: Set<string>, depth = 0): void {
   if (depth > 8 || value === null || value === undefined) return;
   if (typeof value === 'string') {
@@ -180,6 +245,13 @@ const TOOLS = [
           enum: ['keyword', 'semantic'],
           description: 'Search mode: "keyword" for TF-IDF text match (default), "semantic" for embedding-based similarity search.',
         },
+              detail: {
+          type: 'string',
+          enum: ['ids', 'summary', 'skeleton', 'full'],
+          description:
+            'How much of each node to return. Defaults to full for backward compatibility; ' +
+            'prefer summary or skeleton to keep the context window for reasoning.',
+        },
       },
       required: ['query'],
     },
@@ -196,6 +268,13 @@ const TOOLS = [
         node_id: {
           type: 'string',
           description: 'The unique node identifier (e.g. a file path or function id)',
+        },
+              detail: {
+          type: 'string',
+          enum: ['ids', 'summary', 'skeleton', 'full'],
+          description:
+            'How much of each node to return. Defaults to full for backward compatibility; ' +
+            'prefer summary or skeleton to keep the context window for reasoning.',
         },
       },
       required: ['node_id'],
@@ -215,6 +294,13 @@ const TOOLS = [
           items: { type: 'string' },
           description:
             'List of changed file paths (project-relative), e.g. ["src/auth/login.ts"]',
+        },
+              detail: {
+          type: 'string',
+          enum: ['ids', 'summary', 'skeleton', 'full'],
+          description:
+            'How much of each node to return. Defaults to full for backward compatibility; ' +
+            'prefer summary or skeleton to keep the context window for reasoning.',
         },
       },
       required: ['files'],
@@ -239,6 +325,13 @@ const TOOLS = [
           description:
             'Filter tour steps by audience. junior=all steps, senior/experienced=skip intro, pm=domain/service only, non-technical=entry-points and domains only.',
         },
+              detail: {
+          type: 'string',
+          enum: ['ids', 'summary', 'skeleton', 'full'],
+          description:
+            'How much of each node to return. Defaults to full for backward compatibility; ' +
+            'prefer summary or skeleton to keep the context window for reasoning.',
+        },
       },
       required: [],
     },
@@ -255,6 +348,13 @@ const TOOLS = [
         domain_name: {
           type: 'string',
           description: 'Name or ID of the domain to inspect (case-insensitive). Omit to list all.',
+        },
+              detail: {
+          type: 'string',
+          enum: ['ids', 'summary', 'skeleton', 'full'],
+          description:
+            'How much of each node to return. Defaults to full for backward compatibility; ' +
+            'prefer summary or skeleton to keep the context window for reasoning.',
         },
       },
       required: [],
@@ -284,6 +384,13 @@ const TOOLS = [
         node_id: {
           type: 'string',
           description: 'The node ID to look up the decision context for.',
+        },
+              detail: {
+          type: 'string',
+          enum: ['ids', 'summary', 'skeleton', 'full'],
+          description:
+            'How much of each node to return. Defaults to full for backward compatibility; ' +
+            'prefer summary or skeleton to keep the context window for reasoning.',
         },
       },
       required: ['node_id'],
@@ -363,6 +470,13 @@ const TOOLS = [
           description: 'Files the change touches (paths or file:<path> ids).',
         },
         depth: { type: 'number', description: 'Blast-radius hops to consider. Defaults to 2.' },
+              detail: {
+          type: 'string',
+          enum: ['ids', 'summary', 'skeleton', 'full'],
+          description:
+            'How much of each node to return. Defaults to full for backward compatibility; ' +
+            'prefer summary or skeleton to keep the context window for reasoning.',
+        },
       },
       required: ['changed_files'],
     },
@@ -391,6 +505,13 @@ const TOOLS = [
           description: 'Specific identifiers named in the task.',
         },
         limit: { type: 'number', description: 'Maximum items. Defaults to 40.' },
+              detail: {
+          type: 'string',
+          enum: ['ids', 'summary', 'skeleton', 'full'],
+          description:
+            'How much of each node to return. Defaults to full for backward compatibility; ' +
+            'prefer summary or skeleton to keep the context window for reasoning.',
+        },
       },
       required: ['task'],
     },
@@ -695,6 +816,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ],
           isError: true,
         };
+    }
+
+    // Project to the requested detail level before anything else looks at the
+    // result, so receipts and truncation both see what the client will see.
+    const detail = input['detail'];
+    if (typeof detail === 'string' && detail !== 'full') {
+      result = applyDetail(result, detail as DetailLevel);
     }
 
     // Record what this call exposed, unless the call *is* the audit — counting
