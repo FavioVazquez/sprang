@@ -15,6 +15,10 @@ known failure?**
 
 ### Added
 
+- **Three dashboard views for behavioural data** — hotspot treemap (area = size, colour = complexity × churn), knowledge/bus-factor map, and a temporal-coupling arc diagram that highlights pairs with no dependency edge. All three degrade to an explicit empty state on an older graph, and the coupling view labels itself approximate when measured co-change is unavailable.
+- **`sprang check`** — declare architecture rules in `.sprang/rules.txt` and enforce them in CI. Exits non-zero on an error-severity violation, and reports a rule matching no files as unmatched rather than passing it.
+- **Call-edge confidence** — every `calls` edge records whether it was resolved within a file, matched to a unique import, or guessed among several same-named exports, and blast radius reports the weakest link on each path.
+- **Layer assignment rewritten** — patterns now match path segments rather than whole paths, and layers are derived from directory structure when no convention applies.
 - **`sprang_context`** — token-budgeted context selection across four channels (exact symbol, keyword, dependency proximity, change history), fused by reciprocal rank and reranked by personalized PageRank. Every item reports the channel that found it.
 - **`sprang eval`** — measure retrieval quality against your own repository's bug-fix history, as a five-arm ablation ladder. Exits non-zero if the full pipeline stops beating the keyword baseline, so CI can catch a regression.
 - **Tree-sitter parsing** for 13 languages, merged as a union with the regex parsers so a weak grammar can never lose symbols. 38% more symbols found on this repository.

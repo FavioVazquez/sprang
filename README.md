@@ -998,6 +998,26 @@ The UI is React + Vite with an OKLCH-tinted surface ramp, three themes (dark / l
 
 ---
 
+### Three views for what git knows
+
+Beyond the graph, the dashboard renders what history says about the code.
+
+**Hotspots** — a treemap where area is lines of code and colour is
+complexity × churn. Complexity alone is not a problem; a hairy parser nobody
+edits costs nothing. The intersection is what predicts pain.
+
+**Knowledge map** — the same geometry recoloured by risk of knowledge loss:
+where one person holds a file, where knowledge is spread, where git says
+nothing. Derived from commit concentration over a bounded window — it measures
+where knowledge is concentrated, not anyone's contribution or competence, and
+the legend says so.
+
+**Temporal coupling** — an arc diagram of files that change together, with
+**pairs that have no dependency edge drawn in yellow**. Those are the hidden
+couplings, and they are the reason the view exists. When measured co-change is
+unavailable the view falls back to a weaker heuristic and labels itself as
+approximate rather than quietly showing something worse.
+
 ## Knowledge graphs
 
 `/sprang-knowledge [path]` builds a `kind: "knowledge"` graph from markdown notes — Obsidian vaults, Logseq databases, Dendron workspaces, Foam wikis, Zettelkasten archives, or plain markdown.
