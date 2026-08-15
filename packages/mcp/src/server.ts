@@ -7,13 +7,25 @@ import {
   ListResourceTemplatesRequestSchema,
   ReadResourceRequestSchema,
   CompleteRequestSchema,
+  SubscribeRequestSchema,
+  UnsubscribeRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { join } from 'node:path';
 import {
   complete,
   listResources,
   listResourceTemplates,
   readResource,
 } from './resources.js';
+import {
+  ResourceSubscriptionManager,
+  ProgressReporter,
+  progressTokenOf,
+  elicitAnnotationContent,
+  elicitReviewProceed,
+  highRiskUnreadFiles,
+  type ReviewLike,
+} from './notifications.js';
 import { GraphLoader } from './graph-loader.js';
 import { sprangQuery } from './tools/sprang_query.js';
 import type { SprangQueryInput } from './tools/sprang_query.js';
@@ -173,7 +185,14 @@ const server = new Server(
       // menu without the model deciding anything. `listChanged: true` says the
       // list can change (it does — a `sprang scan` adds the report), so a client
       // knows to re-list rather than caching the first answer forever.
-      resources: { listChanged: true },
+      //
+      // `subscribe: true` is what lets a client ask to be *told* when a resource
+      // it holds has changed, instead of being warned once at session start that
+      // the graph might be stale. See notifications.ts: the subscription
+      // replaces the SessionStart staleness hook rather than duplicating it —
+      // running both leaves a stale text warning in the context window
+      // contradicting a fresh push notification.
+      resources: { subscribe: true, listChanged: true },
       // Declared empty, as the spec requires: presence is the signal that
       // `completion/complete` is supported. Without it clients never probe, and
       // the node-id autocomplete below is dead code.
@@ -531,7 +550,10 @@ const TOOLS = [
         },
         content: {
           type: 'string',
-          description: 'Markdown content for the annotation body.',
+          description:
+            'Markdown content for the annotation body. If omitted and the client supports ' +
+            'elicitation, the user is asked for it — an annotation is knowledge a person has ' +
+            'and the graph does not, so inventing one is worse than asking.',
         },
         tags: {
           type: 'array',
@@ -539,7 +561,10 @@ const TOOLS = [
           description: 'Optional tags for the annotation.',
         },
       },
-      required: ['node_id', 'content'],
+      // `content` is no longer required: omitting it is the signal to elicit.
+      // Clients that always send it are unaffected — relaxing a requirement
+      // cannot break a caller that already satisfies it.
+      required: ['node_id'],
     },
     outputSchema: SPRANG_ANNOTATE_OUTPUT,
     annotations: { title: 'Write a team annotation', ...WRITES_ADDITIVELY },
@@ -664,9 +689,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return listTools();
 });
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
   const { name, arguments: args } = request.params;
   const input = (args ?? {}) as Record<string, unknown>;
+
+  // Progress is opt-in per call: no `_meta.progressToken`, no notifications.
+  // `ProgressReporter` swallows every call when the token is absent, so the
+  // tool bodies below do not need to branch on it.
+  const progress = ProgressReporter.from(progressTokenOf(request.params._meta), (params) =>
+    extra.sendNotification({ method: 'notifications/progress', params })
+  );
+  // Set only by tools that report real phase boundaries; drives the final
+  // "complete" tick after projection and truncation, which are the last work
+  // done on the caller's behalf.
+  let progressTotal: number | undefined;
 
   try {
     let result: unknown;
@@ -732,7 +768,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       }
 
+      // ── The three git-history tools ───────────────────────────────────────
+      // Each is a single blocking walk of `git log` (readRepoHistory) whose
+      // duration is unknown up front — tens of seconds on a repository with a
+      // long history — and which reports nothing while it runs. There is no
+      // honest intermediate number to send, so each sends exactly one
+      // indeterminate "working" ping and nothing more. Inventing a total and
+      // stepping it on a timer would be a progress bar measuring the timer.
       case 'sprang_coupled': {
+        await progress.indeterminate('Reading git history for change coupling…');
         const coupledInput: Parameters<typeof sprangCoupled>[1] = {
           file: input['file'] as string,
         };
@@ -745,6 +789,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'sprang_traps': {
+        await progress.indeterminate('Scanning git history for reverts and hotfixes…');
         const trapsInput: Parameters<typeof sprangTraps>[0] = {};
         if (input['file'] !== undefined) trapsInput.file = input['file'] as string;
         if (input['since_months'] !== undefined) trapsInput.since_months = input['since_months'] as number;
@@ -754,6 +799,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'sprang_owners': {
+        await progress.indeterminate('Reading git history for ownership…');
         const ownersInput: Parameters<typeof sprangOwners>[0] = {
           file: input['file'] as string,
         };
@@ -768,10 +814,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
         if (input['depth'] !== undefined) reviewInput.depth = input['depth'] as number;
         result = await sprangReview(loader, reviewInput, sprangRoot);
+
+        // The one Sprang answer that is a judgement call rather than a fact:
+        // shipping a change whose blast radius includes files at risk ≥ 0.8
+        // that nobody opened. Ask the human — the model is the last party who
+        // should get to wave that through, since it is marking its own
+        // homework. Silent no-op on a client without `elicitation`, so the
+        // result is byte-identical to today's for everyone else.
+        if (result !== null && typeof result === 'object') {
+          const risky = highRiskUnreadFiles(result as ReviewLike);
+          if (risky.length > 0) {
+            const decision = await elicitReviewProceed(server, risky);
+            if (decision !== null) {
+              result = {
+                ...(result as Record<string, unknown>),
+                human_decision: decision,
+                human_decision_files: risky,
+              };
+            }
+          }
+        }
         break;
       }
 
+      // Unlike the git tools, this one has real, observable phase boundaries:
+      // parsing the graph (the dominant cost on a first call — the file can be
+      // tens of megabytes, and it is cached afterwards) is genuinely distinct
+      // from running the retrieval channels, which is genuinely distinct from
+      // projecting and size-checking the result. Each tick below is sent after
+      // the work it names has actually finished.
       case 'sprang_context': {
+        progressTotal = 3;
+        await progress.report(0, 3, 'Loading knowledge graph…');
+        const warm = await loader.getGraph();
+        await progress.report(
+          1,
+          3,
+          warm === null
+            ? 'No knowledge graph found — returning guidance'
+            : `Graph loaded (${warm.nodes?.length ?? 0} nodes) — selecting context`
+        );
         const ctxInput: Parameters<typeof sprangContext>[1] = { task: input['task'] as string };
         if (input['budget_tokens'] !== undefined) ctxInput.budget_tokens = input['budget_tokens'] as number;
         if (input['seed_files'] !== undefined) ctxInput.seed_files = input['seed_files'] as string[];
@@ -795,9 +877,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'sprang_annotate': {
+        // An annotation is prose a *person* writes — that is the entire point
+        // of the annotations directory, which holds the knowledge the graph
+        // cannot derive. Called with no content, ask for it rather than
+        // writing a placeholder. `elicitAnnotationContent` returns null when
+        // the client never declared `elicitation` (or the user declined), and
+        // the original argument is then passed through untouched, so a client
+        // that ignores this feature sees exactly today's behaviour.
+        let content = input['content'] as string;
+        if (typeof content !== 'string' || content.trim() === '') {
+          const elicited = await elicitAnnotationContent(server, input['node_id'] as string);
+          if (elicited !== null) content = elicited;
+        }
         const annotateInput: SprangAnnotateInput = {
           node_id: input['node_id'] as string,
-          content: input['content'] as string,
+          content,
         };
         if (input['tags'] !== undefined) {
           annotateInput.tags = input['tags'] as string[];
@@ -816,6 +910,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ],
           isError: true,
         };
+    }
+
+    if (progressTotal !== undefined) {
+      await progress.report(2, progressTotal, 'Selection complete — projecting result');
     }
 
     // Project to the requested detail level before anything else looks at the
@@ -847,6 +945,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         ? (payload as Record<string, unknown>)
         : { value: payload };
 
+    // Final tick, for phased tools only. Sent last so a client can retire its
+    // indicator on `progress === total` without racing the result.
+    if (progressTotal !== undefined) {
+      await progress.report(progressTotal, progressTotal, 'Complete');
+    }
+
     return {
       content: [
         {
@@ -875,6 +979,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 // See resources.ts for why these exist. All four handlers are total: they never
 // throw and never depend on a graph being present.
 
+/**
+ * Push side of the resource surface.
+ *
+ * Constructed eagerly but inert: no watcher exists until the first
+ * `resources/subscribe`, so a client that never subscribes costs exactly one
+ * object and zero file descriptors — the "unaffected if ignored" contract.
+ */
+const subscriptions = new ResourceSubscriptionManager({
+  graphPath: join(sprangRoot, '.sprang', 'knowledge-graph.json'),
+  reportPath: join(sprangRoot, '.sprang', 'SPRANG_REPORT.md'),
+  notifier: {
+    sendResourceUpdated: (params) => server.sendResourceUpdated(params),
+    sendResourceListChanged: () => server.sendResourceListChanged(),
+  },
+});
+
+export { subscriptions };
+
+server.setRequestHandler(SubscribeRequestSchema, async (request) => {
+  subscriptions.subscribe(request.params.uri);
+  // An empty result is the whole protocol answer here; the value arrives later
+  // as `notifications/resources/updated`.
+  return {};
+});
+
+server.setRequestHandler(UnsubscribeRequestSchema, async (request) => {
+  subscriptions.unsubscribe(request.params.uri);
+  return {};
+});
+
 server.setRequestHandler(ListResourcesRequestSchema, async () => listResources());
 
 server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => listResourceTemplates());
@@ -890,10 +1024,35 @@ server.setRequestHandler(CompleteRequestSchema, async (request) =>
   })
 );
 
+/**
+ * Release the file watcher when the connection ends.
+ *
+ * A stdio server whose client has gone away must exit. An `fs.watch` handle or
+ * a live `setInterval` left behind keeps the event loop alive and leaves an
+ * orphan process the user has to hunt down — so cleanup is hung off every exit
+ * path there is, not just the tidy one.
+ */
+function shutdown(): void {
+  subscriptions.close();
+}
+
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
+  server.onclose = shutdown;
+  process.once('SIGINT', () => {
+    shutdown();
+    process.exit(0);
+  });
+  process.once('SIGTERM', () => {
+    shutdown();
+    process.exit(0);
+  });
+  process.once('exit', shutdown);
   await server.connect(transport);
 }
+
+/** Exported for the in-process smoke test, which connects it to a memory transport. */
+export { server };
 
 // Guarded so the contract test can import TOOLS and the size guard without the
 // process attaching itself to stdio and hanging. Nothing else sets this.
